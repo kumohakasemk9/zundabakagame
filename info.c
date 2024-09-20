@@ -19,7 +19,7 @@ extern uint8_t LangID;
 
 //message strings
 const char* JP_STRINGS[MAX_STRINGS] = {
-	"惑星同士の距離が近すぎます。",
+	"施設同士の距離が近すぎます。",
 	"不正なパラメータです",
 	"戦闘配置!",
 	"迫りくるずんだもんから地球を守ろう!",
@@ -46,26 +46,21 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"Unavailable"
 };
 
-const char* FONT_CANDIDATES[FONT_CANDIDATES_COUNT] = {
-	"Ubuntu Mono",
-	"Inconsolata",
-	"梅ゴシック",
-	"IPAゴシック"
-};
-
 //Item description strings: jp
 const char* ITEMDESC_JP[ITEM_COUNT] = {
 	"入渠: 周囲のユニットを回復する施設を設置します",
 	"要塞: 周囲の敵を迎撃する施設を設置します",
 	"ずんだ畑: 囮ずんだもんをを生成する施設を設置します",
+	"攻撃的なずんだ畑: ミサイルを発射するずんだもんを生成する施設を設置します",
 	"速度改良: 自機の速度を早くします"
 };
 
 //Item description strings: en
 const char* ITEMDESC_EN[ITEM_COUNT] = {
-	"Pit: Places facility that recovers nearby units.",
-	"Fort: Places facility that attacks nearby enemies.",
-	"Decoy: Places facility that makes decoy.",
+	"Pit: Places the facility that recovers nearby units.",
+	"Fort: Places the facility that attacks nearby enemies.",
+	"ZundaFarm: Places the facility that makes decoy zundamons.",
+	"Offensive ZundaFarm: Place the facility that makes zundamons who launches missiles.",
 	"Speed Upgrade: Boost your speed."
 };
 
@@ -74,6 +69,7 @@ const uint8_t ITEMIMGIDS[ITEM_COUNT] = {
 	14, //pit
 	15, //fort
 	23, //decoy
+	26, //offensive zundafarm
 	16  //upgrade
 };
 
@@ -82,6 +78,7 @@ const uint16_t ITEMPRICES[ITEM_COUNT] = {
 	10, //pit
 	20, //fort
 	15, //decoy
+	60, //offensive zundafarm
 	30  //upgrade
 };
 
@@ -90,6 +87,7 @@ const int8_t FTIDS[ITEM_COUNT] = {
 	TID_PIT, //pit
 	TID_FORT, //fort
 	TID_DECOYGEN, //decoy
+	TID_ZUNDAMISSILESHIPGEN, //offensive zundafarm
 	-1 //upgrade item, this is not facility
 };
 
@@ -98,6 +96,7 @@ const uint16_t ITEMCOOLDOWNS[ITEM_COUNT] = {
 	1000, //pit
 	2000, //fort
 	1000, //decoy
+	5000, //offensive zundamon farm
 	4000  //upgrade
 };
 
@@ -118,30 +117,33 @@ const int8_t PLAYABLE_INFORMATION[PLAYABLE_CHARACTERS_COUNT][3] = {
 
 //Image assets
 const char *IMGPATHES[IMAGE_COUNT] = {
-	"earth.png", //0 Earth
-	"zunda_star.png", //1 EnemyBase
-	"zunda.png", //2 Zundamon1
-	"zunda2.png", //3 Zundamon2
-	"zunda3.png", //4 Zundamon3
-	"zunda_bomb.png", //5 ZundamonMine
-	"fixing_star.png", //6 Pit
-	"fort_star.png", //7 Fort
-	"missile.png", //8 Missile
-	"dialog-warning.png", //9 bullet
-	"edamame_bullet.png", //10 enemy bullet
-	"playable-kumo9-x24.png", //11 kumo9-x24-robot (playable) (kumohakase9)
-	"zunda_bomb_big.png", //12 Kamikaze zundamon
-	"emblem-unreadable.png", //13 Item unusable icon
-	"preferences-system.png", //14 pit hotbar icon
-	"face-angry.png", //15 fort hotbar icon
-	"preferences-other.png", //16 upgrade hotbar icon
-	"applications-internet.png", //17 earth icon (status bar)
-	"applications-system.png", //18 Money icon (status bar)
-	"playable-kumo9-x24-pr.png", //19 kumo9-x24 portrait (hotbar)
-	"input-mouse.png", //20 Mouse icon (status bar)
-	"zunda_ally.png",  //21 friend decoy zundamon
-	"zunda_decoy_src.png", //22 friend decoy zundamon factory
-	"mail-mark-important.png" //23 friend decoy zundamon factory (hotbar)
+	"img/earth.png", //0 Earth
+	"img/zunda_star.png", //1 EnemyBase
+	"img/zunda.png", //2 Zundamon1
+	"img/zunda2.png", //3 Zundamon2
+	"img/zunda3.png", //4 Zundamon3
+	"img/zunda_bomb.png", //5 ZundamonMine
+	"img/fixing_star.png", //6 Pit
+	"img/fort_star.png", //7 Fort
+	"img/missile.png", //8 Missile
+	"adwaitalegacy/dialog-warning.png", //9 bullet
+	"img/edamame_bullet.png", //10 enemy bullet
+	"img/kumo9-x24/chara.png", //11 kumo9-x24-robot (playable) (kumohakase9)
+	"img/zunda_bomb_big.png", //12 Kamikaze zundamon
+	"adwaitalegacy/emblem-unreadable.png", //13 Item unusable icon
+	"adwaitalegacy/preferences-system.png", //14 pit hotbar icon
+	"adwaitalegacy/face-angry.png", //15 fort hotbar icon
+	"adwaitalegacy/preferences-other.png", //16 upgrade hotbar icon
+	"adwaitalegacy/applications-internet.png", //17 earth icon (status bar)
+	"adwaitalegacy/applications-system.png", //18 Money icon (status bar)
+	"img/kumo9-x24/portrait.png", //19 kumo9-x24 portrait (hotbar)
+	"adwaitalegacy/input-mouse.png", //20 Mouse icon (status bar)
+	"img/zunda_ally.png",  //21 friend decoy zundamon
+	"img/zunda_decoy_src.png", //22 friend decoy zundamon factory
+	"adwaitalegacy/mail-mark-important.png", //23 friend decoy zundamon factory (hotbar)
+	"img/zunda-atk.png", //24 missile zundamon
+	"img/zunda_missile_src.png", //25 missile zundamon factory
+	"img/zunda_missile_src_ico.png" //26 missile zundamon factory (Icon)
 };
 
 //InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout
@@ -164,7 +166,9 @@ const int16_t NUMINFO[MAX_TID][8] = {
 	{11,  5000,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT,  50,    0}, //15 Kumo9-x24-robot
 	{12,   500, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0}, //16 Kamikaze zundamon
 	{22,  6000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0}, //17 Decoy zundamon generator
-	{21,   400,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT, 100, 6000}  //18 Decoy zundamon
+	{21,   400,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT, 100, 6000}, //18 Decoy zundamon
+	{24,   300,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT, 100, 3000}, //19 Missile Zundamon
+	{25,  3000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0}  //20 Missile zundamon generator
 };
 
 //MaxSpeeds, damage
@@ -187,7 +191,8 @@ const double DBLINFO[MAX_TID] = {
 	1.0, //15
 	0.5, //16
 	0,   //17
-	1.5  //18
+	1.5, //18
+	1.4  //19
 };
 
 const char* getlocalizedstring(uint8_t stringid) {

@@ -19,6 +19,9 @@ fix key/mouse mechanism (squueze it in gametick)
 change moving system
 Make it multiplay - Integrate with kumo auth system
 make uint* to int*
+補助アイテム追加します (途中)
+マップマーク改良します(入渠は三角マークみたいなかんじで差別化)
+Fix gameover/gameclear speed issue
 */
 
 #include "main.h"
@@ -58,7 +61,6 @@ uint16_t SkillCooldownTimers[SKILL_COUNT];
 int8_t CurrentPlayableCharacterID = 0;
 keyflags_t KeyFlags;
 gboolean ProgramExiting = FALSE;
-extern const char *FONT_CANDIDATES[FONT_CANDIDATES_COUNT];
 PangoLayout *Gpangolayout = NULL;
 
 //Paint event of Drawing Area, called for every 30mS
@@ -267,22 +269,6 @@ void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
 	}
 	//draw shapes
 	double d = 0;
-	switch(Gobjs[idx].tid) {
-		case TID_ALLYEXPLOSION:
-			chcolor(0x7000A0FF, TRUE);
-		break;
-		case TID_ENEMYEXPLOSION:
-			chcolor(0x70ffa000, TRUE);
-		break;
-		case TID_EXPLOSION:
-			chcolor(0x70ff0000, TRUE);
-		break;
-		default:
-		break;
-	}
-	if(Gobjs[idx].tid == TID_ALLYEXPLOSION || Gobjs[idx].tid == TID_ENEMYEXPLOSION || Gobjs[idx].tid == TID_EXPLOSION) {
-		d = Gobjs[idx].hitdiameter;
-	}
 	if(DebugMode) {
 		chcolor(0x5000ff00, TRUE);
 		switch(Gobjs[idx].tid) {
@@ -311,6 +297,22 @@ void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
 			break;
 		}
 	}
+	if(Gobjs[idx].tid == TID_ALLYEXPLOSION || Gobjs[idx].tid == TID_ENEMYEXPLOSION || Gobjs[idx].tid == TID_EXPLOSION) {
+		d = Gobjs[idx].hitdiameter;
+	}
+	switch(Gobjs[idx].tid) {
+		case TID_ALLYEXPLOSION:
+			chcolor(0x7000A0FF, TRUE);
+		break;
+		case TID_ENEMYEXPLOSION:
+			chcolor(0x70ffa000, TRUE);
+		break;
+		case TID_EXPLOSION:
+			chcolor(0x70ff0000, TRUE);
+		break;
+		default:
+		break;
+	}
 	if(d != 0) {
 		//Draw circle
 		fillcircle(x, y, d);
@@ -330,7 +332,7 @@ void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
 			chcolor(0xa0ff0000, TRUE);
 			fillcircle(tx, ty, 50);
 		} else {
-			g_print("main.c: draw_game_main(): WARNING: ID%d is laser but it has bad target id!\n", idx);
+			//g_print("main.c: draw_game_main(): WARNING: ID%d is laser but it has bad target id!\n", idx);
 		}
 	}
 }
@@ -409,7 +411,7 @@ void draw_info() {
 	//If debug mode, show camera and cursor pos
 	if(DebugMode) {
 		chcolor(COLOR_TEXTCMD, TRUE);
-		drawstringf(0, WINDOW_HEIGHT - 100 - fh, "(Cheat Mode) Camera=(%d,%d) Cursor=(%d,%d) KeyFlags=0x%x", CameraX, CameraY, CursorX, CursorY, KeyFlags);
+		drawstringf(0, WINDOW_HEIGHT - 120 - fh, "(Cheat Mode) Camera=(%d,%d) Cursor=(%d,%d) KeyFlags=0x%x", CameraX, CameraY, CursorX, CursorY, KeyFlags);
 	}
 	//Show item candidates (Minecraft hotbar style)
 	for(uint8_t i = 0; i < ITEM_COUNT; i++) {
@@ -590,7 +592,7 @@ gboolean gameinit() {
 	PangoLanguage* lang = pango_language_get_default();
 	const char* lang_c = pango_language_to_string(lang);
 	if(strcmp(lang_c, "ja-jp") == 0) {
-		g_print("日本語システムが検出されました、日本語モードに切り替えます\n");
+		g_print("Japanese locale detected. Changing language.\n");
 		LangID = LANGID_JP;
 	} else {
 		g_print("Changed to English mode because of your locale setting: %s\n", lang_c);

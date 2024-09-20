@@ -137,9 +137,17 @@ void procai() {
 				}
 			} else if(Gobjs[Gobjs[i].aiming_target].tid == TID_NULL) {
 				//g_print("gamesys.c: gametick(): zundamon2(%d): stalking object dead: %d\n", i, Gobjs[i].aiming_target);
-				Gobjs[i].aiming_target = -1;
+				Gobjs[i].aiming_target = OBJID_INVALID;
 			}
 			set_speed_for_following(i);
+			break;
+		case TID_ZUNDAMISSILESHIPGEN:
+			//Missile gundamon generator planet
+			//Generate missile zundamon every 20 sec
+			if(Gobjs[i].timer0 == 0) {
+				Gobjs[i].timer0 = 300;
+				add_character(TID_ZUNDAMISSILESHIP, Gobjs[i].x, Gobjs[i].y);
+			}
 			break;
 		case TID_ZUNDAMONMINE:
 		case TID_ZUNDAMON_KAMIKAZE:
@@ -152,7 +160,7 @@ void procai() {
 					Gobjs[i].aiming_target = find_nearest_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT);
 				}
 			} else if(Gobjs[Gobjs[i].aiming_target].tid == TID_NULL) {
-				Gobjs[i].aiming_target = TID_NULL;
+				Gobjs[i].aiming_target = OBJID_INVALID;
 			}
 			set_speed_for_following(i);
 			break;
@@ -164,22 +172,32 @@ void procai() {
 			}
 			break;
 		case TID_ZUNDADECOY:
+		case TID_ZUNDAMISSILESHIP:
 			//Follow random enemy persistently
 			if(!is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
 				//Set new aiming target if aiming target is not valid id
 				Gobjs[i].aiming_target = find_random_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT);
 			} else if(Gobjs[Gobjs[i].aiming_target].tid == TID_NULL) {
 				//if aiming target is dead, request to find new target
-				Gobjs[i].aiming_target = TID_NULL;
+				Gobjs[i].aiming_target = OBJID_INVALID;
 			}
 			set_speed_for_following(i);
 			break;
 		case TID_ENEMYZUNDALASER:
 			//Damage aimed target if they are in range
 			if(is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
-				if(Gobjs[Gobjs[i].aiming_target].tid != TID_NULL) {
+				if(Gobjs[Gobjs[i].aiming_target].tid != TID_NULL && get_distance(i, (uint16_t)Gobjs[i].aiming_target) < ENEMYBASE_RADAR_DIAM / 2) {
+					//If aiming target is valid and in range, attack them
 					damage_object((uint16_t)Gobjs[i].aiming_target, srcinfo.damage, 65535);
+				} else {
+					//When out of range or , request to set new target
+					Gobjs[i].aiming_target = OBJID_INVALID;
+					//g_print("procai(): EnemyZundaLaser(%d): target dead or out of range\n", i);
 				}
+			} else {
+				//If object is aiming invalid object, find new target
+				Gobjs[i].aiming_target = find_nearest_unit(i, ENEMYBASE_RADAR_DIAM, UNITTYPE_FACILITY | UNITTYPE_UNIT);
+				//g_print("procai(): EnemyZundaLaser(%d): finding new object\n", i);
 			}
 			//Check is parent dead
 			if(is_range(Gobjs[i].parentid, 0, MAX_OBJECT_COUNT - 1) && Gobjs[Gobjs[i].parentid].tid == TID_NULL) {
@@ -227,7 +245,7 @@ void procai() {
 					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0 ) {
 						//Enemy incoming (except unkillable thing)
 						if(Gobjs[i].timer0 == 0) {
-							//spawn bullet and aim the enemy
+							//spawn bullet
 							add_character(TID_ALLYBULLET, Gobjs[i].x, Gobjs[i].y);
 							Gobjs[i].timer0 = 10; //give delay
 						}
@@ -304,7 +322,7 @@ void procai() {
 				}
 				break;
 			case TID_KUMO9_X24_ROBOT:
-				//AimMode == AIM_MODE_CLOSE_ENEMY will attack nearby enemy automatically
+				//playable is auto-attack enemy within radar diam
 				if(d < PLAYABLE_AUTOMACHINEGUN_DIAM / 2) {
 					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0 ) {
 						//Enemy incoming
@@ -312,6 +330,19 @@ void procai() {
 							//spawn bullet
 							add_character(TID_ALLYBULLET, Gobjs[i].x, Gobjs[i].y);
 							Gobjs[i].timer0 = 10;
+						}
+					}
+				}
+				break;
+			case TID_ZUNDAMISSILESHIP:
+				//zundamissileship will attack enemy with missile within radar diam
+				if(d < ZUNDAMISSILESHIP_RADAR_DIAM / 2) {
+					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0) {
+						//Enemy incoming
+						if(Gobjs[i].timer0 == 0) {
+							//spawn missile
+							add_character(TID_MISSILE, Gobjs[i].x, Gobjs[i].y);
+							Gobjs[i].timer0 = 100;
 						}
 					}
 				}

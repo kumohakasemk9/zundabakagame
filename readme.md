@@ -1,7 +1,9 @@
 # Zundamon game
 Copyright (C) 2024 Kumohakase    
 Program lisenced by https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0      
-Please consider supporting me through https://ko-fi.com/kumohakase or     https://www.patreon.com/kumohakasemk8     
+Please consider supporting me through 
+kofi: https://ko-fi.com/kumohakase or    
+patreon: https://www.patreon.com/kumohakasemk8     
 Kumohakase won't be responsible for any data loss/error by using this software package.      
    
 # Operation
@@ -90,14 +92,15 @@ by typing `gdb gvsbuild-zundamon.exe` from your cmd.exe after building game.
 - Adwaita Icon Theme https://github.com/GNOME/adwaita-icon-theme
 - gvsbuild https://github.com/wingtk/gvsbuild
 
-image asset named `playable-*.png` is permitted for usage by each OC owners, do not redistribute    
-or use those images outside the game without their permissions    
+only adwaita legacy and programs are licensed by CC,   
+do not redistribute or use out of game without perm    
 
 # にほんご
 
 #ズンダモンゲーム
 Copyright (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0   
-https://ko-fi.com/kumohakase や https://www.patreon.com/kumohakasemk8 を通じて私を   
+https://ko-fi.com/kumohakase (kofi) や     
+https://www.patreon.com/kumohakasemk8 (pateron) を通じて私を   
 サポートすることを検討してください   
 kumohakaseは、このソフトウェアパッケージを使用した場合の   
 データの損失/エラーについて責任を負いません。   
@@ -191,5 +194,5 @@ gdbが入ってPATHが適切にセットされていれば、ゲームをビル�
 - gvsbuild https://github.com/wingtk/gvsbuild
 - duckduckgo翻訳システム https://duckduckgo.com/
 
-playable-*.pngと名付けられた画像は、各OC所有者により使用が許可されており、再配布やゲーム外の
-使用は禁止されています
+プログラムとadwaitalegacy以外はCCライセンスの適用外です。     
+許可なく再頒布やゲーム外使用をしないでください   

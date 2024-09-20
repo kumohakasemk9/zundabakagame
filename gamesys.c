@@ -15,7 +15,7 @@ gamesys.c: game process and related functions
 
 #include "main.h"
 
-extern cairo_t *G;
+
 extern char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE];
 extern uint16_t ChatTimeout;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
@@ -82,7 +82,7 @@ uint16_t add_character(uint8_t tid, double x, double y) {
 		Gobjs[i].hp = (double)t.inithp;
 		Gobjs[i].sx = 0;
 		Gobjs[i].sy = 0;
-		Gobjs[i].aiming_target = -1;
+		Gobjs[i].aiming_target = OBJID_INVALID;
 		Gobjs[i].timer0 = 0;
 		Gobjs[i].timer1 = 0;
 		Gobjs[i].timer2 = 0;
@@ -90,13 +90,9 @@ uint16_t add_character(uint8_t tid, double x, double y) {
 		Gobjs[i].timeout = t.timeout;
 		Gobjs[i].damage = t.damage;
 		//MISSLIE, bullet and laser will try to aim closest enemy unit
-		if(tid == TID_MISSILE || tid == TID_ALLYBULLET || tid == TID_ENEMYBULLET || tid == TID_ENEMYZUNDALASER) {
+		if(tid == TID_MISSILE || tid == TID_ALLYBULLET || tid == TID_ENEMYBULLET) {
 			//Set initial target
-			facility_type_t uf = UNITTYPE_FACILITY | UNITTYPE_BULLET_INTERCEPTABLE | UNITTYPE_UNIT;
-			if(tid == TID_ENEMYZUNDALASER) {
-				uf = UNITTYPE_FACILITY | UNITTYPE_UNIT; //Enemy zundamon laser won't target interceptable bullets
-			}
-			int16_t r = find_nearest_unit(i, DISTANCE_INFINITY, uf);
+			int16_t r = find_nearest_unit(i, DISTANCE_INFINITY, UNITTYPE_FACILITY | UNITTYPE_BULLET_INTERCEPTABLE | UNITTYPE_UNIT);
 			if(r != -1) {
 				Gobjs[i].aiming_target = r;
 				set_speed_for_following(i);
@@ -423,11 +419,11 @@ void use_item() {
 		return;
 	}
 	//Buy facility or use item
-	if(is_range(SelectingItemID, 0, 2) ) {
+	if(is_range(SelectingItemID, 0, 3) ) {
 		if( buy_facility((uint8_t)SelectingItemID) == FALSE) {
 			return; //Could not buy facility
 		}
-	} else if (SelectingItemID == 3) {
+	} else if (SelectingItemID == 4) {
 		if(PlayerSpeed < 4.0) {
 			PlayerSpeed += 0.5;
 		} else {
@@ -442,7 +438,7 @@ void use_item() {
 
 gboolean buy_facility(uint8_t fid) {
 	//Try to buy facility (Key handler)
-	if(!is_range(fid, 0, 2) ) {
+	if(!is_range(fid, 0, 3) ) {
 		die("buy_facility(): bad fid passed.\n");
 		return FALSE;
 	}

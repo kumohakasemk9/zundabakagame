@@ -12,14 +12,14 @@ Zundamon is from https://zunko.jp/
 
 main.h: integrated header file
 */
-#define VERSION_STRING "b1.2-sep102024"
+#define VERSION_STRING "b1.5-sep192024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 
 #define WINDOW_WIDTH 800 //Game width
 #define WINDOW_HEIGHT 600 //Game height
 #define MAP_WIDTH 5000 //map max width
 #define MAP_HEIGHT 5000 //map max height
-#define IMAGE_COUNT 24 //Preload image count
+#define IMAGE_COUNT 27 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define MAX_ZINDEX 3 //Max z-index
 #define COLOR_TEXTBG 0x60ffffff //Text background color (30% opaque white)
@@ -34,9 +34,9 @@ main.h: integrated header file
 #define CHAT_TIMEOUT 1000 //Chat message timeout
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
-#define ITEM_COUNT 4 //Max item id
+#define ITEM_COUNT 5 //Max item id
 #define MAX_STRINGS 12 // Max string count
-#define MAX_TID 19 //max type id
+#define MAX_TID 21 //max type id
 #define SKILL_COUNT 3 //Skill Count
 #define IMGID_ICOUNUSABLE 13 //Unusable icon id
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
@@ -46,12 +46,13 @@ main.h: integrated header file
 #define FORT_RADAR_DIAM 1000 //Fort radar diameter
 #define ZUNDAMON2_RADAR_DIAM 600 //ZUNDAMON2 radar diameter
 #define ZUNDAMON3_RADAR_DIAM 800 //ZUNDAMON3 radar diameter
+#define ZUNDAMISSILESHIP_RADAR_DIAM 700 //ZUNDAMISSILESHIP RADAR DIAM
 #define PLAYABLE_AUTOMACHINEGUN_DIAM 500
-#define FONT_CANDIDATES_COUNT 4 //Font candidates count
 #define DISTANCE_INFINITY 65535 //Infinity finddist value
 #define IHOTBAR_XOFF 5 //Item hotbar X offset
 #define IHOTBAR_YOFF WINDOW_HEIGHT - 100 //Item hotbar Y offset
 #define STATUS_XOFF IHOTBAR_XOFF + (ITEM_COUNT * 50) + 10
+#define OBJID_INVALID -1
 
 #include <gtk/gtk.h>
 #include <math.h>
@@ -94,7 +95,9 @@ typedef enum {
 	TID_KUMO9_X24_ROBOT = 15,
 	TID_ZUNDAMON_KAMIKAZE = 16,
 	TID_DECOYGEN = 17,
-	TID_ZUNDADECOY = 18
+	TID_ZUNDADECOY = 18,
+	TID_ZUNDAMISSILESHIP = 19,
+	TID_ZUNDAMISSILESHIPGEN = 20
 } obj_type_t;
 
 //TEAMID
