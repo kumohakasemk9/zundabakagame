@@ -69,7 +69,6 @@ void procai() {
 				//TID_MISSILE, TID_ENEMYZUNDAMONMINE , TID_ZUNDADECOY will explode when timeout
 				switch(Gobjs[i].tid) {
 				case TID_MISSILE:
-				case TID_ZUNDADECOY:
 					add_character(TID_ALLYEXPLOSION, Gobjs[i].x, Gobjs[i].y); //Explode
 				break;
 				case TID_ZUNDAMONMINE:
@@ -141,14 +140,6 @@ void procai() {
 			}
 			set_speed_for_following(i);
 			break;
-		case TID_ZUNDAMISSILESHIPGEN:
-			//Missile gundamon generator planet
-			//Generate missile zundamon every 20 sec
-			if(Gobjs[i].timer0 == 0) {
-				Gobjs[i].timer0 = 300;
-				add_character(TID_ZUNDAMISSILESHIP, Gobjs[i].x, Gobjs[i].y);
-			}
-			break;
 		case TID_ZUNDAMONMINE:
 		case TID_ZUNDAMON_KAMIKAZE:
 			//Follow enemy persistently
@@ -160,25 +151,6 @@ void procai() {
 					Gobjs[i].aiming_target = find_nearest_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT);
 				}
 			} else if(Gobjs[Gobjs[i].aiming_target].tid == TID_NULL) {
-				Gobjs[i].aiming_target = OBJID_INVALID;
-			}
-			set_speed_for_following(i);
-			break;
-		case TID_DECOYGEN:
-			//Decoy generator will generate zundamondecoy every 20 sec
-			if(Gobjs[i].timer0 == 0) {
-				add_character(TID_ZUNDADECOY, Gobjs[i].x, Gobjs[i].y);
-				Gobjs[i].timer0 = 2000;
-			}
-			break;
-		case TID_ZUNDADECOY:
-		case TID_ZUNDAMISSILESHIP:
-			//Follow random enemy persistently
-			if(!is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
-				//Set new aiming target if aiming target is not valid id
-				Gobjs[i].aiming_target = find_random_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT);
-			} else if(Gobjs[Gobjs[i].aiming_target].tid == TID_NULL) {
-				//if aiming target is dead, request to find new target
 				Gobjs[i].aiming_target = OBJID_INVALID;
 			}
 			set_speed_for_following(i);
@@ -334,19 +306,6 @@ void procai() {
 					}
 				}
 				break;
-			case TID_ZUNDAMISSILESHIP:
-				//zundamissileship will attack enemy with missile within radar diam
-				if(d < ZUNDAMISSILESHIP_RADAR_DIAM / 2) {
-					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0) {
-						//Enemy incoming
-						if(Gobjs[i].timer0 == 0) {
-							//spawn missile
-							add_character(TID_MISSILE, Gobjs[i].x, Gobjs[i].y);
-							Gobjs[i].timer0 = 100;
-						}
-					}
-				}
-			break;
 			default:
 			break;
 			}

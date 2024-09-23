@@ -50,8 +50,6 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 const char* ITEMDESC_JP[ITEM_COUNT] = {
 	"入渠: 周囲のユニットを回復する施設を設置します",
 	"要塞: 周囲の敵を迎撃する施設を設置します",
-	"ずんだ畑: 囮ずんだもんをを生成する施設を設置します",
-	"攻撃的なずんだ畑: ミサイルを発射するずんだもんを生成する施設を設置します",
 	"速度改良: 自機の速度を早くします"
 };
 
@@ -59,8 +57,6 @@ const char* ITEMDESC_JP[ITEM_COUNT] = {
 const char* ITEMDESC_EN[ITEM_COUNT] = {
 	"Pit: Places the facility that recovers nearby units.",
 	"Fort: Places the facility that attacks nearby enemies.",
-	"ZundaFarm: Places the facility that makes decoy zundamons.",
-	"Offensive ZundaFarm: Place the facility that makes zundamons who launches missiles.",
 	"Speed Upgrade: Boost your speed."
 };
 
@@ -68,8 +64,6 @@ const char* ITEMDESC_EN[ITEM_COUNT] = {
 const uint8_t ITEMIMGIDS[ITEM_COUNT] = {
 	14, //pit
 	15, //fort
-	23, //decoy
-	26, //offensive zundafarm
 	16  //upgrade
 };
 
@@ -77,8 +71,6 @@ const uint8_t ITEMIMGIDS[ITEM_COUNT] = {
 const uint16_t ITEMPRICES[ITEM_COUNT] = {
 	10, //pit
 	20, //fort
-	15, //decoy
-	60, //offensive zundafarm
 	30  //upgrade
 };
 
@@ -86,8 +78,6 @@ const uint16_t ITEMPRICES[ITEM_COUNT] = {
 const int8_t FTIDS[ITEM_COUNT] = {
 	TID_PIT, //pit
 	TID_FORT, //fort
-	TID_DECOYGEN, //decoy
-	TID_ZUNDAMISSILESHIPGEN, //offensive zundafarm
 	-1 //upgrade item, this is not facility
 };
 
@@ -95,8 +85,6 @@ const int8_t FTIDS[ITEM_COUNT] = {
 const uint16_t ITEMCOOLDOWNS[ITEM_COUNT] = {
 	1000, //pit
 	2000, //fort
-	1000, //decoy
-	5000, //offensive zundamon farm
 	4000  //upgrade
 };
 
@@ -126,7 +114,7 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"img/fixing_star.png", //6 Pit
 	"img/fort_star.png", //7 Fort
 	"img/missile.png", //8 Missile
-	"adwaitalegacy/dialog-warning.png", //9 bullet
+	"adwaitalegacy/dialog-warning.png", //9 enemy fort map mark
 	"img/edamame_bullet.png", //10 enemy bullet
 	"img/kumo9-x24/chara.png", //11 kumo9-x24-robot (playable) (kumohakase9)
 	"img/zunda_bomb_big.png", //12 Kamikaze zundamon
@@ -138,12 +126,9 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"adwaitalegacy/applications-system.png", //18 Money icon (status bar)
 	"img/kumo9-x24/portrait.png", //19 kumo9-x24 portrait (hotbar)
 	"adwaitalegacy/input-mouse.png", //20 Mouse icon (status bar)
-	"img/zunda_ally.png",  //21 friend decoy zundamon
-	"img/zunda_decoy_src.png", //22 friend decoy zundamon factory
-	"adwaitalegacy/mail-mark-important.png", //23 friend decoy zundamon factory (hotbar)
-	"img/zunda-atk.png", //24 missile zundamon
-	"img/zunda_missile_src.png", //25 missile zundamon factory
-	"img/zunda_missile_src_ico.png" //26 missile zundamon factory (Icon)
+	"adwaitalegacy/preferences-system-16.png", //21 map mark: pit
+	"img/bullet.png", //22 bullet
+	"adwaitalegacy/security-medium.png" //23 Ally fort map icon
 };
 
 //InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout
@@ -160,15 +145,11 @@ const int16_t NUMINFO[MAX_TID][8] = {
 	{-1,     0,  TEAMID_ALLY, 2,  1,               UNITTYPE_BULLET, 100,    0}, //9 AllyExplosion
 	{-1,     0, TEAMID_ENEMY, 2,  1,               UNITTYPE_BULLET, 100,    0}, //10 EnemyExplosion
 	{-1,     0,  TEAMID_NONE, 2,  1,               UNITTYPE_BULLET, 100,    0}, //11 Explosion
-	{ 9,     0,  TEAMID_ALLY, 2, 10,               UNITTYPE_BULLET,  10,  700}, //12 AllyBullet
+	{22,     0,  TEAMID_ALLY, 2, 10,               UNITTYPE_BULLET,  10,  700}, //12 AllyBullet
 	{10,     0, TEAMID_ENEMY, 2, 20,               UNITTYPE_BULLET,  20,  800}, //13 EnemyBullet (Edamame)
 	{-1,     0, TEAMID_ENEMY, 2, 15,               UNITTYPE_BULLET,   0,   50}, //14 Enemy Zunda laser
 	{11,  5000,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT,  50,    0}, //15 Kumo9-x24-robot
 	{12,   500, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0}, //16 Kamikaze zundamon
-	{22,  6000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0}, //17 Decoy zundamon generator
-	{21,   400,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT, 100, 6000}, //18 Decoy zundamon
-	{24,   300,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT, 100, 3000}, //19 Missile Zundamon
-	{25,  3000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0}  //20 Missile zundamon generator
 };
 
 //MaxSpeeds, damage
@@ -189,10 +170,7 @@ const double DBLINFO[MAX_TID] = {
 	5.0, //13
 	0,   //14
 	1.0, //15
-	0.5, //16
-	0,   //17
-	1.5, //18
-	1.4  //19
+	0.5 //16
 };
 
 const char* getlocalizedstring(uint8_t stringid) {

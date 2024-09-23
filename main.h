@@ -12,14 +12,16 @@ Zundamon is from https://zunko.jp/
 
 main.h: integrated header file
 */
-#define VERSION_STRING "b1.5-sep192024"
+
+//Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function updated or added (feature add), 3 will increase if function update (bugfix)
+#define VERSION_STRING "2.1.2-sep192024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 
 #define WINDOW_WIDTH 800 //Game width
 #define WINDOW_HEIGHT 600 //Game height
 #define MAP_WIDTH 5000 //map max width
 #define MAP_HEIGHT 5000 //map max height
-#define IMAGE_COUNT 27 //Preload image count
+#define IMAGE_COUNT 24 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define MAX_ZINDEX 3 //Max z-index
 #define COLOR_TEXTBG 0x60ffffff //Text background color (30% opaque white)
@@ -34,9 +36,9 @@ main.h: integrated header file
 #define CHAT_TIMEOUT 1000 //Chat message timeout
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
-#define ITEM_COUNT 5 //Max item id
+#define ITEM_COUNT 3 //Max item id
 #define MAX_STRINGS 12 // Max string count
-#define MAX_TID 21 //max type id
+#define MAX_TID 17 //max type id
 #define SKILL_COUNT 3 //Skill Count
 #define IMGID_ICOUNUSABLE 13 //Unusable icon id
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
@@ -46,7 +48,6 @@ main.h: integrated header file
 #define FORT_RADAR_DIAM 1000 //Fort radar diameter
 #define ZUNDAMON2_RADAR_DIAM 600 //ZUNDAMON2 radar diameter
 #define ZUNDAMON3_RADAR_DIAM 800 //ZUNDAMON3 radar diameter
-#define ZUNDAMISSILESHIP_RADAR_DIAM 700 //ZUNDAMISSILESHIP RADAR DIAM
 #define PLAYABLE_AUTOMACHINEGUN_DIAM 500
 #define DISTANCE_INFINITY 65535 //Infinity finddist value
 #define IHOTBAR_XOFF 5 //Item hotbar X offset
@@ -93,11 +94,7 @@ typedef enum {
 	TID_ENEMYBULLET = 13,
 	TID_ENEMYZUNDALASER = 14,
 	TID_KUMO9_X24_ROBOT = 15,
-	TID_ZUNDAMON_KAMIKAZE = 16,
-	TID_DECOYGEN = 17,
-	TID_ZUNDADECOY = 18,
-	TID_ZUNDAMISSILESHIP = 19,
-	TID_ZUNDAMISSILESHIPGEN = 20
+	TID_ZUNDAMON_KAMIKAZE = 16
 } obj_type_t;
 
 //TEAMID
@@ -198,6 +195,7 @@ void drawstringf(double, double, const char*, ...);
 void drawsubstring(double, double, char*, uint16_t, uint16_t);
 double drawstring_inwidth(double, double, char*, uint16_t, gboolean);
 void drawimage(double, double, uint8_t);
+void drawimage_scale(double, double, double, double, uint8_t);
 void fillrect(double, double, double, double);
 void hollowrect(double, double, double, double);
 void chcolor(uint32_t, gboolean);

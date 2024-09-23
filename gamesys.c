@@ -43,9 +43,11 @@ extern double PlayerSpeed;
 extern uint16_t ItemCooldownTimers[ITEM_COUNT];
 extern uint16_t ITEMCOOLDOWNS[ITEM_COUNT];
 extern uint16_t SkillCooldownTimers[SKILL_COUNT];
+extern uint16_t SkillEnableTimers[SKILL_COUNT];
 extern int8_t CurrentPlayableCharacterID;
 extern keyflags_t KeyFlags;
 extern gboolean ProgramExiting;
+extern uint8_t SkillStates[SKILL_COUNT];
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -396,6 +398,18 @@ void proc_playable_op() {
 	//Set camera location to display playable character in the center of display.
 	CameraX = (uint16_t)constrain_number(Gobjs[PlayingCharacterID].x - (WINDOW_WIDTH / 2.0), 0, MAP_WIDTH - WINDOW_WIDTH);
 	CameraY = (uint16_t)constrain_number(Gobjs[PlayingCharacterID].y - (WINDOW_HEIGHT / 2.0), 0, MAP_HEIGHT - WINDOW_HEIGHT);
+	//Process skill
+	if(KeyFlags & KEY_F1) {
+		//F1 Key Pressed
+		if(SkillStates[0] == 0) {
+			SkillStates[0] = 1;
+		}
+	} else {
+		//F1 Key Released
+		if(SkillStates[0] == 1) {
+
+		}
+	}
 }
 
 void use_item() {
@@ -411,11 +425,11 @@ void use_item() {
 		return;
 	}
 	//Check for price
-	if(ITEMPRICES[SelectingItemID] > Money) {
+	if(ITEMPRICES[SelectingItemID] > Money && !DebugMode) {
 		return;
 	}
 	//Check for cooldown
-	if(ItemCooldownTimers[SelectingItemID] != 0) {
+	if(ItemCooldownTimers[SelectingItemID] != 0 && !DebugMode) {
 		return;
 	}
 	//Buy facility or use item
@@ -432,8 +446,10 @@ void use_item() {
 		}
 	}
 	//If succeed, decrease money and set up Cooldown timer
-	Money -= ITEMPRICES[SelectingItemID];
-	ItemCooldownTimers[SelectingItemID] = ITEMCOOLDOWNS[SelectingItemID];
+	if(!DebugMode) {
+		Money -= ITEMPRICES[SelectingItemID];
+		ItemCooldownTimers[SelectingItemID] = ITEMCOOLDOWNS[SelectingItemID];
+	}
 }
 
 gboolean buy_facility(uint8_t fid) {
@@ -466,23 +482,19 @@ gboolean buy_facility(uint8_t fid) {
 
 //Select next item candidate
 void select_next_item() {
-	if(GameState == GAMESTATE_PLAYING || GameState == GAMESTATE_DEAD) {
-		if(SelectingItemID < ITEM_COUNT - 1) {
-			SelectingItemID++;
-		} else {
-			SelectingItemID = -1;
-		}
+	if(SelectingItemID < ITEM_COUNT - 1) {
+		SelectingItemID++;
+	} else {
+		SelectingItemID = -1;
 	}
 }
 
 //Select previous item candidate
 void select_prev_item() {
-	if(GameState == GAMESTATE_PLAYING || GameState == GAMESTATE_DEAD) {
-		if(SelectingItemID > -1) {
-			SelectingItemID--;
-		} else {
-			SelectingItemID = ITEM_COUNT - 1;
-		}
+	if(SelectingItemID > -1) {
+		SelectingItemID--;
+	} else {
+		SelectingItemID = ITEM_COUNT - 1;
 	}
 }
 
@@ -496,6 +508,7 @@ void debug_add_character() {
 
 void start_command_mode(gboolean c) {
 	KeyFlags = 0;
+	for(uint8_t i = 0; i < SKILL_COUNT; i++) {SkillStates[i] = 0;}
 	if(c) {
 		strcpy(CommandBuffer, "/");
 		CommandCursor = 1;
@@ -640,6 +653,12 @@ void reset_game() {
 	CharacterMove = FALSE;
 	CameraX = 0;
 	CameraY = 0;
+	//Init Skill state and timer
+	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
+		SkillStates[i] = 0;
+		SkillCooldownTimers[i] = 0;
+		SkillEnableTimers[i] = 0;
+	}
 	//Initialize Cooldown Timer
 	for(uint8_t i = 0; i < ITEM_COUNT; i++) {
 		ItemCooldownTimers[i] = 0;

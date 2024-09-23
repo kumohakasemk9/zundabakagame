@@ -117,11 +117,38 @@ double drawstring_inwidth(double x, double y, char* ctx, uint16_t wid, gboolean 
 //draw image in pos x, y
 void drawimage(double x, double y, uint8_t imgid) {
 	if(!is_range(imgid, 0, IMAGE_COUNT - 1)) {
-		die("gutil.c: drawimage() failed: Bad imgid passed: %d\n", imgid);
+		die("drawimage() failed: Bad imgid passed: %d\n", imgid);
 		return;
 	}
 	cairo_set_source_surface(G, Plimgs[imgid], x, y);
 	cairo_paint(G);
+}
+
+//draw image in pos x, y in specific size w, h (scaled)
+void drawimage_scale(double x, double y, double w, double h, uint8_t imgid) {
+	//Test
+	if(w < 0 || h < 0) {
+		die("drawimage_scale() failed, bad scale passed.\n");
+		return;
+	}
+	if(!is_range(imgid, 0, IMAGE_COUNT - 1) ) {
+		die("drawimage_scale() failed, bad imgid passed.\n");
+		return;
+	}
+	//get original image size
+	double _w, _h;
+	get_image_size(imgid, &_w, &_h);
+	//if specified size is the same as original one, do not apply filter.
+	if(_w == w && _h == h) {
+		drawimage(x, y, imgid);
+		return;
+	}
+	cairo_save(G); //save transform matrix
+	cairo_translate(G, x, y); //move image to specified pos
+	cairo_scale(G, w / _w, h / _h); //calc scale and apply
+	cairo_set_source_surface(G, Plimgs[imgid], 0, 0);
+	cairo_paint(G);
+	cairo_restore(G); //restore transform matrix
 }
 
 //draw filled rectangle

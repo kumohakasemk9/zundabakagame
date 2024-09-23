@@ -19,8 +19,6 @@ fix key/mouse mechanism (squueze it in gametick)
 change moving system
 Make it multiplay - Integrate with kumo auth system
 make uint* to int*
-補助アイテム追加します (途中)
-マップマーク改良します(入渠は三角マークみたいなかんじで差別化)
 Fix gameover/gameclear speed issue
 */
 
@@ -58,10 +56,12 @@ double PlayerSpeed;
 uint16_t ItemCooldownTimers[ITEM_COUNT];
 GtkGesture* MouseGestureCatcher;
 uint16_t SkillCooldownTimers[SKILL_COUNT];
+uint16_t SkillEnableTimers[SKILL_COUNT];
 int8_t CurrentPlayableCharacterID = 0;
 keyflags_t KeyFlags;
 gboolean ProgramExiting = FALSE;
 PangoLayout *Gpangolayout = NULL;
+uint8_t SkillStates[SKILL_COUNT];
 
 //Paint event of Drawing Area, called for every 30mS
 void darea_paint(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data) {
@@ -196,15 +196,30 @@ void draw_game_main() {
 					double ty = y - hh;
 					if(!is_range_number(tx, -w, WINDOW_WIDTH) || !is_range_number(ty, -h, WINDOW_HEIGHT) ) {
 						//object is out of range
-						double px = constrain_number(x, 10, WINDOW_WIDTH - 10);
-						double py = constrain_number(y, 10, WINDOW_HEIGHT - 110);
-						if(t.teamid == TEAMID_ALLY) {
+						double px = constrain_number(x, 2, WINDOW_WIDTH - 18);
+						double py = constrain_number(y, 2, WINDOW_HEIGHT - 110 - 16);
+						int8_t iid = -1;
+						switch(Gobjs[i].tid) {
+						case TID_EARTH: iid = 17;
+						break;
+						case TID_PIT: iid = 21;
+						break;
+						case TID_FORT:
+							iid = 23;
+						break;
+						case TID_ENEMYBASE: iid = 9;
+						break;
+						default:
+						break;
+						}
+						if(iid != -1) { drawimage(px, py, (uint8_t)iid); }
+						/*if(t.teamid == TEAMID_ALLY) {
 							chcolor(COLOR_ALLY, TRUE);
 							fillcircle(px, py, 10);
 						} else {
 							chcolor(COLOR_ENEMY, TRUE);
 							fillrect(px - 5, py - 5, 10, 10);
-						}
+						}*/
 					}
 				}
 			}
@@ -221,7 +236,6 @@ void draw_game_main() {
 }
 
 void draw_game_object(uint16_t idx, LookupResult_t t, double x, double y) {
-	//test
 	if(!is_range(idx, 0, MAX_OBJECT_COUNT - 1)) {
 		die("draw_game_object(): bad idx, how can you do that!?\n");
 		return;
@@ -425,16 +439,13 @@ void draw_info() {
 		}
 		fillrect(tx, IHOTBAR_YOFF, 48, 48);
 		//Show Item Image (hotbar)
-		drawimage(tx, IHOTBAR_YOFF, ITEMIMGIDS[i]);
-		//calculate bottom position of item image
+		drawimage_scale(tx, IHOTBAR_YOFF, 48, 48, ITEMIMGIDS[i]);
+		//calculate position of additional text
 		double ty = IHOTBAR_YOFF + 24; //Center of width
 		//If in cooldown, show cooldowntimer orelse show item value
 		if(ItemCooldownTimers[i] != 0) {
 			chcolor(COLOR_TEXTERROR, TRUE);
 			drawstringf(tx, ty, "%d", ItemCooldownTimers[i]);
-		} else {
-			chcolor(COLOR_TEXTCMD, TRUE);
-			drawstringf(tx, ty, "%d", ITEMPRICES[i]);
 		}
 		//draw unusable icon if unavailable
 		if(ItemCooldownTimers[i] != 0 || Money < ITEMPRICES[i]) {
@@ -452,9 +463,10 @@ void draw_info() {
 	if(CharacterMove) {
 		drawimage(STATUS_XOFF, IHOTBAR_YOFF + 16, 20);
 	}
-	//Show Item desc
+	//Show Item desc and value
 	if(is_range(SelectingItemID, 0, ITEM_COUNT - 1) ) {
 		drawstring_inwidth(IHOTBAR_XOFF, IHOTBAR_YOFF + 52, (char*)getlocalizeditemdesc((uint8_t)SelectingItemID), (uint16_t)(WINDOW_WIDTH / 2), COLOR_TEXTBG);
+		drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 24, "Price: %d", ITEMPRICES[SelectingItemID]);
 	}
 	double hbw = ( SKILL_COUNT * 50) + 100; //hotbar width: skill showing area + portrait area + spaces
 	double txo = WINDOW_WIDTH - hbw - 5; //centering x-off
