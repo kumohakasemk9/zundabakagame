@@ -15,7 +15,7 @@ info.c: game object information and localization info
 
 #include "main.h"
 
-extern uint8_t LangID;
+extern langid_t LangID;
 
 //message strings
 const char* JP_STRINGS[MAX_STRINGS] = {
@@ -48,58 +48,70 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 
 //Item description strings: jp
 const char* ITEMDESC_JP[ITEM_COUNT] = {
-	"入渠: 周囲のユニットを回復する施設を設置します",
-	"要塞: 周囲の敵を迎撃する施設を設置します",
-	"速度改良: 自機の速度を早くします"
+	"入渠: 周囲のユニットを回復します",
+	"要塞: 周囲の敵を迎撃します",
+	"優秀な証券取引所: 10秒あたり2個の部品がもらえます",
+	"Google: 操作可能ユニットの速度を向上したり、地球の回復力を早めます。",
+	"発電所: 電力を供給します。総発電電力は必要電力を上回っている必要があります。"
 };
 
 //Item description strings: en
 const char* ITEMDESC_EN[ITEM_COUNT] = {
-	"Pit: Places the facility that recovers nearby units.",
-	"Fort: Places the facility that attacks nearby enemies.",
-	"Speed Upgrade: Boost your speed."
+	"Pit: Facility that recovers nearby units.",
+	"Fort: Facility that attacks nearby enemies.",
+	"Best stock market: Gives 2 Parts per 10 sec.",
+	"Google: Upgrades your speed and gives the earth self recovery ability.",
+	"PowerPlant: Generates power, generated power must be more than required power."
 };
 
 //Hotbar Item Image ID LUT
-const uint8_t ITEMIMGIDS[ITEM_COUNT] = {
+const int32_t ITEMIMGIDS[ITEM_COUNT] = {
 	14, //pit
 	15, //fort
-	16  //upgrade
+	28, //bank
+	16, //techres
+	30 //powerplant
 };
 
 //Item Values
-const uint16_t ITEMPRICES[ITEM_COUNT] = {
+const int32_t ITEMPRICES[ITEM_COUNT] = {
 	10, //pit
 	20, //fort
-	30  //upgrade
+	50, //bank
+	60, //techres
+	20  //powerplant
 };
 
 //Facility TID vs Item ID
-const int8_t FTIDS[ITEM_COUNT] = {
+const obj_type_t FTIDS[ITEM_COUNT] = {
 	TID_PIT, //pit
 	TID_FORT, //fort
-	-1 //upgrade item, this is not facility
+	TID_MONEY_GENE, //bank
+	TID_RESEARCHMENT_CENTRE, //techres
+	TID_POWERPLANT //powerplant
 };
 
 //Item cooldown defaults
-const uint16_t ITEMCOOLDOWNS[ITEM_COUNT] = {
+const int32_t ITEMCOOLDOWNS[ITEM_COUNT] = {
 	1000, //pit
 	2000, //fort
-	4000  //upgrade
+	4000, //bank
+	4000, //techres
+	2000  //power plant
 };
 
 //Playable character skill cooldowns
-const int16_t SKILLCOOLDOWNS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
-	{1000, 3000, 6000} //kumo9-x24 cooldowns (kumohakasemk9)
+const int32_t SKILLCOOLDOWNS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
+	{6000, 6000, 6000} //kumo9-x24 cooldowns (kumohakasemk9)
 };
 
 //Playable character skill icon ids LUT
-const int8_t SKILLICONIDS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
-	{-1, -1, -1} //kumo9-x24 skill icons (kumohakasemk9)
+const int32_t SKILLICONIDS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
+	{24, 13, 13} //kumo9-x24 skill icons (kumohakasemk9)
 };
 
 //Playable character information (tid, portraitimgid, dead portrait)
-const int8_t PLAYABLE_INFORMATION[PLAYABLE_CHARACTERS_COUNT][3] = {
+const int32_t PLAYABLE_INFORMATION[PLAYABLE_CHARACTERS_COUNT][3] = {
 	{15, 19, 19} //kumo9-x24 (kumohakasemk9)
 };
 
@@ -114,7 +126,7 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"img/fixing_star.png", //6 Pit
 	"img/fort_star.png", //7 Fort
 	"img/missile.png", //8 Missile
-	"adwaitalegacy/dialog-warning.png", //9 enemy fort map mark
+	"img/bullet.png", //9 ally bullet
 	"img/edamame_bullet.png", //10 enemy bullet
 	"img/kumo9-x24/chara.png", //11 kumo9-x24-robot (playable) (kumohakase9)
 	"img/zunda_bomb_big.png", //12 Kamikaze zundamon
@@ -127,29 +139,43 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"img/kumo9-x24/portrait.png", //19 kumo9-x24 portrait (hotbar)
 	"adwaitalegacy/input-mouse.png", //20 Mouse icon (status bar)
 	"adwaitalegacy/preferences-system-16.png", //21 map mark: pit
-	"img/bullet.png", //22 bullet
-	"adwaitalegacy/security-medium.png" //23 Ally fort map icon
+	"adwaitalegacy/image-missing.png", //22 image-missing
+	"adwaitalegacy/preferences-other-16.png", //23 technology star (status)
+	"img/kumo9-x24/missile.png", //24 kumo9-x24 missile
+	"img/kumo9-x24/MCLava.png", //25 kumo9-x24 missile residue
+	"img/money_star.png", //26 money generator facility
+	"img/tech_star.png", //27 researcher facility
+	"img/moneybag.png", //28 money factory (hotbar)
+	"img/power_star.png", //29 power plant
+	"adwaitalegacy/battery-full-charging.png", //30 power plant (hotbar)
+	"adwaitalegacy/battery-full.png", //31 full battery icon
+	"adwaitalegacy/battery-caution.png" //32 Insufficient energy level icon
 };
 
-//InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout
-const int16_t NUMINFO[MAX_TID][8] = {
-	{ 0, 10000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0}, //0 Earth
-	{ 1, 20000, TEAMID_ENEMY, 0,  0,             UNITTYPE_FACILITY, 210,    0}, //1 Zundamon Star
-	{ 2,   100, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0}, //2 Zundamon
-	{ 3,   300, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0}, //3 Spicy Zundamon
-	{ 4,   500, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0}, //4 Mad Zundamon
-	{ 5,    70, TEAMID_ENEMY, 2,  0, UNITTYPE_BULLET_INTERCEPTABLE,  50,  300}, //5 Zundamon space mine
-	{ 6,  5000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0}, //6 Pit
-	{ 7,  7000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0}, //7 Fort
-	{ 8,    20,  TEAMID_ALLY, 2,  0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  300}, //8 Missile
-	{-1,     0,  TEAMID_ALLY, 2,  1,               UNITTYPE_BULLET, 100,    0}, //9 AllyExplosion
-	{-1,     0, TEAMID_ENEMY, 2,  1,               UNITTYPE_BULLET, 100,    0}, //10 EnemyExplosion
-	{-1,     0,  TEAMID_NONE, 2,  1,               UNITTYPE_BULLET, 100,    0}, //11 Explosion
-	{22,     0,  TEAMID_ALLY, 2, 10,               UNITTYPE_BULLET,  10,  700}, //12 AllyBullet
-	{10,     0, TEAMID_ENEMY, 2, 20,               UNITTYPE_BULLET,  20,  800}, //13 EnemyBullet (Edamame)
-	{-1,     0, TEAMID_ENEMY, 2, 15,               UNITTYPE_BULLET,   0,   50}, //14 Enemy Zunda laser
-	{11,  5000,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT,  50,    0}, //15 Kumo9-x24-robot
-	{12,   500, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0}, //16 Kamikaze zundamon
+//InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout, requirepowerlevel
+const int32_t NUMINFO[MAX_TID][9] = {
+	{ 0, 10000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  0}, //0 Earth
+	{ 1, 20000, TEAMID_ENEMY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  0}, //1 Zundamon Star
+	{ 2,   100, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0,  0}, //2 Zundamon
+	{ 3,   300, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0,  0}, //3 Spicy Zundamon
+	{ 4,   500, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0,  0}, //4 Mad Zundamon
+	{ 5,    70, TEAMID_ENEMY, 2,  0, UNITTYPE_BULLET_INTERCEPTABLE,  50,  300,  0}, //5 Zundamon space mine
+	{ 6,  5000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0,  2}, //6 Pit
+	{ 7,  7000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0, 10}, //7 Fort
+	{ 8,    20,  TEAMID_ALLY, 2,  0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  300,  0}, //8 Missile
+	{-1,     0,  TEAMID_ALLY, 2,  1,               UNITTYPE_BULLET, 100,    0,  0}, //9 AllyExplosion
+	{-1,     0, TEAMID_ENEMY, 2,  1,               UNITTYPE_BULLET, 100,    0,  0}, //10 EnemyExplosion
+	{-1,     0,  TEAMID_NONE, 2,  1,               UNITTYPE_BULLET, 100,    0,  0}, //11 Explosion
+	{ 9,     0,  TEAMID_ALLY, 2, 10,               UNITTYPE_BULLET,  10,  700,  0}, //12 AllyBullet
+	{10,     0, TEAMID_ENEMY, 2, 20,               UNITTYPE_BULLET,  20,  800,  0}, //13 EnemyBullet (Edamame)
+	{-1,     0, TEAMID_ENEMY, 2, 15,               UNITTYPE_BULLET,   0,   50,  0}, //14 Enemy Zunda laser
+	{11,  5000,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT,  50,    0,  0}, //15 Kumo9-x24-robot
+	{12,   500, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0,  0}, //16 Kamikaze zundamon
+	{24,    70,  TEAMID_ALLY, 2,  0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  700,  0}, //17 Kumo9 x24 missile
+	{25,     0,  TEAMID_ALLY, 0, 10,               UNITTYPE_BULLET, 100,  500,  0}, //18 kumo9 x24 missile residue
+	{26,  3000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0, 15}, //19 Money generater facility
+	{27,  3000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  4}, //20 researchment facility
+	{29,  5000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  0}  //21 power plant
 };
 
 //MaxSpeeds, damage
@@ -170,7 +196,12 @@ const double DBLINFO[MAX_TID] = {
 	5.0, //13
 	0,   //14
 	1.0, //15
-	0.5 //16
+	0.5, //16
+	2.5, //17
+	0,   //18
+	0,   //19
+	0,   //20
+	0    //21
 };
 
 const char* getlocalizedstring(uint8_t stringid) {
@@ -191,15 +222,16 @@ void lookup(obj_type_t i, LookupResult_t* r) {
 		die("lookup() failed: bad tid: %d", i);
 		return;
 	}
-	r->initimgid = (int8_t)NUMINFO[i][0];
-	r->inithp = (uint16_t)NUMINFO[i][1];
-	r->teamid = (teamid_t)NUMINFO[i][2];
+	r->initimgid = NUMINFO[i][0];
+	r->inithp = NUMINFO[i][1];
+	r->teamid = NUMINFO[i][2];
 	r->maxspeed = DBLINFO[i];
-	r->zindex = (uint8_t)NUMINFO[i][3];
-	r->damage = (uint16_t)NUMINFO[i][4];
+	r->zindex = NUMINFO[i][3];
+	r->damage = NUMINFO[i][4];
 	r->objecttype = (facility_type_t)NUMINFO[i][5];
-	r->inithitdiameter = (uint16_t)NUMINFO[i][6];
-	r->timeout = (uint16_t)NUMINFO[i][7];
+	r->inithitdiameter = NUMINFO[i][6];
+	r->timeout = NUMINFO[i][7];
+	r->requirepower = NUMINFO[i][8];
 }
 
 void check_data() {
@@ -235,6 +267,10 @@ void check_data() {
 		}
 		if(!is_range(NUMINFO[i][7], 0, 65535)) {
 			die("info.c: check_data(): bad timeout value on tid %d\n", i);
+			return;
+		}
+		if(!is_range(NUMINFO[i][8], 0, 255) ) {
+			die("info.c: check_data(): bad reqpwrlevel value on tid %d\n", i);
 			return;
 		}
 		if(!is_range_number(DBLINFO[i], -5, 5)) {

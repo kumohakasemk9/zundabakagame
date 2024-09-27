@@ -16,10 +16,10 @@ TODO List
 add ult
 Make me ahri
 fix key/mouse mechanism (squueze it in gametick)
-change moving system
 Make it multiplay - Integrate with kumo auth system
 make uint* to int*
 Fix gameover/gameclear speed issue
+make electricity
 */
 
 #include "main.h"
@@ -30,38 +30,38 @@ GtkWidget *GameDrawingArea; //Gamescreen drawing area
 cairo_surface_t *Plimgs[IMAGE_COUNT]; //Preloaded images
 GtkApplication *Application; //Application
 GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game Objects
-uint16_t CameraX = 0, CameraY = 0; //Camera Position
+int32_t CameraX = 0, CameraY = 0; //Camera Position
 extern const char* IMGPATHES[];
-int16_t CommandCursor = -1; //Command System Related
+int32_t CommandCursor = -1; //Command System Related
 char CommandBuffer[BUFFER_SIZE];
-uint16_t ChatTimeout = 0; //Remaining time to show chat
+int32_t ChatTimeout = 0; //Remaining time to show chat
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chat message buffer
 GdkClipboard* GClipBoard;
 obj_type_t AddingTID;
-uint16_t CursorX, CursorY; //Current Cursor Pos
+int32_t CursorX, CursorY; //Current Cursor Pos
 gboolean DebugMode = FALSE;
 gamestate_t GameState;
-int16_t PlayingCharacterID = -1; //Current Playable Character ID
-uint16_t EarthID; //Current Earth ID
-uint32_t Money;
+int32_t PlayingCharacterID = -1; //Current Playable Character type ID
+int32_t EarthID; //Current Earth ID
+int32_t Money;
 gboolean CharacterMove; //Character Moving on/off
-int8_t SelectingItemID;
-extern const uint16_t ITEMPRICES[ITEM_COUNT];
-extern const uint8_t ITEMIMGIDS[ITEM_COUNT];
+int32_t SelectingItemID;
+extern const int32_t ITEMPRICES[ITEM_COUNT];
+extern const int32_t ITEMIMGIDS[ITEM_COUNT];
 langid_t LangID = LANGID_JP;
-int8_t RecentErrorId = -1;
-uint16_t ErrorShowTimer = 0;
-uint16_t StateChangeTimer;
-double PlayerSpeed;
-uint16_t ItemCooldownTimers[ITEM_COUNT];
+int32_t RecentErrorId = -1;
+int32_t ErrorShowTimer = 0;
+int32_t StateChangeTimer;
+int32_t ItemCooldownTimers[ITEM_COUNT];
 GtkGesture* MouseGestureCatcher;
-uint16_t SkillCooldownTimers[SKILL_COUNT];
-uint16_t SkillEnableTimers[SKILL_COUNT];
-int8_t CurrentPlayableCharacterID = 0;
+int32_t SkillCooldownTimers[SKILL_COUNT];
+int32_t CurrentPlayableCharacterID = 0; //Current Playable Character ID
 keyflags_t KeyFlags;
 gboolean ProgramExiting = FALSE;
 PangoLayout *Gpangolayout = NULL;
-uint8_t SkillStates[SKILL_COUNT];
+int32_t MapTechnologyLevel = 0;
+int32_t MapEnergyLevel = 0;
+int32_t MapRequiredEnergyLevel = 0;
 
 //Paint event of Drawing Area, called for every 30mS
 void darea_paint(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data) {
@@ -70,7 +70,7 @@ void darea_paint(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpoin
 	cairo_paint(G);
 	//Draw game
 	draw_game_main();
-	draw_cui();
+	draw_ui();
 	draw_info();
 	//Apply screen
 	cairo_set_source_surface(cr, Gsfc, 0, 0);
@@ -196,30 +196,21 @@ void draw_game_main() {
 					double ty = y - hh;
 					if(!is_range_number(tx, -w, WINDOW_WIDTH) || !is_range_number(ty, -h, WINDOW_HEIGHT) ) {
 						//object is out of range
-						double px = constrain_number(x, 2, WINDOW_WIDTH - 18);
-						double py = constrain_number(y, 2, WINDOW_HEIGHT - 110 - 16);
-						int8_t iid = -1;
-						switch(Gobjs[i].tid) {
-						case TID_EARTH: iid = 17;
-						break;
-						case TID_PIT: iid = 21;
-						break;
-						case TID_FORT:
-							iid = 23;
-						break;
-						case TID_ENEMYBASE: iid = 9;
-						break;
-						default:
-						break;
+						double px = constrain_number(x, 0, WINDOW_WIDTH - 16);
+						double py = constrain_number(y, 0, WINDOW_HEIGHT - 116);
+						if(Gobjs[i].tid == TID_PIT) {
+							drawimage(px, py, IMG_PIT_MAP_MARK); //pit icon
+						} else if (Gobjs[i].tid == TID_EARTH) {
+							drawimage(px, py, IMG_EARTH_ICO); //earth icon
+						} else if(t.objecttype == UNITTYPE_FACILITY) {
+							if(t.teamid == TEAMID_ALLY) {
+								chcolor(COLOR_ALLY, TRUE);
+								fillcircle(px + 8, py + 8, 16); //pit icon
+							} else {
+								chcolor(COLOR_ENEMY, TRUE);
+								fillrect(px, py, 16, 16);
+							}
 						}
-						if(iid != -1) { drawimage(px, py, (uint8_t)iid); }
-						/*if(t.teamid == TEAMID_ALLY) {
-							chcolor(COLOR_ALLY, TRUE);
-							fillcircle(px, py, 10);
-						} else {
-							chcolor(COLOR_ENEMY, TRUE);
-							fillrect(px - 5, py - 5, 10, 10);
-						}*/
 					}
 				}
 			}
@@ -284,7 +275,6 @@ void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
 	//draw shapes
 	double d = 0;
 	if(DebugMode) {
-		chcolor(0x5000ff00, TRUE);
 		switch(Gobjs[idx].tid) {
 			case TID_EARTH:
 				d = EARTH_RADAR_DIAM;
@@ -325,6 +315,7 @@ void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
 			chcolor(0x70ff0000, TRUE);
 		break;
 		default:
+			chcolor(0x7000A0FF, TRUE);
 		break;
 	}
 	if(d != 0) {
@@ -351,8 +342,8 @@ void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
 	}
 }
 
-void draw_cui() {
-	//draw ingame cui
+void draw_ui() {
+	//draw ingame ui
 	uint16_t fh = get_font_height();
 	//Show command input window if command mode
 	if(CommandCursor != -1) {
@@ -372,6 +363,8 @@ void draw_cui() {
 		drawsubstring(0, 0, CommandBuffer, sp, 65535);
 		drawline(w, 0, w ,fh + 2, 1);
 	}
+	draw_mchotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
+	draw_lolhotbar(LHOTBAR_XOFF, LHOTBAR_YOFF); //draw lol like hotbar
 }
 
 void draw_info() {
@@ -427,65 +420,53 @@ void draw_info() {
 		chcolor(COLOR_TEXTCMD, TRUE);
 		drawstringf(0, WINDOW_HEIGHT - 120 - fh, "(Cheat Mode) Camera=(%d,%d) Cursor=(%d,%d) KeyFlags=0x%x", CameraX, CameraY, CursorX, CursorY, KeyFlags);
 	}
-	//Show item candidates (Minecraft hotbar style)
-	for(uint8_t i = 0; i < ITEM_COUNT; i++) {
-		double tx = IHOTBAR_XOFF + (i * 50);
-		if(SelectingItemID == i) {
-			//When selected, change color
-			chcolor(COLOR_TEXTCHAT, TRUE);
-		} else {
-			//When unselected
-			chcolor(COLOR_TEXTBG, TRUE);
-		}
-		fillrect(tx, IHOTBAR_YOFF, 48, 48);
-		//Show Item Image (hotbar)
-		drawimage_scale(tx, IHOTBAR_YOFF, 48, 48, ITEMIMGIDS[i]);
-		//calculate position of additional text
-		double ty = IHOTBAR_YOFF + 24; //Center of width
-		//If in cooldown, show cooldowntimer orelse show item value
-		if(ItemCooldownTimers[i] != 0) {
-			chcolor(COLOR_TEXTERROR, TRUE);
-			drawstringf(tx, ty, "%d", ItemCooldownTimers[i]);
-		}
-		//draw unusable icon if unavailable
-		if(ItemCooldownTimers[i] != 0 || Money < ITEMPRICES[i]) {
-			drawimage(tx, IHOTBAR_YOFF, IMGID_ICOUNUSABLE);
-		}
-	}
 	//const double ddd = 10 + (ITEM_COUNT * 50);
 	//Show Money value
 	//Show Money Icon
-	drawimage(STATUS_XOFF, IHOTBAR_YOFF, 18);
+	drawimage(STATUS_XOFF, IHOTBAR_YOFF, IMG_STAT_MONEY_ICO);
 	//Show current Money
 	chcolor(COLOR_TEXTCMD, TRUE);
 	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF, "%d", Money);
-	//Show Mouse Icon if Moving
-	if(CharacterMove) {
-		drawimage(STATUS_XOFF, IHOTBAR_YOFF + 16, 20);
+	//Show MapTechnologyLevel
+	//Show Technology Icon
+	drawimage(STATUS_XOFF, IHOTBAR_YOFF + 16, IMG_STAT_TECH_ICO);
+	//Show current Technology level
+	chcolor(COLOR_TEXTCMD, TRUE);
+	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 16, "%d", MapTechnologyLevel);
+	//Show Energy Level
+	//Show Energy Icon
+	uint8_t tiid = IMG_STAT_ENERGY_GOOD; //battery icon index, if energy level is inefficient, change icon
+	uint32_t ttxtclr = COLOR_TEXTCMD;
+	if(MapRequiredEnergyLevel > MapEnergyLevel) {
+		tiid = IMG_STAT_ENERGY_BAD;
+		ttxtclr = COLOR_TEXTERROR;
 	}
-	//Show Item desc and value
-	if(is_range(SelectingItemID, 0, ITEM_COUNT - 1) ) {
-		drawstring_inwidth(IHOTBAR_XOFF, IHOTBAR_YOFF + 52, (char*)getlocalizeditemdesc((uint8_t)SelectingItemID), (uint16_t)(WINDOW_WIDTH / 2), COLOR_TEXTBG);
-		drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 24, "Price: %d", ITEMPRICES[SelectingItemID]);
-	}
-	double hbw = ( SKILL_COUNT * 50) + 100; //hotbar width: skill showing area + portrait area + spaces
-	double txo = WINDOW_WIDTH - hbw - 5; //centering x-off
+	drawimage(STATUS_XOFF, IHOTBAR_YOFF + 32, tiid);
+	//Show current Energy level
+	chcolor(ttxtclr, TRUE);
+	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 32, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
+}
 
+void draw_lolhotbar(double offsx, double offsy) {
 	//Show LOL like hotbar
 	PlayableInfo_t t;
 	lookup_playable(0, &t);
 	chcolor(COLOR_TEXTBG, TRUE);
-	fillrect(txo, WINDOW_HEIGHT - 100, hbw, 100); //show bg
+	fillrect(offsx, offsy, LHOTBAR_WIDTH, 100); //show bg
 	//show portrait image
-	drawimage(txo + 2, WINDOW_HEIGHT - 98, (uint8_t)t.portraitimgid);
+	drawimage(offsx + 2, offsy + 2, (uint8_t)t.portraitimgid);
+	//Show Mouse Icon if Moving
+	if(CharacterMove) {
+		drawimage(offsx + 2, offsy + 2, 20);
+	}
 	//Show respawn timer if dead
 	if(GameState == GAMESTATE_DEAD) {
 		//gray out portrait
 		chcolor(COLOR_UNUSABLE, TRUE);
-		fillrect(txo + 2, WINDOW_HEIGHT - 98, 96, 96);
+		fillrect(offsx + 2, offsy + 2, 96, 96);
 		//Show respawn timer
 		chcolor(COLOR_TEXTERROR, TRUE);
-		drawstringf(txo + 2, WINDOW_HEIGHT - 98, "%d", StateChangeTimer);
+		drawstringf(offsx + 2, offsy + 2, "%d", StateChangeTimer);
 	}
 	//Draw hp bar
 	double chp = 0;
@@ -496,85 +477,97 @@ void draw_info() {
 		chp = Gobjs[PlayingCharacterID].hp;
 		fhp = t2.inithp;
 	}
-	draw_hpbar(txo + 100, WINDOW_HEIGHT - 45, hbw - 102, 10, chp, fhp, COLOR_ENEMY, COLOR_ALLY);
+	draw_hpbar(offsx + 100, offsy + 53, LHOTBAR_WIDTH - 100, 10, chp, fhp, COLOR_ENEMY, COLOR_ALLY);
 	//Show Earth HP If there's earth
 	if(is_range(EarthID, 0, MAX_OBJECT_COUNT - 1) && Gobjs[EarthID].tid == TID_EARTH) {
 		//Show Earth Icon (Earth HP)
-		drawimage(txo + 100, WINDOW_HEIGHT - 30, 17);
+		drawimage(offsx + 100, offsy + 67, IMG_EARTH_ICO);
 		//Draw Earth HP bar
 		LookupResult_t t;
 		lookup(TID_EARTH, &t);
-		draw_hpbar(txo + 120, WINDOW_HEIGHT - 30, hbw - 122, 10, Gobjs[EarthID].hp, t.inithp, COLOR_ENEMY, COLOR_ALLY);
+		draw_hpbar(offsx + 117, offsy + 67, LHOTBAR_WIDTH - 122, 10, Gobjs[EarthID].hp, t.inithp, COLOR_ENEMY, COLOR_ALLY);
 	}
 	//show skill images and cooldown (if needed)
 	char* L[] = {"Q", "W", "E"};
 	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
-		double tx = txo + 100 + (i * 50);
-		if(t.skillimageids[i] == -1) {
-			chcolor(COLOR_TEXTCHAT, TRUE);
-			fillrect(tx, WINDOW_HEIGHT - 98, 48, 48);
-		} else {
-			drawimage(tx, WINDOW_HEIGHT - 98, (uint8_t)t.skillimageids[i]);
+		double tx = offsx + 102 + (i * 54);
+		if(is_range(t.skillimageids[i], 0, IMAGE_COUNT - 1) ) {
+			drawimage_scale(tx, offsy + 2, 48, 48, (uint8_t)t.skillimageids[i]);
 		}
 		chcolor(COLOR_TEXTCMD, TRUE);
-		drawstring(tx, WINDOW_HEIGHT - 98, L[i]);
+		hollowrect(tx, offsy + 2, 48, 48);
 		//If it is in cooldown, grayout button in LOL way
 		if(SkillCooldownTimers[i] != 0) {
 			//LOL like gray out
 			uint16_t r = (uint16_t)scale_number(SkillCooldownTimers[i], t.skillcooldowns[i], 360);
-			double p[12] = {0, -24};
-			uint8_t np = 1;
+			double p[12] = {0, -24, 24, 0, 0, 48, -48, 0, 0, -48, 24, 0};
+			uint8_t np = 6;
 			if(is_range(r, 0, 45)) {
 				//half of top line of rect (x: 0 - 24)
 				p[2] = scale_number(r, 45, 24); //x line grow left
-				p[3] = 0;
 				np = 2;
 			} else if(is_range(r, 46, 135) ) {
 				//left line of rect (y: -24 - 24)
-				p[2] = 24;
-				p[3] = 0;
-				p[4] = 0;
 				p[5] = scale_number(r - 46, 89, 48); //y line grow down
 				np = 3;
 			} else if(is_range(r, 136, 225) ) {
 				//bottom line of rect (x: 24 - -24)
-				p[2] = 24;
-				p[3] = 0;
-				p[4] = 0;
-				p[5] = 48;
 				p[6] = -scale_number(r - 136, 89, 48); //x line grow right
-				p[7] = 0;
 				np = 4;
 			} else if(is_range(r, 226, 315) ) {
 				//right line of rect (y: 24 - -24)
-				p[2] = 24;
-				p[3] = 0;
-				p[4] = 0;
-				p[5] = 48;
-				p[6] = -48;
-				p[7] = 0;
-				p[8] = 0;
-				p[9] = -scale_number(r - 226, 89, 48);
+				p[9] = -scale_number(r - 226, 89, 48); //y line grow up
 				np = 5;
 			} else {
 				//half of top lineof rect (x -24 - 0)
-				p[2] = 24;
-				p[3] = 0;
-				p[4] = 0;
-				p[5] = 48;
-				p[6] = -48;
-				p[7] = 0;
-				p[8] = 0;
-				p[9] = -48;
-				p[10] = -scale_number(r - 316, 44, 24);
-				p[11] = 0;
+				p[10] = scale_number(r - 316, 44, 24); //x line grows right
 				np = 6;
 			}
 			chcolor(COLOR_TEXTBG, TRUE);
-			draw_polygon(tx + 24, WINDOW_HEIGHT - 66 + 24, np, p);
+			draw_polygon(tx + 24, offsy + 2 + 24, np, p);
+		}
+		if(SkillCooldownTimers[i] == 0) {
+			//Draw QWE Label
+			chcolor(COLOR_TEXTCMD, TRUE);
+			drawstring(tx + 2, offsy + 2 + 24, L[i]);
+		} else {
 			//Draw timer
 			chcolor(COLOR_TEXTERROR, TRUE);
-			drawstringf(tx, WINDOW_HEIGHT - 66 + fh + 2, "%d", SkillCooldownTimers[i]);
+			drawstringf(tx + 2, offsy + 2 + 24, "%d", SkillCooldownTimers[i]);
+		}
+	}
+}
+
+void draw_mchotbar(double offsx, double offsy) {
+	//Show item candidates (Minecraft hotbar style)
+	for(uint8_t i = 0; i < ITEM_COUNT; i++) {
+		double tx = offsx + (i * 50);
+		if(SelectingItemID == i) {
+			//When selected, show description in bottom
+			chcolor(COLOR_TEXTCMD, TRUE);
+			drawstring_inwidth(offsx, offsy + 52, (char*)getlocalizeditemdesc((uint8_t)SelectingItemID), (uint16_t)(WINDOW_WIDTH / 2), COLOR_TEXTBG);
+			//When selected, change color
+			chcolor(COLOR_TEXTCHAT, TRUE);
+		} else {
+			//When unselected
+			chcolor(COLOR_TEXTBG, TRUE);
+		}
+		fillrect(tx, offsy, 48, 48);
+		//Show Item Image (hotbar)
+		drawimage_scale(tx, offsy, 48, 48, (uint8_t)ITEMIMGIDS[i]);
+		//calculate position of additional text
+		double ty = offsy + 24; //Center of width
+		//If in cooldown, show cooldowntimer orelse show item value
+		if(ItemCooldownTimers[i] != 0) {
+			chcolor(COLOR_TEXTERROR, TRUE);
+			drawstringf(tx, ty, "%d", ItemCooldownTimers[i]);
+		} else {
+			chcolor(COLOR_TEXTCMD, TRUE);
+			drawstringf(tx, ty, "%d", ITEMPRICES[i]);
+		}
+		//draw unusable icon if unavailable
+		if(ItemCooldownTimers[i] != 0 || Money < ITEMPRICES[i]) {
+			drawimage(tx, offsy, IMG_ITEM_UNUSABLE);
 		}
 	}
 }

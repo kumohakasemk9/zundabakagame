@@ -14,14 +14,14 @@ main.h: integrated header file
 */
 
 //Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function updated or added (feature add), 3 will increase if function update (bugfix)
-#define VERSION_STRING "2.1.2-sep192024"
+#define VERSION_STRING "4.0.0-sep272024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 
 #define WINDOW_WIDTH 800 //Game width
 #define WINDOW_HEIGHT 600 //Game height
 #define MAP_WIDTH 5000 //map max width
 #define MAP_HEIGHT 5000 //map max height
-#define IMAGE_COUNT 24 //Preload image count
+#define IMAGE_COUNT 33 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define MAX_ZINDEX 3 //Max z-index
 #define COLOR_TEXTBG 0x60ffffff //Text background color (30% opaque white)
@@ -36,11 +36,10 @@ main.h: integrated header file
 #define CHAT_TIMEOUT 1000 //Chat message timeout
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
-#define ITEM_COUNT 3 //Max item id
+#define ITEM_COUNT 5 //Max item id
 #define MAX_STRINGS 12 // Max string count
-#define MAX_TID 17 //max type id
+#define MAX_TID 22 //max type id
 #define SKILL_COUNT 3 //Skill Count
-#define IMGID_ICOUNUSABLE 13 //Unusable icon id
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
 #define EARTH_RADAR_DIAM 500 //Earth radar diameter
 #define ENEMYBASE_RADAR_DIAM 600 //Enemy base radar diameter
@@ -51,9 +50,23 @@ main.h: integrated header file
 #define PLAYABLE_AUTOMACHINEGUN_DIAM 500
 #define DISTANCE_INFINITY 65535 //Infinity finddist value
 #define IHOTBAR_XOFF 5 //Item hotbar X offset
-#define IHOTBAR_YOFF WINDOW_HEIGHT - 100 //Item hotbar Y offset
-#define STATUS_XOFF IHOTBAR_XOFF + (ITEM_COUNT * 50) + 10
+#define IHOTBAR_YOFF (WINDOW_HEIGHT - 100) //Item hotbar Y offset
+#define STATUS_XOFF (IHOTBAR_XOFF + (ITEM_COUNT * 50) + 10)
+#define LHOTBAR_WIDTH ( ( SKILL_COUNT * 54) + 100)
+#define LHOTBAR_XOFF (WINDOW_WIDTH - LHOTBAR_WIDTH) //LOL hotbar X
+#define LHOTBAR_YOFF (WINDOW_HEIGHT - 100) //LOL hotbar Y
 #define OBJID_INVALID -1
+
+//Image ID Definition for special purposes
+#define IMG_ITEM_UNUSABLE 13 //Cross icon, this means item is unusable
+#define IMG_EARTH_ICO 17 //Earth icon, represents the earth or its HP
+#define IMG_STAT_MONEY_ICO 18 //Money Icon
+#define IMG_MOUSE_ICO 20 //Mouse Icon
+#define IMG_PIT_MAP_MARK 21 //pit map mark
+#define IMG_ICO_IMGMISSING 22 //Image Missing icon
+#define IMG_STAT_TECH_ICO 23 //Technology level icon
+#define IMG_STAT_ENERGY_GOOD 31 //Energy icon (good)
+#define IMG_STAT_ENERGY_BAD 32 //Energy icon (insufficient energy)
 
 #include <gtk/gtk.h>
 #include <math.h>
@@ -94,7 +107,12 @@ typedef enum {
 	TID_ENEMYBULLET = 13,
 	TID_ENEMYZUNDALASER = 14,
 	TID_KUMO9_X24_ROBOT = 15,
-	TID_ZUNDAMON_KAMIKAZE = 16
+	TID_ZUNDAMON_KAMIKAZE = 16,
+	TID_KUMO9_X24_MISSILE = 17,
+	TID_KUMO9_X24_MISSILE_RESIDUE = 18,
+	TID_MONEY_GENE = 19,
+	TID_RESEARCHMENT_CENTRE = 20,
+	TID_POWERPLANT = 21
 } obj_type_t;
 
 //TEAMID
@@ -137,6 +155,7 @@ typedef struct {
 	uint16_t timer0; //automatically decreases to 0
 	uint16_t timer1;
 	uint16_t timer2;
+	uint16_t timer3;
 	uint16_t hitdiameter; //when objects are within sum of both hit diameters, hitdetection will trigger
 	int16_t parentid; //source id
 	uint16_t timeout; //lifespan, automatically decreased, dies when 0
@@ -145,25 +164,24 @@ typedef struct {
 
 //constant information of characters
 typedef struct {
-	int8_t initimgid; //initial image id
-	uint16_t damage; //how opponent hp devreases when hit
-	uint16_t inithp; //init hp
+	int32_t initimgid; //initial image id
+	int32_t damage; //how opponent hp devreases when hit
+	int32_t inithp; //init hp
 	teamid_t teamid; //team id
 	double maxspeed; //object maximum follow speed
-	uint8_t zindex; //object z index
-	//gboolean isunkillable; //is object damageable
-	//gboolean showhpbar; //can object has hp bar
+	int32_t zindex; //object z index
 	facility_type_t objecttype; //object type
-	uint16_t inithitdiameter; //initial hit radius
-	uint16_t timeout; //object lifespan
+	int32_t inithitdiameter; //initial hit radius
+	int32_t timeout; //object lifespan
+	int32_t requirepower; //requiredpower
 } LookupResult_t;
 
 //constant information of players
 typedef struct {
-	int8_t *skillimageids;
-	int16_t *skillcooldowns;
-	int8_t portraitimgid;
-	int8_t portraitimg_dead_id;
+	int32_t *skillimageids;
+	int32_t *skillcooldowns;
+	int32_t portraitimgid;
+	int32_t portraitimg_dead_id;
 	obj_type_t associatedtid;
 } PlayableInfo_t;
 
@@ -171,7 +189,7 @@ typedef struct {
 void activate(GtkApplication*, gpointer);
 void darea_paint(GtkDrawingArea*, cairo_t*, int, int, gpointer);
 void draw_game_main();
-void draw_cui();
+void draw_ui();
 void draw_info();
 gboolean keypress_handler(GtkWidget*, guint, guint, GdkModifierType, gpointer);
 void keyrelease_handler(GtkWidget*, guint, guint, GdkModifierType, gpointer);
@@ -183,6 +201,8 @@ void draw_shapes(uint16_t, LookupResult_t, double, double);
 gboolean mousescroll_handler(GtkWidget*, gdouble, gdouble, gpointer);
 void mousepressed_handler(GtkWidget*, gint, gdouble, gdouble, gpointer);
 void draw_hpbar(double, double, double, double, double, double, uint32_t, uint32_t);
+void draw_mchotbar(double, double);
+void draw_lolhotbar(double, double);
 
 //graphics.c
 void drawline(double, double, double, double, double);

@@ -17,37 +17,37 @@ gamesys.c: game process and related functions
 
 
 extern char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE];
-extern uint16_t ChatTimeout;
+extern int32_t ChatTimeout;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
-extern uint16_t CameraX, CameraY;
-extern uint16_t CursorX, CursorY;
+extern int32_t CameraX, CameraY;
+extern int32_t CursorX, CursorY;
 extern obj_type_t AddingTID;
-extern int16_t CommandCursor; //Command System Related
+extern int32_t CommandCursor; //Command System Related
 extern char CommandBuffer[BUFFER_SIZE];
 gboolean CommandBufferMutex = FALSE;
 extern GdkClipboard* GClipBoard;
 extern gboolean DebugMode;
 extern gamestate_t GameState;
-extern uint16_t StateChangeTimer;
-extern int16_t PlayingCharacterID;
-extern uint32_t Money;
-extern uint16_t EarthID;
+extern int32_t StateChangeTimer;
+extern int32_t PlayingCharacterID;
+extern int32_t Money;
+extern int32_t EarthID;
 extern gboolean CharacterMove;
-extern int8_t SelectingItemID;
-extern const uint16_t ITEMPRICES[ITEM_COUNT];
-extern const int8_t FTIDS[ITEM_COUNT];
-extern uint16_t ErrorShowTimer;
-extern int8_t RecentErrorId;
+extern int32_t SelectingItemID;
+extern const int32_t ITEMPRICES[ITEM_COUNT];
+extern const int32_t FTIDS[ITEM_COUNT];
+extern int32_t ErrorShowTimer;
+extern int32_t RecentErrorId;
 extern langid_t LangID;
-extern double PlayerSpeed;
-extern uint16_t ItemCooldownTimers[ITEM_COUNT];
-extern uint16_t ITEMCOOLDOWNS[ITEM_COUNT];
-extern uint16_t SkillCooldownTimers[SKILL_COUNT];
-extern uint16_t SkillEnableTimers[SKILL_COUNT];
-extern int8_t CurrentPlayableCharacterID;
+extern int32_t ItemCooldownTimers[ITEM_COUNT];
+extern int32_t ITEMCOOLDOWNS[ITEM_COUNT];
+extern int32_t SkillCooldownTimers[SKILL_COUNT];
+extern int32_t CurrentPlayableCharacterID;
 extern keyflags_t KeyFlags;
 extern gboolean ProgramExiting;
-extern uint8_t SkillStates[SKILL_COUNT];
+extern int32_t MapTechnologyLevel;
+extern int32_t SKILLCOOLDOWNS[SKILL_COUNT];
+extern int32_t MapEnergyLevel;
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -77,7 +77,7 @@ uint16_t add_character(uint8_t tid, double x, double y) {
 		if(Gobjs[i].tid != TID_NULL) { continue; } //Skip occupied slot
 		LookupResult_t t;
 		lookup(tid, &t);
-		Gobjs[i].imgid = t.initimgid;
+		Gobjs[i].imgid = (int8_t)t.initimgid;
 		Gobjs[i].tid = (int8_t)tid;
 		Gobjs[i].x = x;
 		Gobjs[i].y = y;
@@ -88,8 +88,8 @@ uint16_t add_character(uint8_t tid, double x, double y) {
 		Gobjs[i].timer0 = 0;
 		Gobjs[i].timer1 = 0;
 		Gobjs[i].timer2 = 0;
-		Gobjs[i].hitdiameter = t.inithitdiameter;
-		Gobjs[i].timeout = t.timeout;
+		Gobjs[i].hitdiameter = (uint16_t)t.inithitdiameter;
+		Gobjs[i].timeout = (uint16_t)t.timeout;
 		Gobjs[i].damage = t.damage;
 		//MISSLIE, bullet and laser will try to aim closest enemy unit
 		if(tid == TID_MISSILE || tid == TID_ALLYBULLET || tid == TID_ENEMYBULLET) {
@@ -339,6 +339,11 @@ gboolean gametick(gpointer data) {
 	case GAMESTATE_GAMEOVER:
 		//Init game in 5 sec.
 		StateChangeTimer++;
+		//Pause playable character
+		if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
+			Gobjs[PlayingCharacterID].sx = 0;
+			Gobjs[PlayingCharacterID].sy = 0;
+		}
 		if(StateChangeTimer > 500) {
 			reset_game();
 			return TRUE; //Not doing AI proc after init game, or bug.
@@ -384,13 +389,14 @@ void proc_playable_op() {
 		//If CharacterMove == TRUE, playable character will follow mouse
 		//Set player move speed
 		double cx, cy;
+		double playerspd = 1.0 + (MapTechnologyLevel * 0.5);
 		getlocalcoord((uint16_t)PlayingCharacterID, &cx, &cy);
 		double dx, dy;
 		dx = constrain_number(CursorX, cx - 100, cx + 100) - (cx - 100);
 		dy = constrain_number(CursorY, cy - 100, cy + 100) - (cy - 100);
 		//g_print("%f, %f, %f, %f\n", dx, dy, cx, cy);
-		Gobjs[PlayingCharacterID].sx = scale_number(dx, 200, PlayerSpeed * 2) - PlayerSpeed;
-		Gobjs[PlayingCharacterID].sy = PlayerSpeed - scale_number(dy, 200, PlayerSpeed * 2);
+		Gobjs[PlayingCharacterID].sx = scale_number(dx, 200, playerspd * 2) - playerspd;
+		Gobjs[PlayingCharacterID].sy = playerspd - scale_number(dy, 200, playerspd * 2);
 	} else {
 		Gobjs[PlayingCharacterID].sx = 0;
 		Gobjs[PlayingCharacterID].sy = 0;
@@ -398,16 +404,19 @@ void proc_playable_op() {
 	//Set camera location to display playable character in the center of display.
 	CameraX = (uint16_t)constrain_number(Gobjs[PlayingCharacterID].x - (WINDOW_WIDTH / 2.0), 0, MAP_WIDTH - WINDOW_WIDTH);
 	CameraY = (uint16_t)constrain_number(Gobjs[PlayingCharacterID].y - (WINDOW_HEIGHT / 2.0), 0, MAP_HEIGHT - WINDOW_HEIGHT);
-	//Process skill
-	if(KeyFlags & KEY_F1) {
-		//F1 Key Pressed
-		if(SkillStates[0] == 0) {
-			SkillStates[0] = 1;
-		}
-	} else {
-		//F1 Key Released
-		if(SkillStates[0] == 1) {
-
+	//Process skill keys
+	const keyflags_t SKILLKFLG[SKILL_COUNT] = {KEY_F1, KEY_F2, KEY_F3};
+	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
+		if( (KeyFlags & SKILLKFLG[i]) && SkillCooldownTimers[i] == 0) {
+			SkillCooldownTimers[i] = SKILLCOOLDOWNS[i];
+			switch(i) {
+			case 0: Gobjs[PlayingCharacterID].timer1 = 500;
+				break;
+			case 1: Gobjs[PlayingCharacterID].timer2 = 500;
+				break;
+			case 2: Gobjs[PlayingCharacterID].timer3 = 500;
+				break;
+			}
 		}
 	}
 }
@@ -432,18 +441,9 @@ void use_item() {
 	if(ItemCooldownTimers[SelectingItemID] != 0 && !DebugMode) {
 		return;
 	}
-	//Buy facility or use item
-	if(is_range(SelectingItemID, 0, 3) ) {
-		if( buy_facility((uint8_t)SelectingItemID) == FALSE) {
-			return; //Could not buy facility
-		}
-	} else if (SelectingItemID == 4) {
-		if(PlayerSpeed < 4.0) {
-			PlayerSpeed += 0.5;
-		} else {
-			showerrorstr(10);
-			return;
-		}
+	//Buy facility
+	if( buy_facility((uint8_t)SelectingItemID) == FALSE) {
+		return; //Could not buy facility
 	}
 	//If succeed, decrease money and set up Cooldown timer
 	if(!DebugMode) {
@@ -454,11 +454,7 @@ void use_item() {
 
 gboolean buy_facility(uint8_t fid) {
 	//Try to buy facility (Key handler)
-	if(!is_range(fid, 0, 3) ) {
-		die("buy_facility(): bad fid passed.\n");
-		return FALSE;
-	}
-	int8_t tid = FTIDS[fid];
+	obj_type_t tid = FTIDS[fid];
 	if(tid == TID_NULL) {
 		die("buy_facility(): This tid is not facility!.\n");
 		return FALSE;
@@ -508,7 +504,6 @@ void debug_add_character() {
 
 void start_command_mode(gboolean c) {
 	KeyFlags = 0;
-	for(uint8_t i = 0; i < SKILL_COUNT; i++) {SkillStates[i] = 0;}
 	if(c) {
 		strcpy(CommandBuffer, "/");
 		CommandCursor = 1;
@@ -645,19 +640,18 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 
 void reset_game() {
 	PlayableInfo_t t;
-	lookup_playable(CurrentPlayableCharacterID, &t);
+	lookup_playable((int8_t)CurrentPlayableCharacterID, &t); //TODO: conv error
 	GameState = GAMESTATE_INITROUND;
+	MapTechnologyLevel = 0;
+	MapEnergyLevel = 0;
 	Money = 0;
-	PlayerSpeed = 1.0;
 	SelectingItemID = -1;
 	CharacterMove = FALSE;
 	CameraX = 0;
 	CameraY = 0;
 	//Init Skill state and timer
 	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
-		SkillStates[i] = 0;
 		SkillCooldownTimers[i] = 0;
-		SkillEnableTimers[i] = 0;
 	}
 	//Initialize Cooldown Timer
 	for(uint8_t i = 0; i < ITEM_COUNT; i++) {

@@ -17,14 +17,20 @@ aiproc.c: Character AI
 
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
 extern gamestate_t GameState;
-extern uint16_t Money;
-extern int16_t PlayingCharacterID;
-extern uint16_t StateChangeTimer;
+extern int32_t Money;
+extern int32_t PlayingCharacterID;
+extern int32_t StateChangeTimer;
+extern int32_t MapTechnologyLevel;
+extern int32_t MapEnergyLevel;
+extern int32_t MapRequiredEnergyLevel;
 
 void procai() {
 	//AI proc
-	uint8_t earthcount = 0;
-	uint8_t enemybasecount = 0;
+	uint16_t earthcount = 0;
+	uint16_t enemybasecount = 0;
+	uint16_t tecstar_count = 0;
+	uint16_t powerplant_cnt = 0;
+	int32_t tmpreqpowerlevel = 0;
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		if(Gobjs[i].tid == TID_NULL) {continue;}
 		LookupResult_t srcinfo;
@@ -62,6 +68,7 @@ void procai() {
 		Gobjs[i].timer0 = (uint16_t)constrain_i32(Gobjs[i].timer0 - 1, 0, 65535);
 		Gobjs[i].timer1 = (uint16_t)constrain_i32(Gobjs[i].timer1 - 1, 0, 65535);
 		Gobjs[i].timer2 = (uint16_t)constrain_i32(Gobjs[i].timer2 - 1, 0, 65535);
+		Gobjs[i].timer3 = (uint16_t)constrain_i32(Gobjs[i].timer3 - 1, 0, 65535);
 		//If timeout != 0, decrease it and if it reaches to 0, delete object
 		if(Gobjs[i].timeout != 0) {
 			Gobjs[i].timeout--;
@@ -81,9 +88,13 @@ void procai() {
 				continue;
 			}
 		}
+		//Calculate required Power
+		tmpreqpowerlevel += srcinfo.requirepower;
 		switch(Gobjs[i].tid) {
 		case TID_EARTH:
 			earthcount++;
+			//Apply recovery according to MapTechnologyLevel
+			Gobjs[i].hp = constrain_number(Gobjs[i].hp + MapTechnologyLevel, 0, srcinfo.inithp);
 			break;
 		case TID_ENEMYBASE:
 			enemybasecount++;
@@ -142,6 +153,7 @@ void procai() {
 			break;
 		case TID_ZUNDAMONMINE:
 		case TID_ZUNDAMON_KAMIKAZE:
+		case TID_KUMO9_X24_MISSILE:
 			//Follow enemy persistently
 			if(!is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
 				//if aiming_target is not set, find new object to aim
@@ -149,6 +161,8 @@ void procai() {
 					Gobjs[i].aiming_target = find_nearest_unit(i, 1500, UNITTYPE_BULLET_INTERCEPTABLE | UNITTYPE_UNIT | UNITTYPE_FACILITY);
 				} else if(Gobjs[i].tid == TID_ZUNDAMON_KAMIKAZE) {
 					Gobjs[i].aiming_target = find_nearest_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT);
+				} else if (Gobjs[i].tid == TID_KUMO9_X24_MISSILE) {
+					Gobjs[i].aiming_target = find_random_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT | UNITTYPE_FACILITY);
 				}
 			} else if(Gobjs[Gobjs[i].aiming_target].tid == TID_NULL) {
 				Gobjs[i].aiming_target = OBJID_INVALID;
@@ -187,6 +201,27 @@ void procai() {
 				Gobjs[i].tid = TID_NULL;
 				continue;
 			}
+			break;
+		case TID_KUMO9_X24_ROBOT:
+			if(Gobjs[i].timer1 != 0) {
+				//If timer0 is not 0, generate missile every 50mS
+				if(Gobjs[i].timer1 % 50 == 0) {
+					add_character(TID_KUMO9_X24_MISSILE, Gobjs[i].x, Gobjs[i].y);
+				}
+			}
+			break;
+		case TID_RESEARCHMENT_CENTRE:
+			if(MapRequiredEnergyLevel < MapEnergyLevel) {tecstar_count++;} //Count number of researchment centre
+			break;
+		case TID_MONEY_GENE:
+			//Money gene will give 2 parts per 10 sec
+			if(Gobjs[i].timer0 == 0 && MapRequiredEnergyLevel < MapEnergyLevel) {
+				Gobjs[i].timer0 = 1000;
+				Money += 2;
+			}
+			break;
+		case TID_POWERPLANT:
+			powerplant_cnt++;
 			break;
 		default:
 			break;
@@ -229,7 +264,7 @@ void procai() {
 				}
 				break;
 			case TID_FORT:
-				if(d < (FORT_RADAR_DIAM / 2) ) {
+				if(d < (FORT_RADAR_DIAM / 2) && MapRequiredEnergyLevel < MapEnergyLevel) {
 					//Fort radar
 					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0 ) {
 						//Enemy incoming
@@ -247,7 +282,7 @@ void procai() {
 				}
 				break;
 			case TID_PIT:
-				if(d < (PIT_RADAR_DIAM / 2) ) {
+				if(d < (PIT_RADAR_DIAM / 2) && MapRequiredEnergyLevel < MapEnergyLevel) {
 					//Pit radar
 					if(dstinfo.teamid == TEAMID_ALLY && (dstinfo.objecttype & UNITTYPE_UNIT) ) {
 						//Recover Ally
@@ -290,12 +325,18 @@ void procai() {
 							Gobjs[i].timer1 = 500;
 							//g_print("gametick(): ENEMYBASE(%d): spawn laser.\n", i);
 						}
+						//Spawn bullet
+						if(Gobjs[i].timer2 == 0) {
+							add_character(TID_ENEMYBULLET, Gobjs[i].x, Gobjs[i].y);
+							Gobjs[i].timer2 = 10;
+						}
 					}
 				}
 				break;
 			case TID_KUMO9_X24_ROBOT:
 				//playable is auto-attack enemy within radar diam
-				if(d < PLAYABLE_AUTOMACHINEGUN_DIAM / 2) {
+				double m = 1.0 + (MapTechnologyLevel * 100);
+				if(d < (PLAYABLE_AUTOMACHINEGUN_DIAM + m) / 2) {
 					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0 ) {
 						//Enemy incoming
 						if(Gobjs[i].timer0 == 0) {
@@ -311,6 +352,11 @@ void procai() {
 			}
 		}
 	}
+	//Determine map technology level
+	MapTechnologyLevel = (uint8_t)constrain_ui32(tecstar_count, 0, 5);
+	//Determine Power Level
+	MapEnergyLevel = powerplant_cnt * 50;
+	MapRequiredEnergyLevel = tmpreqpowerlevel;
 	//Determine if gameclear or gameover
 	if(GameState == GAMESTATE_PLAYING || GameState == GAMESTATE_DEAD) {
 		//g_print("damage_object(): Game object Earth=%d Enemy=%d\n", earthcount, enemycount);
@@ -333,7 +379,7 @@ gboolean procobjhit(uint16_t src, uint16_t dst, LookupResult_t srcinfo, LookupRe
 	}
 	if(dstinfo.inithp != 0 && srcinfo.teamid != dstinfo.teamid) {
 		//Damage if different team id and target initial hp is not 0
-		if(Gobjs[src].tid == TID_MISSILE || Gobjs[src].tid == TID_ZUNDAMONMINE || Gobjs[src].tid == TID_ZUNDAMON_KAMIKAZE) {
+		if(Gobjs[src].tid == TID_MISSILE || Gobjs[src].tid == TID_ZUNDAMONMINE || Gobjs[src].tid == TID_ZUNDAMON_KAMIKAZE || Gobjs[src].tid == TID_KUMO9_X24_MISSILE) {
 			//Explode missile if hit to enemy object (unit and facility)
 			if(dstinfo.objecttype == UNITTYPE_FACILITY || dstinfo.objecttype == UNITTYPE_UNIT) {
 				if(Gobjs[src].tid == TID_MISSILE) {
@@ -344,6 +390,9 @@ gboolean procobjhit(uint16_t src, uint16_t dst, LookupResult_t srcinfo, LookupRe
 					uint16_t r = add_character(TID_ENEMYEXPLOSION, Gobjs[src].x, Gobjs[src].y);
 					Gobjs[r].hitdiameter = 500;
 					Gobjs[r].damage = 2.5;
+				} else if(Gobjs[src].tid == TID_KUMO9_X24_MISSILE) {
+					//Kumo9 x24 missile will put lava and destroy self
+					add_character(TID_KUMO9_X24_MISSILE_RESIDUE, Gobjs[src].x, Gobjs[src].y);
 				}
 				return FALSE; //kill source object
 				//g_print("procobjhit(): Missile %d exploded: hit with %d\n", src, dst);
@@ -352,7 +401,7 @@ gboolean procobjhit(uint16_t src, uint16_t dst, LookupResult_t srcinfo, LookupRe
 			//Except missile and object has dealing damage
 			damage_object(dst, Gobjs[src].damage, 65535);
 			//preserve explosion or laser
-			if(Gobjs[src].tid == TID_ENEMYZUNDALASER || Gobjs[src].tid == TID_ALLYEXPLOSION || Gobjs[src].tid == TID_ENEMYEXPLOSION || Gobjs[src].tid == TID_EXPLOSION) {
+			if(Gobjs[src].tid == TID_ENEMYZUNDALASER || Gobjs[src].tid == TID_ALLYEXPLOSION || Gobjs[src].tid == TID_ENEMYEXPLOSION || Gobjs[src].tid == TID_EXPLOSION || Gobjs[src].tid == TID_KUMO9_X24_MISSILE_RESIDUE) {
 				return TRUE;
 			}
 			return FALSE; //kill this source object if not laser nor explosion
@@ -366,7 +415,7 @@ void damage_object(uint16_t i, double damage, uint16_t hpmax) {
 		die("damage_object(): Bad parameter!\n");
 		return;
 	}
-	Gobjs[i].hp = constrain_number(Gobjs[i].hp - damage, 0, hpmax);
+	Gobjs[i].hp = constrain_number(Gobjs[i].hp - damage , 0, hpmax);
 	if(Gobjs[i].hp == 0) {
 		//Object Dead
 		//g_print("damage_object(): Object %d is dead.\n", i);
@@ -382,7 +431,7 @@ void damage_object(uint16_t i, double damage, uint16_t hpmax) {
 			Money += 13;
 			break;
 		case TID_ENEMYBASE:
-			Money += 100;
+			Money += 50;
 			break;
 		default:
 			break;
