@@ -55,11 +55,11 @@ int32_t constrain_i32(int32_t v, int32_t mi, int32_t mx) {
 } 
 
 //Get utf8 substring of src from index st to ed, store into dst (length dstlen restricted)
-void utf8_substring(char* src, uint16_t st, uint16_t ed, char *dst, uint16_t dstlen) {
+void utf8_substring(char* src, int32_t st, int32_t ed, char *dst, int32_t dstlen) {
 	char* s;
 	char* e;
 	uint32_t subl;
-	ed = (uint16_t)constrain_ui32(ed, 0, (uint32_t)g_utf8_strlen(src, 65535)); //Restrict ed not to be greater than src letter count
+	ed = constrain_i32(ed, 0, g_utf8_strlen(src, 65535) ); //Restrict ed not to be greater than src letter count
 	if(st > ed || dstlen < 2) {
 		die("utf8_substring() failed. Parameters error: st=%d, ed=%d, dstlen=%d\n", st, ed, dstlen);
 		return;
@@ -76,10 +76,10 @@ void utf8_substring(char* src, uint16_t st, uint16_t ed, char *dst, uint16_t dst
 }
 
 //insert string src at index pos to dst, returns FALSE if insufficient src space. (length dstlen restricted)
-gboolean utf8_insertstring(char *dst, char *src, uint16_t pos, uint16_t dstlen) {
+gboolean utf8_insertstring(char *dst, char *src, int32_t pos, int32_t dstlen) {
 	uint16_t l = (uint16_t)strlen(src);
 	//Restrict pos 
-	pos = (uint16_t)constrain_ui32(pos, 0, (uint32_t)g_utf8_strlen(dst, 65535));
+	pos = constrain_i32(pos, 0, g_utf8_strlen(dst, 65535) );
 	//Check if processed string is shorter than dstlen bytes
 	if(strlen(dst) + l + 1 > dstlen) {
 		return FALSE;
@@ -118,7 +118,7 @@ void die(const char *p, ...) {
 }
 
 //Get how string ctx occupy width if drawn in current font
-uint16_t get_string_width(char* ctx) {
+int32_t get_string_width(char* ctx) {
 	int w;
 	pango_layout_set_text(Gpangolayout, ctx, -1);
 	pango_layout_get_pixel_size(Gpangolayout, &w, NULL);
@@ -126,14 +126,14 @@ uint16_t get_string_width(char* ctx) {
 }
 
 //get_string_width but substring version (from index st to ed)
-uint16_t get_substring_width(char* ctx, uint16_t st, uint16_t ed) {
+int32_t get_substring_width(char* ctx, int32_t st, int32_t ed) {
 	char b[BUFFER_SIZE];
-	utf8_substring(ctx, st, ed, b, sizeof(b));
+	utf8_substring(ctx, st, ed, b, sizeof(b) );
 	return get_string_width(b);
 }
 
 //Get maximum letter height of current selected font.
-uint16_t get_font_height() {
+int32_t get_font_height() {
 	int h;
 	pango_layout_set_text(Gpangolayout, "abcdefghijklmnopqrstuvwxyz", -1);
 	pango_layout_get_pixel_size(Gpangolayout, NULL, &h);
@@ -141,15 +141,15 @@ uint16_t get_font_height() {
 }
 
 //shorten string to fit in width wid, returns shorten string length, stores actual width to widr if not NULL
-uint16_t shrink_string(char *ctx, uint16_t wid, uint16_t* widr) {
-	uint16_t l = (uint16_t)g_utf8_strlen(ctx, 65535);
+int32_t shrink_string(char *ctx, int32_t wid, int32_t* widr) {
+	int32_t l = g_utf8_strlen(ctx, 65535);
 	return shrink_substring(ctx, wid, 0, l, widr);
 }
 
 //substring version of shrink_string()
-uint16_t shrink_substring(char *ctx, uint16_t wid, uint16_t st, uint16_t ed, uint16_t* widr) {
-	uint16_t l = (uint16_t)constrain_ui32(ed, 0, (uint16_t)g_utf8_strlen(ctx, 65535) );
-	uint16_t w = wid + 10;
+int32_t shrink_substring(char *ctx, int32_t wid, int32_t st, int32_t ed, int32_t* widr) {
+	int32_t l = constrain_i32(ed, 0, g_utf8_strlen(ctx, 65535) );
+	int32_t w = wid + 10;
 	//Delete one letter from ctx in each loops, continue until string width fits in wid
 	while(l > 0) {
 		w = get_substring_width(ctx, st, l);
@@ -182,7 +182,7 @@ int32_t randint(int32_t mi, int32_t ma) {
 }
 
 //get image size of imgid
-void get_image_size(uint8_t imgid, double *w, double *h) {
+void get_image_size(int32_t imgid, double *w, double *h) {
 	if(!is_range(imgid, 0, IMAGE_COUNT - 1)) {
 		die("gutil.c: get_image_size() failed: Bad imgid passed: %d\n", imgid);
 		return;

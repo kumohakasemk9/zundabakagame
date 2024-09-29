@@ -19,7 +19,7 @@ fix key/mouse mechanism (squueze it in gametick)
 Make it multiplay - Integrate with kumo auth system
 make uint* to int*
 Fix gameover/gameclear speed issue
-make electricity
+Fix laser system
 */
 
 #include "main.h"
@@ -176,7 +176,7 @@ void draw_game_main() {
 		for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 			if(Gobjs[i].tid == TID_NULL) {continue;} //Skip if slot is not used.
 			LookupResult_t t;
-			lookup((uint8_t)Gobjs[i].tid, &t);
+			lookup(Gobjs[i].tid, &t);
 			double x, y;
 			getlocalcoord(i, &x, &y);
 			if(z == 2) {
@@ -197,7 +197,7 @@ void draw_game_main() {
 					if(!is_range_number(tx, -w, WINDOW_WIDTH) || !is_range_number(ty, -h, WINDOW_HEIGHT) ) {
 						//object is out of range
 						double px = constrain_number(x, 0, WINDOW_WIDTH - 16);
-						double py = constrain_number(y, 0, WINDOW_HEIGHT - 116);
+						double py = constrain_number(y, 0, WINDOW_HEIGHT - 114);
 						if(Gobjs[i].tid == TID_PIT) {
 							drawimage(px, py, IMG_PIT_MAP_MARK); //pit icon
 						} else if (Gobjs[i].tid == TID_EARTH) {
@@ -226,7 +226,7 @@ void draw_game_main() {
 	}
 }
 
-void draw_game_object(uint16_t idx, LookupResult_t t, double x, double y) {
+void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 	if(!is_range(idx, 0, MAX_OBJECT_COUNT - 1)) {
 		die("draw_game_object(): bad idx, how can you do that!?\n");
 		return;
@@ -237,10 +237,10 @@ void draw_game_object(uint16_t idx, LookupResult_t t, double x, double y) {
 	}
 	double w;
 	double h;
-	get_image_size((uint8_t)Gobjs[idx].imgid, &w, &h);
+	get_image_size(Gobjs[idx].imgid, &w, &h);
 	x = x - (w / 2.0);
 	y = y - (h / 2.0);
-	drawimage(x, y, (uint8_t)Gobjs[idx].imgid);
+	drawimage(x, y, Gobjs[idx].imgid);
 	if(DebugMode) {
 		chcolor(0xffffffff, TRUE);
 		hollowrect(x, y, w, h);
@@ -255,7 +255,26 @@ void draw_game_object(uint16_t idx, LookupResult_t t, double x, double y) {
 		if(t.teamid == TEAMID_ALLY) {
 			cc = COLOR_ALLY;
 		}
-		draw_hpbar(x, y - 7, w, 2, Gobjs[idx].hp, t.inithp, COLOR_TEXTCHAT, cc);
+		draw_hpbar(x, y - 7, w, 5, Gobjs[idx].hp, t.inithp, COLOR_TEXTCHAT, cc);
+	}
+	//draw timer bars
+	double bary = y + h + 2; //initial timer bar pos x
+	//Draw timer bar if timerNfill is not 0 and timerN is not 0
+	if(Gobjs[idx].timer0 != 0 && Gobjs[idx].timer0fill != 0) {
+		draw_hpbar(x, bary, w, 5, Gobjs[idx].timer0, Gobjs[idx].timer0fill, COLOR_ENEMY, COLOR_TEXTCHAT);
+		bary += 7;
+	}
+	if(Gobjs[idx].timer1 != 0 && Gobjs[idx].timer1fill != 0) {
+		draw_hpbar(x, bary, w, 5, Gobjs[idx].timer1, Gobjs[idx].timer1fill, COLOR_ENEMY, COLOR_TEXTCHAT);
+		bary += 7;
+	}
+	if(Gobjs[idx].timer2 != 0 && Gobjs[idx].timer2fill != 0) {
+		draw_hpbar(x, bary, w, 5, Gobjs[idx].timer2, Gobjs[idx].timer2fill, COLOR_ENEMY, COLOR_TEXTCHAT);
+		bary += 7;
+	}
+	if(Gobjs[idx].timer3 != 0 && Gobjs[idx].timer3fill != 0) {
+		draw_hpbar(x, bary, w, 5, Gobjs[idx].timer3, Gobjs[idx].timer3fill, COLOR_ENEMY, COLOR_TEXTCHAT);
+		bary += 7;
 	}
 }
 
@@ -267,10 +286,14 @@ void draw_hpbar(double x, double y, double w, double h, double chp, double fhp, 
 	fillrect(x, y, bw, h);
 }
 
-void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
+void draw_shapes(int32_t idx, LookupResult_t t, double x, double y) {
 	if(!is_range(idx, 0, MAX_OBJECT_COUNT - 1)) {
 		die("draw_game_object(): bad idx, how can you do that!?\n");
 		return;
+	}
+	if(DebugMode) {
+		chcolor(0xffffffff, TRUE);
+		drawstringf(x, y, "(Shape) ID=%d", idx);
 	}
 	//draw shapes
 	double d = 0;
@@ -297,8 +320,6 @@ void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
 			case TID_KUMO9_X24_ROBOT:
 				d = PLAYABLE_AUTOMACHINEGUN_DIAM;
 				break;
-			default:
-			break;
 		}
 	}
 	if(Gobjs[idx].tid == TID_ALLYEXPLOSION || Gobjs[idx].tid == TID_ENEMYEXPLOSION || Gobjs[idx].tid == TID_EXPLOSION) {
@@ -321,19 +342,26 @@ void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
 	if(d != 0) {
 		//Draw circle
 		fillcircle(x, y, d);
-	} else if(Gobjs[idx].tid == TID_ENEMYZUNDALASER) {
+	} else if(Gobjs[idx].tid == TID_ENEMYZUNDALASER || Gobjs[idx].tid == TID_KUMO9_X24_LASER) {
 		//Draw laser obj
+		uint32_t lasercolour = 0xc07f00ff;
+		double laserwidth = 5;
+		if(Gobjs[idx].tid == TID_ENEMYZUNDALASER) {
+			//Apply EnemyZundaColourLaser if TID is TID_ENEMYZUNDALASER
+			lasercolour = 0xa000ff00;
+			laserwidth = 20;
+		}
 		if(is_range(Gobjs[idx].aiming_target, 0, MAX_OBJECT_COUNT - 1)) {
-			chcolor(0xa000ff00, TRUE);
+			chcolor(lasercolour, TRUE);
 			double sx = x;
 			double sy = y;
-			if(is_range(Gobjs[idx].parentid, 0, MAX_OBJECT_COUNT - 1) ) {
-				getlocalcoord( (uint16_t)Gobjs[idx].parentid, &sx, &sy);
-			}
+			//if(is_range(Gobjs[idx].parentid, 0, MAX_OBJECT_COUNT - 1) ) {
+			//	getlocalcoord( (uint16_t)Gobjs[idx].parentid, &sx, &sy);
+			//}
 			double tx;
 			double ty;
-			getlocalcoord((uint16_t)Gobjs[idx].aiming_target, &tx, &ty);
-			drawline(sx, sy, tx, ty, 20);
+			getlocalcoord(Gobjs[idx].aiming_target, &tx, &ty);
+			drawline(sx, sy, tx, ty, laserwidth);
 			chcolor(0xa0ff0000, TRUE);
 			fillcircle(tx, ty, 50);
 		} else {
@@ -344,15 +372,15 @@ void draw_shapes(uint16_t idx, LookupResult_t t, double x, double y) {
 
 void draw_ui() {
 	//draw ingame ui
-	uint16_t fh = get_font_height();
+	int32_t fh = get_font_height();
 	//Show command input window if command mode
 	if(CommandCursor != -1) {
 		//Shrink string to fit in screen
 		uint16_t sp = 0;
-		uint16_t w = WINDOW_WIDTH + 10;
+		int32_t w = WINDOW_WIDTH + 10;
 		uint16_t l = (uint16_t)g_utf8_strlen(CommandBuffer, 65535);
 		while(w > WINDOW_WIDTH - 5) {
-			w = get_substring_width(CommandBuffer, sp, (uint16_t)CommandCursor);
+			w = get_substring_width(CommandBuffer, sp, CommandCursor);
 			if(w <= WINDOW_WIDTH - 5 || sp >= l - 1) { break; }
 			sp++;
 		}
@@ -369,7 +397,7 @@ void draw_ui() {
 
 void draw_info() {
 	//Draw additional information
-	uint16_t fh = get_font_height();
+	int32_t fh = get_font_height();
 	//Show message window if there are message
 	if(CommandCursor != -1 || ChatTimeout != 0) {
 		chcolor(COLOR_TEXTCHAT, TRUE);
@@ -388,12 +416,12 @@ void draw_info() {
 			die("draw_info(): bad RecentErrorId!\n");
 			return;
 		}
-		drawstring_title(WINDOW_WIDTH / 2, (char*)getlocalizedstring((uint8_t)RecentErrorId), FONT_DEFAULT_SIZE);
+		drawstring_title(WINDOW_WIDTH / 2, (char*)getlocalizedstring(RecentErrorId), FONT_DEFAULT_SIZE);
 	}
 	//Draw Message when GAMESTATE != PLAYING
 	if(GameState != GAMESTATE_PLAYING) {
 		chcolor(COLOR_TEXTCMD, TRUE);
-		uint16_t r;
+		int32_t r;
 		switch(GameState) {
 		case GAMESTATE_INITROUND:
 			r = drawstring_title(100, (char*)getlocalizedstring(2), 48);
@@ -410,8 +438,6 @@ void draw_info() {
 		case GAMESTATE_DEAD:
 			r = drawstring_title(100, (char*)getlocalizedstring(4), 48);
 			drawstring_title(120 + r, (char*)getlocalizedstring(5), FONT_DEFAULT_SIZE);
-			break;
-		default:
 			break;
 		}
 	}
@@ -454,7 +480,7 @@ void draw_lolhotbar(double offsx, double offsy) {
 	chcolor(COLOR_TEXTBG, TRUE);
 	fillrect(offsx, offsy, LHOTBAR_WIDTH, 100); //show bg
 	//show portrait image
-	drawimage(offsx + 2, offsy + 2, (uint8_t)t.portraitimgid);
+	drawimage(offsx + 2, offsy + 2, t.portraitimgid);
 	//Show Mouse Icon if Moving
 	if(CharacterMove) {
 		drawimage(offsx + 2, offsy + 2, 20);
@@ -473,7 +499,7 @@ void draw_lolhotbar(double offsx, double offsy) {
 	double fhp = 1;
 	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
 		LookupResult_t t2;
-		lookup((uint8_t)Gobjs[PlayingCharacterID].tid, &t2);
+		lookup(Gobjs[PlayingCharacterID].tid, &t2);
 		chp = Gobjs[PlayingCharacterID].hp;
 		fhp = t2.inithp;
 	}
@@ -492,7 +518,7 @@ void draw_lolhotbar(double offsx, double offsy) {
 	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
 		double tx = offsx + 102 + (i * 54);
 		if(is_range(t.skillimageids[i], 0, IMAGE_COUNT - 1) ) {
-			drawimage_scale(tx, offsy + 2, 48, 48, (uint8_t)t.skillimageids[i]);
+			drawimage_scale(tx, offsy + 2, 48, 48, t.skillimageids[i]);
 		}
 		chcolor(COLOR_TEXTCMD, TRUE);
 		hollowrect(tx, offsy + 2, 48, 48);
@@ -545,7 +571,7 @@ void draw_mchotbar(double offsx, double offsy) {
 		if(SelectingItemID == i) {
 			//When selected, show description in bottom
 			chcolor(COLOR_TEXTCMD, TRUE);
-			drawstring_inwidth(offsx, offsy + 52, (char*)getlocalizeditemdesc((uint8_t)SelectingItemID), (uint16_t)(WINDOW_WIDTH / 2), COLOR_TEXTBG);
+			drawstring_inwidth(offsx, offsy + 52, (char*)getlocalizeditemdesc(SelectingItemID), WINDOW_WIDTH / 2, COLOR_TEXTBG);
 			//When selected, change color
 			chcolor(COLOR_TEXTCHAT, TRUE);
 		} else {
@@ -554,7 +580,7 @@ void draw_mchotbar(double offsx, double offsy) {
 		}
 		fillrect(tx, offsy, 48, 48);
 		//Show Item Image (hotbar)
-		drawimage_scale(tx, offsy, 48, 48, (uint8_t)ITEMIMGIDS[i]);
+		drawimage_scale(tx, offsy, 48, 48, ITEMIMGIDS[i]);
 		//calculate position of additional text
 		double ty = offsy + 24; //Center of width
 		//If in cooldown, show cooldowntimer orelse show item value
@@ -734,6 +760,6 @@ void keyrelease_handler(GtkWidget* wid, guint keyval, guint keycode, GdkModifier
 
 void mousemotion_handler(GtkWidget *wid, gdouble x, gdouble y, gpointer user_data) {
 	//Called when mouse moved, save mouse location value
-	CursorX = (uint16_t)x;
-	CursorY = (uint16_t)y;
+	CursorX = (int32_t)x;
+	CursorY = (int32_t)y;
 }

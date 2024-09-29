@@ -61,7 +61,7 @@ void local2map(double localx, double localy, double* mapx, double* mapy) {
 //	*localy = WINDOW_HEIGHT - (mapy - CameraY);
 //}
 
-void getlocalcoord(uint16_t i, double *x, double *y) {
+void getlocalcoord(int32_t i, double *x, double *y) {
 	if(!is_range(i, 0, MAX_OBJECT_COUNT - 1)){
 		die("getlocalcoord(): bad parameter passed!\n");
 		return;
@@ -72,13 +72,13 @@ void getlocalcoord(uint16_t i, double *x, double *y) {
 
 //Add character into game object buffer, returns -1 if fail.
 //tid (character id), x, y(initial pos)
-uint16_t add_character(uint8_t tid, double x, double y) {
+int32_t add_character(int32_t tid, double x, double y) {
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		if(Gobjs[i].tid != TID_NULL) { continue; } //Skip occupied slot
 		LookupResult_t t;
 		lookup(tid, &t);
-		Gobjs[i].imgid = (int8_t)t.initimgid;
-		Gobjs[i].tid = (int8_t)tid;
+		Gobjs[i].imgid = t.initimgid;
+		Gobjs[i].tid = tid;
 		Gobjs[i].x = x;
 		Gobjs[i].y = y;
 		Gobjs[i].hp = (double)t.inithp;
@@ -88,13 +88,17 @@ uint16_t add_character(uint8_t tid, double x, double y) {
 		Gobjs[i].timer0 = 0;
 		Gobjs[i].timer1 = 0;
 		Gobjs[i].timer2 = 0;
-		Gobjs[i].hitdiameter = (uint16_t)t.inithitdiameter;
-		Gobjs[i].timeout = (uint16_t)t.timeout;
+		Gobjs[i].hitdiameter = t.inithitdiameter;
+		Gobjs[i].timeout = t.timeout;
 		Gobjs[i].damage = t.damage;
+		Gobjs[i].timer0fill = 0;
+		Gobjs[i].timer1fill = 0;
+		Gobjs[i].timer2fill = 0;
+		Gobjs[i].timer3fill = 0;
 		//MISSLIE, bullet and laser will try to aim closest enemy unit
 		if(tid == TID_MISSILE || tid == TID_ALLYBULLET || tid == TID_ENEMYBULLET) {
 			//Set initial target
-			int16_t r = find_nearest_unit(i, DISTANCE_INFINITY, UNITTYPE_FACILITY | UNITTYPE_BULLET_INTERCEPTABLE | UNITTYPE_UNIT);
+			int32_t r = find_nearest_unit(i, DISTANCE_INFINITY, UNITTYPE_FACILITY | UNITTYPE_BULLET_INTERCEPTABLE | UNITTYPE_UNIT);
 			if(r != -1) {
 				Gobjs[i].aiming_target = r;
 				set_speed_for_following(i);
@@ -152,7 +156,7 @@ void chatf(const char* p, ...) {
 }
 
 //calculate distance between Gobjs[id1] and Gobjs[id2]
-double get_distance(uint16_t id1, uint16_t id2){
+double get_distance(int32_t id1, int32_t id2){
 	if(!is_range(id1, 0, MAX_OBJECT_COUNT - 1) || !is_range(id2, 0, MAX_OBJECT_COUNT - 1)) {
 		die("gamesys.c: set_speed_for_following(): bad id passed!\n");
 		return INFINITY;
@@ -170,12 +174,12 @@ double get_distance_raw(double x1, double y1, double x2, double y2) {
 }
 
 //calculate appropriate speed for following object to Gobjs[srcid]
-void set_speed_for_following(uint16_t srcid) {
+void set_speed_for_following(int32_t srcid) {
 	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
 		die("gamesys.c: set_speed_for_following(): bad srcid passed!\n");
 		return;
 	}
-	int16_t targetid = Gobjs[srcid].aiming_target;
+	int32_t targetid = Gobjs[srcid].aiming_target;
 	if(!is_range(targetid, 0, MAX_OBJECT_COUNT - 1)) {
 		Gobjs[srcid].sx = 0;
 		Gobjs[srcid].sy = 0;
@@ -198,7 +202,7 @@ void set_speed_for_following(uint16_t srcid) {
 }
 
 //set appropriate speed for Gobjs[srcid] to go to coordinate dstx, dsty from current coordinate of Gobjs[srcid]
-void set_speed_for_going_location(uint16_t srcid, double dstx, double dsty, double speedlimit) {
+void set_speed_for_going_location(int32_t srcid, double dstx, double dsty, double speedlimit) {
 	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
 		die("set_speed_for_going_location(): bad srcid passed!\n");
 		return;
@@ -234,9 +238,9 @@ void set_speed_for_going_location(uint16_t srcid, double dstx, double dsty, doub
 
 //find nearest object (different team) from Gobjs[srcid] within diameter finddist
 //if object has same objecttype specified in va_list, they will be excluded
-int16_t find_nearest_unit(uint16_t srcid, uint16_t finddist, facility_type_t cfilter) {
+int32_t find_nearest_unit(int32_t srcid, int32_t finddist, facility_type_t cfilter) {
 	double mindist = finddist / 2;
-	int16_t t = -1;
+	int32_t t = -1;
 	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
 		die("find_nearest_unit(): bad srcid passed!\n");
 		return -1;
@@ -248,15 +252,15 @@ int16_t find_nearest_unit(uint16_t srcid, uint16_t finddist, facility_type_t cfi
 			//C = self.lookup(e.tid)
 			LookupResult_t dstinfo;
 			LookupResult_t srcinfo;
-			lookup((uint8_t)Gobjs[i].tid, &dstinfo);
-			lookup((uint8_t)Gobjs[srcid].tid, &srcinfo);
+			lookup(Gobjs[i].tid, &dstinfo);
+			lookup(Gobjs[srcid].tid, &srcinfo);
 			//if objects are in same team, exclude from searching
 			if(dstinfo.teamid != srcinfo.teamid && (cfilter & dstinfo.objecttype) ) {
 				double dist = get_distance(i, srcid);
 				//find nearest object
 				if(dist < mindist) {
 					mindist = dist;
-					t = (int16_t)i;
+					t = i;
 				}
 			}
 		}
@@ -269,7 +273,7 @@ int16_t find_nearest_unit(uint16_t srcid, uint16_t finddist, facility_type_t cfi
 
 //find random object (different team) from Gobjs[srcid] within diameter finddist
 //if object has same objecttype specified in va_list, they will be excluded
-int16_t find_random_unit(uint16_t srcid, uint16_t finddist, facility_type_t cfilter) {
+int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilter) {
 	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
 		die("find_nearest_unit(): bad srcid passed!\n");
 		return -1;
@@ -283,8 +287,8 @@ int16_t find_random_unit(uint16_t srcid, uint16_t finddist, facility_type_t cfil
 			//C = self.lookup(e.tid)
 			LookupResult_t dstinfo;
 			LookupResult_t srcinfo;
-			lookup((uint8_t)Gobjs[i].tid, &dstinfo);
-			lookup((uint8_t)Gobjs[srcid].tid, &srcinfo);
+			lookup(Gobjs[i].tid, &dstinfo);
+			lookup(Gobjs[srcid].tid, &srcinfo);
 			//if objects are in same team, exclude from searching
 			//if object type is not in cfilter, exclude
 			//if object im more far than finddist / 2, exclude
@@ -301,7 +305,7 @@ int16_t find_random_unit(uint16_t srcid, uint16_t finddist, facility_type_t cfil
 		//if(t != -1){
 		//	g_print("gamesys.c: find_nearest_unit(): src=%d id=%d dist=%d\n", srcid, t, mindist);
 		//}
-		return (int16_t)findobjs[selnum];
+		return findobjs[selnum];
 	}
 }
 
@@ -353,12 +357,10 @@ gboolean gametick(gpointer data) {
 		//Respawn in 10 sec
 		StateChangeTimer--;
 		if(StateChangeTimer == 0) {
-			PlayingCharacterID = (int16_t)add_character(TID_KUMO9_X24_ROBOT, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
+			PlayingCharacterID = add_character(TID_KUMO9_X24_ROBOT, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
 			CharacterMove = FALSE;
 			GameState = GAMESTATE_PLAYING;
 		}
-		break;
-	default:
 		break;
 	}
 	if(GameState == GAMESTATE_PLAYING) {
@@ -390,7 +392,7 @@ void proc_playable_op() {
 		//Set player move speed
 		double cx, cy;
 		double playerspd = 1.0 + (MapTechnologyLevel * 0.5);
-		getlocalcoord((uint16_t)PlayingCharacterID, &cx, &cy);
+		getlocalcoord(PlayingCharacterID, &cx, &cy);
 		double dx, dy;
 		dx = constrain_number(CursorX, cx - 100, cx + 100) - (cx - 100);
 		dy = constrain_number(CursorY, cy - 100, cy + 100) - (cy - 100);
@@ -402,19 +404,25 @@ void proc_playable_op() {
 		Gobjs[PlayingCharacterID].sy = 0;
 	}
 	//Set camera location to display playable character in the center of display.
-	CameraX = (uint16_t)constrain_number(Gobjs[PlayingCharacterID].x - (WINDOW_WIDTH / 2.0), 0, MAP_WIDTH - WINDOW_WIDTH);
-	CameraY = (uint16_t)constrain_number(Gobjs[PlayingCharacterID].y - (WINDOW_HEIGHT / 2.0), 0, MAP_HEIGHT - WINDOW_HEIGHT);
+	CameraX = constrain_number(Gobjs[PlayingCharacterID].x - (WINDOW_WIDTH / 2.0), 0, MAP_WIDTH - WINDOW_WIDTH);
+	CameraY = constrain_number(Gobjs[PlayingCharacterID].y - (WINDOW_HEIGHT / 2.0), 0, MAP_HEIGHT - WINDOW_HEIGHT);
 	//Process skill keys
 	const keyflags_t SKILLKFLG[SKILL_COUNT] = {KEY_F1, KEY_F2, KEY_F3};
 	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
 		if( (KeyFlags & SKILLKFLG[i]) && SkillCooldownTimers[i] == 0) {
 			SkillCooldownTimers[i] = SKILLCOOLDOWNS[i];
 			switch(i) {
-			case 0: Gobjs[PlayingCharacterID].timer1 = 500;
+			case 0:
+				Gobjs[PlayingCharacterID].timer1 = 200;
+				Gobjs[PlayingCharacterID].timer1fill = 200;
 				break;
-			case 1: Gobjs[PlayingCharacterID].timer2 = 500;
+			case 1:
+				Gobjs[PlayingCharacterID].timer2 = 500;
+				Gobjs[PlayingCharacterID].timer2fill = 500;
 				break;
-			case 2: Gobjs[PlayingCharacterID].timer3 = 500;
+			case 2:
+				Gobjs[PlayingCharacterID].timer3 = 500;
+				Gobjs[PlayingCharacterID].timer3fill = 500;
 				break;
 			}
 		}
@@ -452,7 +460,7 @@ void use_item() {
 	}
 }
 
-gboolean buy_facility(uint8_t fid) {
+gboolean buy_facility(int32_t fid) {
 	//Try to buy facility (Key handler)
 	obj_type_t tid = FTIDS[fid];
 	if(tid == TID_NULL) {
@@ -472,7 +480,7 @@ gboolean buy_facility(uint8_t fid) {
 			}
 		}
 	}
-	add_character((uint8_t)tid, mx, my);
+	add_character(tid, mx, my);
 	return TRUE;
 }
 
@@ -585,7 +593,7 @@ void commandmode_keyhandler(guint keyval, GdkModifierType state) {
 		if(CommandCursor > 0) {CommandCursor--;}
 	} else if(keyval == GDK_KEY_Right) {
 		//RightArrow
-		if(CommandCursor < g_utf8_strlen(CommandBuffer, 65535)) {
+		if(CommandCursor < g_utf8_strlen(CommandBuffer, 65535) ) {
 			CommandCursor++;
 		}
 	} else if(keyval == GDK_KEY_v && (state & GDK_CONTROL_MASK) != 0) {
@@ -601,8 +609,8 @@ void commandmode_keyhandler(guint keyval, GdkModifierType state) {
 		if(is_range((int32_t)t, 0x20, 0x7e) && !CommandBufferMutex) {
 			CommandBufferMutex = TRUE;
 			char s[] = {(char)t, 0};
-			if(strlen(CommandBuffer) + strlen(s) + 1 <= sizeof(CommandBuffer)) {
-				utf8_insertstring(CommandBuffer, s, (uint16_t)CommandCursor, sizeof(CommandBuffer));
+			if(strlen(CommandBuffer) + strlen(s) + 1 <= sizeof(CommandBuffer) ) {
+				utf8_insertstring(CommandBuffer, s, CommandCursor, sizeof(CommandBuffer) );
 				CommandCursor += 1;
 			} else {
 				g_print("main.c: commandmode_keyhandler(): Append letter failed: Buffer full.\n");
@@ -629,18 +637,18 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 	char *cb = gdk_clipboard_read_text_finish(GClipBoard, res, NULL);
 	//g_print("Clipboard string size: %d\nCommandBuffer length: %d\n", l, (uint32_t)strlen(CommandBuffer));
 	CommandBufferMutex = TRUE;
-	if(utf8_insertstring(CommandBuffer, cb, (uint16_t)CommandCursor, sizeof(CommandBuffer) ) == TRUE) {
-		CommandCursor += (int16_t)g_utf8_strlen(cb, 65535);
+	if(utf8_insertstring(CommandBuffer, cb, CommandCursor, sizeof(CommandBuffer) ) == TRUE) {
+		CommandCursor += g_utf8_strlen(cb, 65535);
 	} else {
 		g_print("main.c: clipboard_read_handler(): insert failed.\n");
 	}
-		CommandBufferMutex = FALSE;
+	CommandBufferMutex = FALSE;
 	free(cb);
 }
 
 void reset_game() {
 	PlayableInfo_t t;
-	lookup_playable((int8_t)CurrentPlayableCharacterID, &t); //TODO: conv error
+	lookup_playable(CurrentPlayableCharacterID, &t);
 	GameState = GAMESTATE_INITROUND;
 	MapTechnologyLevel = 0;
 	MapEnergyLevel = 0;
@@ -665,22 +673,22 @@ void reset_game() {
 	add_character(TID_ENEMYBASE, MAP_WIDTH - 200, MAP_HEIGHT - 200);
 	add_character(TID_ENEMYBASE, MAP_WIDTH - 200, MAP_HEIGHT - 500);
 	add_character(TID_ENEMYBASE, MAP_WIDTH - 500, MAP_HEIGHT - 200);
-	PlayingCharacterID = (int16_t)add_character(t.associatedtid, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
+	PlayingCharacterID = add_character(t.associatedtid, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
 }
 
 //Set object to aim the earth
-void aim_earth(uint16_t i) {
+void aim_earth(int32_t i) {
 	//Gobjs[i].aiming_target = (int16_t)find_earth();
 		for(uint16_t j = 0; j < MAX_OBJECT_COUNT; j++) {
 			if(Gobjs[j].tid == TID_EARTH) {
-				Gobjs[i].aiming_target = (int16_t)j;
+				Gobjs[i].aiming_target = j;
 				break;
 			}
 		}
 	set_speed_for_following(i);
 }
 
-void showerrorstr(uint8_t errorid) {
-	RecentErrorId = (int8_t)errorid;
+void showerrorstr(int32_t errorid) {
+	RecentErrorId = errorid;
 	ErrorShowTimer = ERROR_SHOW_TIMEOUT;
 }

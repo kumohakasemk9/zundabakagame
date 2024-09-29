@@ -21,7 +21,7 @@ main.h: integrated header file
 #define WINDOW_HEIGHT 600 //Game height
 #define MAP_WIDTH 5000 //map max width
 #define MAP_HEIGHT 5000 //map max height
-#define IMAGE_COUNT 33 //Preload image count
+#define IMAGE_COUNT 34 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define MAX_ZINDEX 3 //Max z-index
 #define COLOR_TEXTBG 0x60ffffff //Text background color (30% opaque white)
@@ -38,7 +38,7 @@ main.h: integrated header file
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
 #define ITEM_COUNT 5 //Max item id
 #define MAX_STRINGS 12 // Max string count
-#define MAX_TID 22 //max type id
+#define MAX_TID 23 //max type id
 #define SKILL_COUNT 3 //Skill Count
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
 #define EARTH_RADAR_DIAM 500 //Earth radar diameter
@@ -112,7 +112,8 @@ typedef enum {
 	TID_KUMO9_X24_MISSILE_RESIDUE = 18,
 	TID_MONEY_GENE = 19,
 	TID_RESEARCHMENT_CENTRE = 20,
-	TID_POWERPLANT = 21
+	TID_POWERPLANT = 21,
+	TID_KUMO9_X24_LASER = 22
 } obj_type_t;
 
 //TEAMID
@@ -144,22 +145,26 @@ typedef enum {
 
 //Character object
 typedef struct {
-	int8_t imgid; //Image id, -1 means no image
+	int32_t imgid; //Image id, -1 means no image
 	obj_type_t tid; //Type Id, -1 means unused slot
 	double x; //object location
 	double y;
 	double hp; //Object life
 	double sx; //object speed
 	double sy;
-	int16_t aiming_target; //holding stalking object id
-	uint16_t timer0; //automatically decreases to 0
-	uint16_t timer1;
-	uint16_t timer2;
-	uint16_t timer3;
-	uint16_t hitdiameter; //when objects are within sum of both hit diameters, hitdetection will trigger
-	int16_t parentid; //source id
-	uint16_t timeout; //lifespan, automatically decreased, dies when 0
+	int32_t aiming_target; //holding stalking object id
+	int32_t timer0; //automatically decreases to 0
+	int32_t timer1;
+	int32_t timer2;
+	int32_t timer3;
+	int32_t hitdiameter; //when objects are within sum of both hit diameters, hitdetection will trigger
+	int32_t parentid; //source id
+	int32_t timeout; //lifespan, automatically decreased, dies when 0
 	double damage; //given damage when hit
+	int32_t timer0fill; //If timerNfill and timerN are not 0, show progress bar
+	int32_t timer1fill; //on bottom of characters. the progress bars have value
+	int32_t timer2fill; //timerN / timerNfill.
+	int32_t timer3fill;
 } GameObjs_t;
 
 //constant information of characters
@@ -196,8 +201,8 @@ void keyrelease_handler(GtkWidget*, guint, guint, GdkModifierType, gpointer);
 void mousemotion_handler(GtkWidget*, gdouble, gdouble, gpointer);
 gboolean gameinit();
 gboolean drawtimer_tick(gpointer);
-void draw_game_object(uint16_t, LookupResult_t, double, double);
-void draw_shapes(uint16_t, LookupResult_t, double, double);
+void draw_game_object(int32_t, LookupResult_t, double, double);
+void draw_shapes(int32_t, LookupResult_t, double, double);
 gboolean mousescroll_handler(GtkWidget*, gdouble, gdouble, gpointer);
 void mousepressed_handler(GtkWidget*, gint, gdouble, gdouble, gpointer);
 void draw_hpbar(double, double, double, double, double, double, uint32_t, uint32_t);
@@ -209,74 +214,74 @@ void drawline(double, double, double, double, double);
 void fillcircle(double, double, double);
 //void hollowcircle(double, double, double);
 void drawstring(double, double, char*);
-void set_font_size(uint16_t);
+void set_font_size(int32_t);
 void loadfont(const char*);
 void drawstringf(double, double, const char*, ...);
-void drawsubstring(double, double, char*, uint16_t, uint16_t);
-double drawstring_inwidth(double, double, char*, uint16_t, gboolean);
-void drawimage(double, double, uint8_t);
-void drawimage_scale(double, double, double, double, uint8_t);
+void drawsubstring(double, double, char*, int32_t, int32_t);
+double drawstring_inwidth(double, double, char*, int32_t, gboolean);
+void drawimage(double, double, int32_t);
+void drawimage_scale(double, double, double, double, int32_t);
 void fillrect(double, double, double, double);
 void hollowrect(double, double, double, double);
 void chcolor(uint32_t, gboolean);
 void restore_color();
-uint16_t drawstring_title(double, char*, uint8_t);
-void draw_polygon(double, double, uint8_t, double[]);
+int32_t drawstring_title(double, char*, int32_t);
+void draw_polygon(double, double, int32_t, double[]);
 
 //util.c
 double scale_number(double, double, double);
 double constrain_number(double, double, double);
 uint32_t constrain_ui32(uint32_t, uint32_t, uint32_t);
 int32_t constrain_i32(int32_t, int32_t, int32_t);
-void utf8_substring(char*, uint16_t, uint16_t, char*, uint16_t);
-gboolean utf8_insertstring(char*, char*, uint16_t, uint16_t);
+void utf8_substring(char*, int32_t, int32_t, char*, int32_t);
+gboolean utf8_insertstring(char*, char*, int32_t, int32_t);
 void die(const char*, ...);
-uint16_t get_font_height();
-uint16_t get_string_width(char*);
-uint16_t shrink_string(char*, uint16_t, uint16_t*);
-uint16_t get_substring_width(char*, uint16_t, uint16_t);
-uint16_t shrink_substring(char*, uint16_t, uint16_t, uint16_t, uint16_t*);
+int32_t get_font_height();
+int32_t get_string_width(char*);
+int32_t shrink_string(char*, int32_t, int32_t*);
+int32_t get_substring_width(char*, int32_t, int32_t);
+int32_t shrink_substring(char*, int32_t, int32_t, int32_t, int32_t*);
 gboolean is_range(int32_t, int32_t, int32_t);
 gboolean is_range_number(double, double, double);
 int32_t randint(int32_t, int32_t);
-void get_image_size(uint8_t, double*, double*);
+void get_image_size(int32_t, double*, double*);
 
 //gamesys.c
 void local2map(double, double, double*, double*);
-void getlocalcoord(uint16_t, double*, double*);
+void getlocalcoord(int32_t, double*, double*);
 void chat(char*);
 void chatf(const char*, ...);
-uint16_t add_character(uint8_t, double, double);
-double get_distance(uint16_t, uint16_t);
-void set_speed_for_following(uint16_t);
-void set_speed_for_going_location(uint16_t, double, double, double);
-int16_t find_nearest_unit(uint16_t, uint16_t, facility_type_t);
-int16_t find_random_unit(uint16_t, uint16_t, facility_type_t);
+int32_t add_character(int32_t, double, double);
+double get_distance(int32_t, int32_t);
+void set_speed_for_following(int32_t);
+void set_speed_for_going_location(int32_t, double, double, double);
+int32_t find_nearest_unit(int32_t, int32_t, facility_type_t);
+int32_t find_random_unit(int32_t, int32_t, facility_type_t);
 gboolean gametick(gpointer);
 void start_command_mode(gboolean);
 void switch_character_move();
 void execcmd();
 void use_item();
 void proc_playable_op();
-gboolean buy_facility(uint8_t fid);
+gboolean buy_facility(int32_t fid);
 void debug_add_character();
 void clipboard_read_handler(GObject*, GAsyncResult*, gpointer);
 void commandmode_keyhandler(guint, GdkModifierType);
 void reset_game();
-void aim_earth(uint16_t);
+void aim_earth(int32_t);
 double get_distance_raw(double, double, double, double);
-void showerrorstr(uint8_t);
+void showerrorstr(int32_t);
 void select_next_item();
 void select_prev_item();
 
 //info.c
 void lookup(obj_type_t, LookupResult_t*);
 void check_data();
-const char *getlocalizedstring(uint8_t);
-const char *getlocalizeditemdesc(uint8_t);
-void lookup_playable(int8_t, PlayableInfo_t*);
+const char *getlocalizedstring(int32_t);
+const char *getlocalizeditemdesc(int32_t);
+void lookup_playable(int32_t, PlayableInfo_t*);
 
 //aiproc.c
 void procai();
-gboolean procobjhit(uint16_t, uint16_t, LookupResult_t, LookupResult_t);
-void damage_object(uint16_t, double, uint16_t);
+gboolean procobjhit(int32_t, int32_t, LookupResult_t, LookupResult_t);
+void damage_object(int32_t, double, int32_t);

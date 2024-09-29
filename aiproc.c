@@ -34,12 +34,12 @@ void procai() {
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		if(Gobjs[i].tid == TID_NULL) {continue;}
 		LookupResult_t srcinfo;
-		lookup((uint8_t)Gobjs[i].tid, &srcinfo);
+		lookup(Gobjs[i].tid, &srcinfo);
 		//Process dead character (skip when inithp = 0, it means they are invulnerable)
 		if(Gobjs[i].hp == 0 && srcinfo.inithp != 0) {
 			if(srcinfo.objecttype == UNITTYPE_FACILITY) {
 				//Facility will make big explosion if destroyed
-				uint16_t r = add_character(TID_EXPLOSION, Gobjs[i].x, Gobjs[i].y);
+				int32_t r = add_character(TID_EXPLOSION, Gobjs[i].x, Gobjs[i].y);
 				Gobjs[r].hitdiameter = 500;
 			} else if(Gobjs[i].tid != TID_ALLYBULLET && Gobjs[i].tid != TID_ENEMYBULLET) {
 				//other than bullets and planets, explodes when dead
@@ -65,10 +65,10 @@ void procai() {
 			}
 		}
 		//Process timers
-		Gobjs[i].timer0 = (uint16_t)constrain_i32(Gobjs[i].timer0 - 1, 0, 65535);
-		Gobjs[i].timer1 = (uint16_t)constrain_i32(Gobjs[i].timer1 - 1, 0, 65535);
-		Gobjs[i].timer2 = (uint16_t)constrain_i32(Gobjs[i].timer2 - 1, 0, 65535);
-		Gobjs[i].timer3 = (uint16_t)constrain_i32(Gobjs[i].timer3 - 1, 0, 65535);
+		Gobjs[i].timer0 = constrain_i32(Gobjs[i].timer0 - 1, 0, 65535);
+		Gobjs[i].timer1 = constrain_i32(Gobjs[i].timer1 - 1, 0, 65535);
+		Gobjs[i].timer2 = constrain_i32(Gobjs[i].timer2 - 1, 0, 65535);
+		Gobjs[i].timer3 = constrain_i32(Gobjs[i].timer3 - 1, 0, 65535);
 		//If timeout != 0, decrease it and if it reaches to 0, delete object
 		if(Gobjs[i].timeout != 0) {
 			Gobjs[i].timeout--;
@@ -80,8 +80,6 @@ void procai() {
 				break;
 				case TID_ZUNDAMONMINE:
 					add_character(TID_ENEMYEXPLOSION, Gobjs[i].x, Gobjs[i].y); //Explode
-				break;
-				default:
 				break;
 				}
 				Gobjs[i].tid = TID_NULL;
@@ -115,7 +113,7 @@ void procai() {
 			}
 			//Stop moving if they got close to earth
 			if(is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
-				if(get_distance((uint16_t)Gobjs[i].aiming_target, i) < 200) {
+				if(get_distance(Gobjs[i].aiming_target, i) < 200) {
 					Gobjs[i].sx = 0;
 					Gobjs[i].sy = 0;
 				}
@@ -170,11 +168,12 @@ void procai() {
 			set_speed_for_following(i);
 			break;
 		case TID_ENEMYZUNDALASER:
+		case TID_KUMO9_X24_LASER:
 			//Damage aimed target if they are in range
 			if(is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
-				if(Gobjs[Gobjs[i].aiming_target].tid != TID_NULL && get_distance(i, (uint16_t)Gobjs[i].aiming_target) < ENEMYBASE_RADAR_DIAM / 2) {
+				if(Gobjs[Gobjs[i].aiming_target].tid != TID_NULL && get_distance(i, Gobjs[i].aiming_target) < Gobjs[i].hitdiameter / 2) {
 					//If aiming target is valid and in range, attack them
-					damage_object((uint16_t)Gobjs[i].aiming_target, srcinfo.damage, 65535);
+					damage_object(Gobjs[i].aiming_target, srcinfo.damage, 65535);
 				} else {
 					//When out of range or , request to set new target
 					Gobjs[i].aiming_target = OBJID_INVALID;
@@ -182,17 +181,22 @@ void procai() {
 				}
 			} else {
 				//If object is aiming invalid object, find new target
-				Gobjs[i].aiming_target = find_nearest_unit(i, ENEMYBASE_RADAR_DIAM, UNITTYPE_FACILITY | UNITTYPE_UNIT);
+				Gobjs[i].aiming_target = find_nearest_unit(i, Gobjs[i].hitdiameter, UNITTYPE_FACILITY | UNITTYPE_UNIT);
 				//g_print("procai(): EnemyZundaLaser(%d): finding new object\n", i);
 			}
-			//Check is parent dead
-			if(is_range(Gobjs[i].parentid, 0, MAX_OBJECT_COUNT - 1) && Gobjs[Gobjs[i].parentid].tid == TID_NULL) {
-				//Destroy laser object if parent dead.
-				//g_print("gametick(): Enemy Zunda Laser(%d) deleted because object got out of range.\n", i);
-				Gobjs[i].tid = TID_NULL;
-				continue; //skip further process for this object
+			if(is_range(Gobjs[i].parentid, 0, MAX_OBJECT_COUNT - 1) ) {
+				if(Gobjs[Gobjs[i].parentid].tid == TID_NULL) {
+					//Destroy laser object if parent dead.
+					//g_print("gametick(): Enemy Zunda Laser(%d) deleted because object got out of range.\n", i);
+					Gobjs[i].tid = TID_NULL;
+					continue; //skip further process for this object
+				} else {
+					//follow parent
+					Gobjs[i].x = Gobjs[Gobjs[i].parentid].x;
+					Gobjs[i].y = Gobjs[Gobjs[i].parentid].y;
+				}
 			}
-			break;
+			continue; //Laser object has own damaging system, skip hit detection
 		case TID_ALLYEXPLOSION:
 		case TID_ENEMYEXPLOSION:
 		case TID_EXPLOSION:
@@ -209,6 +213,11 @@ void procai() {
 					add_character(TID_KUMO9_X24_MISSILE, Gobjs[i].x, Gobjs[i].y);
 				}
 			}
+			if(Gobjs[i].timer2 == 499) {
+				int32_t r = add_character(TID_KUMO9_X24_LASER, Gobjs[i].x, Gobjs[i].y);
+				Gobjs[r].parentid = i;
+				//g_print("procai(): Kumo9x24 (%d): laser object generated.\n", i);
+			}
 			break;
 		case TID_RESEARCHMENT_CENTRE:
 			if(MapRequiredEnergyLevel < MapEnergyLevel) {tecstar_count++;} //Count number of researchment centre
@@ -223,17 +232,13 @@ void procai() {
 		case TID_POWERPLANT:
 			powerplant_cnt++;
 			break;
-		default:
-			break;
 		}
-		//Laser has original damaging system, skip hitdetection
-		if(Gobjs[i].tid == TID_ENEMYZUNDALASER) {continue;}
 		//Hitdetection proc
 		for(uint16_t j = 0; j < MAX_OBJECT_COUNT; j++) {
 			if(i == j) { continue; }
 			if(Gobjs[j].tid == TID_NULL) { continue; }
 			LookupResult_t dstinfo;
-			lookup((uint8_t)Gobjs[j].tid, &dstinfo);
+			lookup(Gobjs[j].tid, &dstinfo);
 			double d = get_distance(i, j);
 			//normal hitdetection
 			if(d < ((Gobjs[i].hitdiameter + Gobjs[j].hitdiameter) / 2)) {
@@ -307,7 +312,7 @@ void procai() {
 					if(dstinfo.teamid == TEAMID_ALLY && dstinfo.inithp != 0 ) {
 						if(Gobjs[i].timer2 == 0) {
 							//spawn laser and aim the enemy
-							uint16_t r = add_character(TID_ENEMYZUNDALASER, Gobjs[i].x, Gobjs[i].y);
+							int32_t r = add_character(TID_ENEMYZUNDALASER, Gobjs[i].x, Gobjs[i].y);
 							Gobjs[r].parentid = (int16_t)i;
 							Gobjs[i].timer2 = 1000;
 						}
@@ -320,7 +325,7 @@ void procai() {
 						//g_print("gametick(): ENEMYBASE(%d): ally unit approaching.\n", i);
 						if(Gobjs[i].timer1 == 0) {
 							//spawn laser and aim the enemy
-							uint16_t r = add_character(TID_ENEMYZUNDALASER, Gobjs[i].x, Gobjs[i].y);
+							int32_t r = add_character(TID_ENEMYZUNDALASER, Gobjs[i].x, Gobjs[i].y);
 							Gobjs[r].parentid = (int16_t)i;
 							Gobjs[i].timer1 = 500;
 							//g_print("gametick(): ENEMYBASE(%d): spawn laser.\n", i);
@@ -347,13 +352,11 @@ void procai() {
 					}
 				}
 				break;
-			default:
-			break;
 			}
 		}
 	}
 	//Determine map technology level
-	MapTechnologyLevel = (uint8_t)constrain_ui32(tecstar_count, 0, 5);
+	MapTechnologyLevel = constrain_i32(tecstar_count, 0, 5);
 	//Determine Power Level
 	MapEnergyLevel = powerplant_cnt * 50;
 	MapRequiredEnergyLevel = tmpreqpowerlevel;
@@ -372,7 +375,7 @@ void procai() {
 
 //Called when Gobjs[dst] object is close (within Gobjs[dst].hitdiameter) to Gobjs[src] object
 //Return FALSE if you want to delete source object
-gboolean procobjhit(uint16_t src, uint16_t dst, LookupResult_t srcinfo, LookupResult_t dstinfo) {
+gboolean procobjhit(int32_t src, int32_t dst, LookupResult_t srcinfo, LookupResult_t dstinfo) {
 	if(!is_range(src, 0, MAX_OBJECT_COUNT - 1) || !is_range(dst, 0, MAX_OBJECT_COUNT - 1)) {
 		die("damage_object(): Bad parameter!\n");
 		return FALSE;
@@ -387,7 +390,7 @@ gboolean procobjhit(uint16_t src, uint16_t dst, LookupResult_t srcinfo, LookupRe
 				} else if(Gobjs[src].tid == TID_ZUNDAMONMINE) {
 					add_character(TID_ENEMYEXPLOSION, Gobjs[src].x, Gobjs[src].y);
 				} else if(Gobjs[src].tid == TID_ZUNDAMON_KAMIKAZE) {
-					uint16_t r = add_character(TID_ENEMYEXPLOSION, Gobjs[src].x, Gobjs[src].y);
+					int32_t r = add_character(TID_ENEMYEXPLOSION, Gobjs[src].x, Gobjs[src].y);
 					Gobjs[r].hitdiameter = 500;
 					Gobjs[r].damage = 2.5;
 				} else if(Gobjs[src].tid == TID_KUMO9_X24_MISSILE) {
@@ -401,7 +404,7 @@ gboolean procobjhit(uint16_t src, uint16_t dst, LookupResult_t srcinfo, LookupRe
 			//Except missile and object has dealing damage
 			damage_object(dst, Gobjs[src].damage, 65535);
 			//preserve explosion or laser
-			if(Gobjs[src].tid == TID_ENEMYZUNDALASER || Gobjs[src].tid == TID_ALLYEXPLOSION || Gobjs[src].tid == TID_ENEMYEXPLOSION || Gobjs[src].tid == TID_EXPLOSION || Gobjs[src].tid == TID_KUMO9_X24_MISSILE_RESIDUE) {
+			if(Gobjs[src].tid == TID_ENEMYZUNDALASER || Gobjs[src].tid == TID_ALLYEXPLOSION || Gobjs[src].tid == TID_ENEMYEXPLOSION || Gobjs[src].tid == TID_EXPLOSION || Gobjs[src].tid == TID_KUMO9_X24_MISSILE_RESIDUE || Gobjs[src].tid == TID_KUMO9_X24_LASER) {
 				return TRUE;
 			}
 			return FALSE; //kill this source object if not laser nor explosion
@@ -410,7 +413,7 @@ gboolean procobjhit(uint16_t src, uint16_t dst, LookupResult_t srcinfo, LookupRe
 	return TRUE;
 }
 
-void damage_object(uint16_t i, double damage, uint16_t hpmax) {
+void damage_object(int32_t i, double damage, int32_t hpmax) {
 	if(!is_range(i, 0, MAX_OBJECT_COUNT - 1)) {
 		die("damage_object(): Bad parameter!\n");
 		return;
@@ -432,8 +435,6 @@ void damage_object(uint16_t i, double damage, uint16_t hpmax) {
 			break;
 		case TID_ENEMYBASE:
 			Money += 50;
-			break;
-		default:
 			break;
 		}
 	}

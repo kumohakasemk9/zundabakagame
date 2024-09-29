@@ -101,13 +101,13 @@ const int32_t ITEMCOOLDOWNS[ITEM_COUNT] = {
 };
 
 //Playable character skill cooldowns
-const int32_t SKILLCOOLDOWNS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
-	{6000, 6000, 6000} //kumo9-x24 cooldowns (kumohakasemk9)
+int32_t SKILLCOOLDOWNS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
+	{500, 1000, 6000} //kumo9-x24 cooldowns (kumohakasemk9)
 };
 
 //Playable character skill icon ids LUT
-const int32_t SKILLICONIDS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
-	{24, 13, 13} //kumo9-x24 skill icons (kumohakasemk9)
+int32_t SKILLICONIDS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
+	{24, 33, 13} //kumo9-x24 skill icons (kumohakasemk9)
 };
 
 //Playable character information (tid, portraitimgid, dead portrait)
@@ -149,7 +149,8 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"img/power_star.png", //29 power plant
 	"adwaitalegacy/battery-full-charging.png", //30 power plant (hotbar)
 	"adwaitalegacy/battery-full.png", //31 full battery icon
-	"adwaitalegacy/battery-caution.png" //32 Insufficient energy level icon
+	"adwaitalegacy/battery-caution.png", //32 Insufficient energy level icon
+	"img/kumo9-x24/kumolaser.png" //33 Kumo x24 laser icon (LOL hotbar)
 };
 
 //InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout, requirepowerlevel
@@ -168,14 +169,15 @@ const int32_t NUMINFO[MAX_TID][9] = {
 	{-1,     0,  TEAMID_NONE, 2,  1,               UNITTYPE_BULLET, 100,    0,  0}, //11 Explosion
 	{ 9,     0,  TEAMID_ALLY, 2, 10,               UNITTYPE_BULLET,  10,  700,  0}, //12 AllyBullet
 	{10,     0, TEAMID_ENEMY, 2, 20,               UNITTYPE_BULLET,  20,  800,  0}, //13 EnemyBullet (Edamame)
-	{-1,     0, TEAMID_ENEMY, 2, 15,               UNITTYPE_BULLET,   0,   50,  0}, //14 Enemy Zunda laser
+	{-1,     0, TEAMID_ENEMY, 2, 15,               UNITTYPE_BULLET, 600,   50,  0}, //14 Enemy Zunda laser
 	{11,  5000,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT,  50,    0,  0}, //15 Kumo9-x24-robot
 	{12,   500, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0,  0}, //16 Kamikaze zundamon
 	{24,    70,  TEAMID_ALLY, 2,  0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  700,  0}, //17 Kumo9 x24 missile
-	{25,     0,  TEAMID_ALLY, 0, 10,               UNITTYPE_BULLET, 100,  500,  0}, //18 kumo9 x24 missile residue
+	{25,     0,  TEAMID_ALLY, 0,  5,               UNITTYPE_BULLET, 100,  100,  0}, //18 kumo9 x24 missile residue
 	{26,  3000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0, 15}, //19 Money generater facility
 	{27,  3000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  4}, //20 researchment facility
-	{29,  5000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  0}  //21 power plant
+	{29,  5000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  0}, //21 power plant
+	{-1,     0,  TEAMID_ALLY, 2,  1,               UNITTYPE_BULLET, 600,  500,  0}  //22 Kumo9-x24-robot-laser
 };
 
 //MaxSpeeds, damage
@@ -204,7 +206,7 @@ const double DBLINFO[MAX_TID] = {
 	0    //21
 };
 
-const char* getlocalizedstring(uint8_t stringid) {
+const char* getlocalizedstring(int32_t stringid) {
 	if(!is_range(stringid, 0, MAX_STRINGS - 1) ) {
 		die("getlocalizedstring(): bad stringid passed.\n");
 		return NULL;
@@ -300,19 +302,19 @@ void check_data() {
 	}
 }
 
-void lookup_playable(int8_t i, PlayableInfo_t *t) {
+void lookup_playable(int32_t i, PlayableInfo_t *t) {
 	if(!is_range(i, 0, PLAYABLE_CHARACTERS_COUNT - 1) ) {
 		die("lookup_playable(): bad id passed!\n");
 		return;
 	}
 	t->associatedtid = (obj_type_t)PLAYABLE_INFORMATION[i][0];
-	t->portraitimgid = (int8_t)PLAYABLE_INFORMATION[i][1];
-	t->portraitimg_dead_id = (int8_t)PLAYABLE_INFORMATION[i][2];
-	t->skillcooldowns = (int16_t*)SKILLCOOLDOWNS[i];
-	t->skillimageids = (int8_t*)SKILLICONIDS[i];
+	t->portraitimgid = PLAYABLE_INFORMATION[i][1];
+	t->portraitimg_dead_id = PLAYABLE_INFORMATION[i][2];
+	t->skillcooldowns = SKILLCOOLDOWNS[i];
+	t->skillimageids = SKILLICONIDS[i];
 }
 
-const char* getlocalizeditemdesc(uint8_t did) {
+const char* getlocalizeditemdesc(int32_t did) {
 	if(!is_range(did,0 ,ITEM_COUNT - 1) ) {
 		die("getlocalizeditemdesc(): bad did passed: %d\n", did);
 		return NULL;

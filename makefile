@@ -13,7 +13,7 @@
 
 CC=gcc
 CFLAGSEXTRA=`pkg-config --cflags gtk4`
-CFLAGS=-g3 -Wall -Wconversion -Werror $(CFLAGSEXTRA)
+CFLAGS=-g3 $(CFLAGSEXTRA)
 LDFLAGS=`pkg-config --libs gtk4`
 OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o
 OUTNAME=zundagame

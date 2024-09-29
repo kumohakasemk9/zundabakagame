@@ -70,7 +70,7 @@ void drawstring(double x, double y, char* ctx) {
 }
 
 //draw substring ctx (index sp to ed) in pos x, y
-void drawsubstring(double x, double y, char* ctx, uint16_t st, uint16_t ed) {
+void drawsubstring(double x, double y, char* ctx, int32_t st, int32_t ed) {
 	char b[BUFFER_SIZE];
 	utf8_substring(ctx, st, ed, b, sizeof(b));
 	drawstring(x, y, b);
@@ -92,15 +92,15 @@ void drawstringf(double x, double y, const char *p, ...) {
 }
 
 //draw string and let it fit in width wid using newline. if bg is TRUE, string will have rectangular background
-double drawstring_inwidth(double x, double y, char* ctx, uint16_t wid, gboolean bg) {
+double drawstring_inwidth(double x, double y, char* ctx, int32_t wid, gboolean bg) {
 	double ty = y;
-	uint16_t cp = 0;
-	uint16_t ch = get_font_height();
+	int32_t cp = 0;
+	int32_t ch = get_font_height();
 	uint16_t ml = (uint16_t)g_utf8_strlen(ctx, 65535);
 	while(cp < ml) {
 		//Write a adjusted string to fit in wid
-		uint16_t a;
-		uint16_t t = shrink_substring(ctx, wid, cp, ml, &a);
+		int32_t a;
+		int32_t t = shrink_substring(ctx, wid, cp, ml, &a);
 		if(bg) {
 			chcolor(COLOR_TEXTBG, FALSE);
 			fillrect(x, ty, a, ch + 5);
@@ -115,7 +115,7 @@ double drawstring_inwidth(double x, double y, char* ctx, uint16_t wid, gboolean 
 }
 
 //draw image in pos x, y
-void drawimage(double x, double y, uint8_t imgid) {
+void drawimage(double x, double y, int32_t imgid) {
 	if(!is_range(imgid, 0, IMAGE_COUNT - 1)) {
 		die("drawimage() failed: Bad imgid passed: %d\n", imgid);
 		return;
@@ -125,7 +125,7 @@ void drawimage(double x, double y, uint8_t imgid) {
 }
 
 //draw image in pos x, y in specific size w, h (scaled)
-void drawimage_scale(double x, double y, double w, double h, uint8_t imgid) {
+void drawimage_scale(double x, double y, double w, double h, int32_t imgid) {
 	//Test
 	if(w < 0 || h < 0) {
 		die("drawimage_scale() failed, bad scale passed.\n");
@@ -164,11 +164,11 @@ void hollowrect(double x, double y, double w, double h){
 	cairo_stroke(G);
 }
 
-uint16_t drawstring_title(double y, char* ctx, uint8_t s) {
+int32_t drawstring_title(double y, char* ctx, int32_t s) {
 	//cairo_set_font_size(G, s);
 	set_font_size(s);
-	uint16_t w = get_string_width(ctx);
-	uint16_t h = get_font_height();
+	int32_t w = get_string_width(ctx);
+	int32_t h = get_font_height();
 	double x = (WINDOW_WIDTH / 2) - (w / 2);
 	chcolor(COLOR_TEXTBG, FALSE);
 	fillrect(x, y, w, h);
@@ -180,7 +180,7 @@ uint16_t drawstring_title(double y, char* ctx, uint8_t s) {
 }
 
 //Set font size to s
-void set_font_size(uint16_t s) {
+void set_font_size(int32_t s) {
 	const PangoFontDescription *pfd = pango_layout_get_font_description(Gpangolayout);
 	PangoFontDescription *pfdd = pango_font_description_copy(pfd);
 	pango_font_description_set_size(pfdd, s * PANGO_SCALE);
@@ -197,7 +197,7 @@ void loadfont(const char* fontlist) {
 
 //draw polygon that has start point x,y and vertexes represented by x: points[2n], y: points[2n+1]
 //n: num_points, region specified by points don't have to be closed. all points are relative.
-void draw_polygon(double x, double y, uint8_t num_points, double points[]) {
+void draw_polygon(double x, double y, int32_t num_points, double points[]) {
 	cairo_set_line_width(G, 1);
 	cairo_move_to(G, x, y);
 	for(uint8_t i = 0; i < num_points; i++) {
