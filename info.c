@@ -29,7 +29,17 @@ const char* JP_STRINGS[MAX_STRINGS] = {
 	"プレイありがとうございます。(作戦失敗)",
 	"地球は守られた!",
 	"プレイありがとうございます。おめでとう!",
-	"現在使用出来ません"
+	"現在使用出来ません",
+	"爆発に巻き込まれた",
+	"蜂の巣にされた",
+	"大量の枝豆を浴びた",
+	"カリカリに焼けた",
+	"消滅した",
+	"わけの分からない理由で死んだ",
+	"サーバーに接続しています",
+	"接続できませんでした",
+	"サーバーから切断しました",
+	"サーバーとの接続を確立しました"
 };
 
 const char *EN_STRINGS[MAX_STRINGS] = {
@@ -43,7 +53,72 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"Thank you for playing.",
 	"Earth is safe now!",
 	"Thanks for playing, Congratulations!",
-	"Unavailable"
+	"Unavailable",
+	"blown up",
+	"turned into a bee hive",
+	"took too much Edamames",
+	"burnt into crisp",
+	"annihilated",
+	"got killed by uncomprehensible reason",
+	"Connecting to server",
+	"Server connection failed.",
+	"Disconnected from server.",
+	"Connection established."
+};
+
+//TID names LUT
+const char *JP_TID_NAMES[MAX_TID] = {
+	"地球",
+	"ずんだもん星",
+	"ざこずん",
+	"おこずん",
+	"ぷんぷんずん",
+	"ずんだもん地雷",
+	"入渠",
+	"要塞",
+	"見方ミサイル",
+	"見方爆発",
+	"敵爆発",
+	"爆発",
+	"見方弾",
+	"敵弾",
+	"敵ずんだレーザー",
+	"Kumo9-x24",
+	"神風もん",
+	"kumo9-x24-ミサイル",
+	"kumo9-x24-ミサイル爆発痕",
+	"優秀な証券取引所",
+	"グーグル",
+	"発電所",
+	"kumo9-x24-レーザー",
+	"kumo9-x24-陽電子砲"
+};
+
+const char *EN_TID_NAMES[MAX_TID] = {
+	"TheEarth",
+	"ZundamonStar",
+	"NormalZundamon",
+	"MadZundamon",
+	"SpicyZundamon",
+	"ZundaMine",
+	"Pit",
+	"Fort",
+	"AllyMissile",
+	"AllyExplosion",
+	"EnemyExplosion",
+	"Explosion",
+	"AllyBullet",
+	"EnemyBullet",
+	"EnemyZundaLaser",
+	"Kumo9-x24",
+	"KamikazeZunda",
+	"Kumo9-x24-missile",
+	"Kumo9-x24-missile-residue",
+	"BestStockMarket",
+	"Google",
+	"PowerPlant",
+	"Kumo9-x24-laser",
+	"Kumo9-x24-PositronCanon"
 };
 
 //Item description strings: jp
@@ -102,12 +177,22 @@ const int32_t ITEMCOOLDOWNS[ITEM_COUNT] = {
 
 //Playable character skill cooldowns
 int32_t SKILLCOOLDOWNS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
-	{500, 1000, 6000} //kumo9-x24 cooldowns (kumohakasemk9)
+	{1000, 1500, 6000} //kumo9-x24 cooldowns (kumohakasemk9)
+};
+
+//initial value of timers when skill activated
+int32_t SKILL_INIT_TIMERS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
+	{500, 500, 2} //kumo9-x24
+};
+
+//skill ranges
+int32_t SKILL_RANGES[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
+	{KUMO9_X24_MISSILE_RANGE, KUMO9_X24_LASER_RANGE, KUMO9_X24_PCANNON_RANGE} //kumo9-x24
 };
 
 //Playable character skill icon ids LUT
 int32_t SKILLICONIDS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
-	{24, 33, 13} //kumo9-x24 skill icons (kumohakasemk9)
+	{24, 33, 34} //kumo9-x24 skill icons (kumohakasemk9)
 };
 
 //Playable character information (tid, portraitimgid, dead portrait)
@@ -150,34 +235,36 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"adwaitalegacy/battery-full-charging.png", //30 power plant (hotbar)
 	"adwaitalegacy/battery-full.png", //31 full battery icon
 	"adwaitalegacy/battery-caution.png", //32 Insufficient energy level icon
-	"img/kumo9-x24/kumolaser.png" //33 Kumo x24 laser icon (LOL hotbar)
+	"img/kumo9-x24/kumolaser.png", //33 Kumo x24 laser icon (LOL hotbar)
+	"img/kumo9-x24/positron.png" //34 Kumo x24 positron icon (LOL hotbar)
 };
 
 //InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout, requirepowerlevel
 const int32_t NUMINFO[MAX_TID][9] = {
-	{ 0, 10000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  0}, //0 Earth
-	{ 1, 20000, TEAMID_ENEMY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  0}, //1 Zundamon Star
-	{ 2,   100, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0,  0}, //2 Zundamon
-	{ 3,   300, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0,  0}, //3 Spicy Zundamon
-	{ 4,   500, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0,  0}, //4 Mad Zundamon
-	{ 5,    70, TEAMID_ENEMY, 2,  0, UNITTYPE_BULLET_INTERCEPTABLE,  50,  300,  0}, //5 Zundamon space mine
-	{ 6,  5000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0,  2}, //6 Pit
-	{ 7,  7000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 200,    0, 10}, //7 Fort
-	{ 8,    20,  TEAMID_ALLY, 2,  0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  300,  0}, //8 Missile
-	{-1,     0,  TEAMID_ALLY, 2,  1,               UNITTYPE_BULLET, 100,    0,  0}, //9 AllyExplosion
-	{-1,     0, TEAMID_ENEMY, 2,  1,               UNITTYPE_BULLET, 100,    0,  0}, //10 EnemyExplosion
-	{-1,     0,  TEAMID_NONE, 2,  1,               UNITTYPE_BULLET, 100,    0,  0}, //11 Explosion
-	{ 9,     0,  TEAMID_ALLY, 2, 10,               UNITTYPE_BULLET,  10,  700,  0}, //12 AllyBullet
-	{10,     0, TEAMID_ENEMY, 2, 20,               UNITTYPE_BULLET,  20,  800,  0}, //13 EnemyBullet (Edamame)
-	{-1,     0, TEAMID_ENEMY, 2, 15,               UNITTYPE_BULLET, 600,   50,  0}, //14 Enemy Zunda laser
-	{11,  5000,  TEAMID_ALLY, 1,  0,                 UNITTYPE_UNIT,  50,    0,  0}, //15 Kumo9-x24-robot
-	{12,   500, TEAMID_ENEMY, 1,  0,                 UNITTYPE_UNIT, 100,    0,  0}, //16 Kamikaze zundamon
-	{24,    70,  TEAMID_ALLY, 2,  0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  700,  0}, //17 Kumo9 x24 missile
-	{25,     0,  TEAMID_ALLY, 0,  5,               UNITTYPE_BULLET, 100,  100,  0}, //18 kumo9 x24 missile residue
-	{26,  3000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0, 15}, //19 Money generater facility
-	{27,  3000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  4}, //20 researchment facility
-	{29,  5000,  TEAMID_ALLY, 0,  0,             UNITTYPE_FACILITY, 210,    0,  0}, //21 power plant
-	{-1,     0,  TEAMID_ALLY, 2,  1,               UNITTYPE_BULLET, 600,  500,  0}  //22 Kumo9-x24-robot-laser
+	{ 0, 10000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //0 Earth
+	{ 1, 20000, TEAMID_ENEMY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //1 Zundamon Star
+	{ 2,   100, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //2 Zundamon
+	{ 3,   300, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //3 Spicy Zundamon
+	{ 4,   500, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //4 Mad Zundamon
+	{ 5,    70, TEAMID_ENEMY, 2,    0, UNITTYPE_BULLET_INTERCEPTABLE,  50,  300,  0}, //5 Zundamon space mine
+	{ 6,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 200,    0,  2}, //6 Pit
+	{ 7,  7000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 200,    0, 10}, //7 Fort
+	{ 8,    20,  TEAMID_ALLY, 2,    0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  300,  0}, //8 Missile
+	{-1,     0,  TEAMID_ALLY, 2,    1,               UNITTYPE_BULLET, 100,    0,  0}, //9 AllyExplosion
+	{-1,     0, TEAMID_ENEMY, 2,    1,               UNITTYPE_BULLET, 100,    0,  0}, //10 EnemyExplosion
+	{-1,     0,  TEAMID_NONE, 2,    1,               UNITTYPE_BULLET, 100,    0,  0}, //11 Explosion
+	{ 9,     0,  TEAMID_ALLY, 2,   10,               UNITTYPE_BULLET,  10,  700,  0}, //12 AllyBullet
+	{10,     0, TEAMID_ENEMY, 2,   20,               UNITTYPE_BULLET,  20,  800,  0}, //13 EnemyBullet (Edamame)
+	{-1,     0, TEAMID_ENEMY, 2,   15,               UNITTYPE_BULLET, 600,  100,  0}, //14 Enemy Zunda laser
+	{11,  2500,  TEAMID_ALLY, 1,    0,                 UNITTYPE_UNIT,  50,    0,  0}, //15 Kumo9-x24-robot
+	{12,   500, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //16 Kamikaze zundamon
+	{24,    70,  TEAMID_ALLY, 2,    0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  700,  0}, //17 Kumo9 x24 missile
+	{25,     0,  TEAMID_ALLY, 0,    5,               UNITTYPE_BULLET, 100,  100,  0}, //18 kumo9 x24 missile residue
+	{26,  3000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0, 15}, //19 Money generater facility
+	{27,  3000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  4}, //20 researchment facility
+	{29,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //21 power plant
+	{-1,     0,  TEAMID_ALLY, 2,    1,               UNITTYPE_BULLET, 600,  500,  0}, //22 Kumo9-x24-robot-laser
+	{-1,     0,  TEAMID_ALLY, 2, 2000,               UNITTYPE_BULLET,   0,  300,  0}  //23 Kumo9-x24-robot-pcanon
 };
 
 //MaxSpeeds, damage
@@ -203,7 +290,9 @@ const double DBLINFO[MAX_TID] = {
 	0,   //18
 	0,   //19
 	0,   //20
-	0    //21
+	0,   //21
+	0,   //22
+	0    //23
 };
 
 const char* getlocalizedstring(int32_t stringid) {
@@ -312,6 +401,8 @@ void lookup_playable(int32_t i, PlayableInfo_t *t) {
 	t->portraitimg_dead_id = PLAYABLE_INFORMATION[i][2];
 	t->skillcooldowns = SKILLCOOLDOWNS[i];
 	t->skillimageids = SKILLICONIDS[i];
+	t->skillinittimers = SKILL_INIT_TIMERS[i];
+	t->skillranges = SKILL_RANGES[i];
 }
 
 const char* getlocalizeditemdesc(int32_t did) {
@@ -323,4 +414,16 @@ const char* getlocalizeditemdesc(int32_t did) {
 		return ITEMDESC_JP[did];
 	}
 	return ITEMDESC_EN[did];
+}
+
+
+const char* getlocalizedcharactername(int32_t did) {
+	if(!is_range(did,0 , MAX_TID - 1) ) {
+		die("getlocalizedcharactername(): bad did passed: %d\n", did);
+		return NULL;
+	}
+	if(LangID == LANGID_JP) {
+		return JP_TID_NAMES[did];
+	}
+	return EN_TID_NAMES[did];
 }

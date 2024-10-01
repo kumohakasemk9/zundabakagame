@@ -13,13 +13,11 @@ Zundamon is from https://zunko.jp/
 main.c: main window process, game process (keyevents) and drawing
 
 TODO List
-add ult
+add lol style death/kill anouncement
+add getCurrentPlayableCharacterId()
+add objsrcid
 Make me ahri
-fix key/mouse mechanism (squueze it in gametick)
 Make it multiplay - Integrate with kumo auth system
-make uint* to int*
-Fix gameover/gameclear speed issue
-Fix laser system
 */
 
 #include "main.h"
@@ -57,11 +55,15 @@ GtkGesture* MouseGestureCatcher;
 int32_t SkillCooldownTimers[SKILL_COUNT];
 int32_t CurrentPlayableCharacterID = 0; //Current Playable Character ID
 keyflags_t KeyFlags;
+int32_t SkillKeyState;
 gboolean ProgramExiting = FALSE;
 PangoLayout *Gpangolayout = NULL;
 int32_t MapTechnologyLevel = 0;
 int32_t MapEnergyLevel = 0;
 int32_t MapRequiredEnergyLevel = 0;
+int NetworkSocket = -1;
+
+//LOLSkillKeyState_t SkillKeyStates[SKILL_COUNT];
 
 //Paint event of Drawing Area, called for every 30mS
 void darea_paint(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data) {
@@ -151,11 +153,17 @@ gboolean mousescroll_handler(GtkWidget* wid, gdouble dx, gdouble dy, gpointer us
 
 int main(int argc, char *argv[]) {
 	int s;
+	//Create new GUI
 	Application = gtk_application_new("kumotechmadlab.kumohakase.zundamonbakage", G_APPLICATION_DEFAULT_FLAGS);
 	g_signal_connect(Application, "activate", G_CALLBACK(activate), NULL);
 	s = g_application_run(G_APPLICATION(Application), argc, argv);
 	//Finalize
 	ProgramExiting = TRUE;
+	//Close Network Connection
+	if(NetworkSocket != -1) {
+		close(NetworkSocket);
+	}
+	//Unload images
 	for(uint8_t i = 0; i < IMAGE_COUNT; i++) {
 		if(Plimgs[i] != NULL) {
 			cairo_surface_destroy(Plimgs[i]);
@@ -171,6 +179,15 @@ int main(int argc, char *argv[]) {
 }
 
 void draw_game_main() {
+	//draw lol type skill helper
+	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) && is_range(CurrentPlayableCharacterID, 0, PLAYABLE_CHARACTERS_COUNT - 1) && is_range(SkillKeyState,0, SKILL_COUNT - 1) ) {
+		PlayableInfo_t t;
+		lookup_playable(CurrentPlayableCharacterID, &t);
+		double x, y;
+		getlocalcoord(PlayingCharacterID, &x, &y);
+		chcolor(0x600000ff, TRUE);
+		fillcircle(x, y, t.skillranges[SkillKeyState]);
+	}
 	//draw characters
 	for(uint8_t z = 0; z < MAX_ZINDEX; z++) {
 		for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
@@ -257,24 +274,17 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 		}
 		draw_hpbar(x, y - 7, w, 5, Gobjs[idx].hp, t.inithp, COLOR_TEXTCHAT, cc);
 	}
-	//draw timer bars
-	double bary = y + h + 2; //initial timer bar pos x
-	//Draw timer bar if timerNfill is not 0 and timerN is not 0
-	if(Gobjs[idx].timer0 != 0 && Gobjs[idx].timer0fill != 0) {
-		draw_hpbar(x, bary, w, 5, Gobjs[idx].timer0, Gobjs[idx].timer0fill, COLOR_ENEMY, COLOR_TEXTCHAT);
-		bary += 7;
-	}
-	if(Gobjs[idx].timer1 != 0 && Gobjs[idx].timer1fill != 0) {
-		draw_hpbar(x, bary, w, 5, Gobjs[idx].timer1, Gobjs[idx].timer1fill, COLOR_ENEMY, COLOR_TEXTCHAT);
-		bary += 7;
-	}
-	if(Gobjs[idx].timer2 != 0 && Gobjs[idx].timer2fill != 0) {
-		draw_hpbar(x, bary, w, 5, Gobjs[idx].timer2, Gobjs[idx].timer2fill, COLOR_ENEMY, COLOR_TEXTCHAT);
-		bary += 7;
-	}
-	if(Gobjs[idx].timer3 != 0 && Gobjs[idx].timer3fill != 0) {
-		draw_hpbar(x, bary, w, 5, Gobjs[idx].timer3, Gobjs[idx].timer3fill, COLOR_ENEMY, COLOR_TEXTCHAT);
-		bary += 7;
+	//Timer bar for kumo9-x24's W skill
+	double bary = y + h + 2;
+	if(Gobjs[idx].tid == TID_KUMO9_X24_ROBOT) {
+		for(uint8_t i = 0; i < SKILL_COUNT; i++) {
+			if(Gobjs[idx].timers[i + 1] != 0) {
+				PlayableInfo_t plinfo;
+				lookup_playable(CurrentPlayableCharacterID, &plinfo);
+				draw_hpbar(x, bary, w, 5, Gobjs[idx].timers[i + 1], plinfo.skillinittimers[i], COLOR_ENEMY, COLOR_TEXTCHAT);
+				bary += 7;
+			}
+		}
 	}
 }
 
@@ -335,14 +345,16 @@ void draw_shapes(int32_t idx, LookupResult_t t, double x, double y) {
 		case TID_EXPLOSION:
 			chcolor(0x70ff0000, TRUE);
 		break;
-		default:
-			chcolor(0x7000A0FF, TRUE);
-		break;
+		case TID_KUMO9_X24_PCANNON:
+			d = Gobjs[idx].timeout;
+			chcolor(COLOR_KUMO9_X24_PCANNON, TRUE);
+			break;
 	}
 	if(d != 0) {
 		//Draw circle
 		fillcircle(x, y, d);
-	} else if(Gobjs[idx].tid == TID_ENEMYZUNDALASER || Gobjs[idx].tid == TID_KUMO9_X24_LASER) {
+	}
+	if(Gobjs[idx].tid == TID_ENEMYZUNDALASER || Gobjs[idx].tid == TID_KUMO9_X24_LASER || (Gobjs[idx].tid == TID_KUMO9_X24_PCANNON && Gobjs[idx].timeout < 20) ) {
 		//Draw laser obj
 		uint32_t lasercolour = 0xc07f00ff;
 		double laserwidth = 5;
@@ -350,6 +362,9 @@ void draw_shapes(int32_t idx, LookupResult_t t, double x, double y) {
 			//Apply EnemyZundaColourLaser if TID is TID_ENEMYZUNDALASER
 			lasercolour = 0xa000ff00;
 			laserwidth = 20;
+		} else if(Gobjs[idx].tid == TID_KUMO9_X24_PCANNON) {
+			lasercolour = COLOR_KUMO9_X24_PCANNON;
+			laserwidth = 30;
 		}
 		if(is_range(Gobjs[idx].aiming_target, 0, MAX_OBJECT_COUNT - 1)) {
 			chcolor(lasercolour, TRUE);
@@ -502,6 +517,9 @@ void draw_lolhotbar(double offsx, double offsy) {
 		lookup(Gobjs[PlayingCharacterID].tid, &t2);
 		chp = Gobjs[PlayingCharacterID].hp;
 		fhp = t2.inithp;
+		chcolor(COLOR_TEXTCMD, TRUE);
+		//Draw current speed
+		drawstringf(offsx + 120, offsy + 75, "X: %.1f Y: %.1f", Gobjs[PlayingCharacterID].sx, Gobjs[PlayingCharacterID].sy);
 	}
 	draw_hpbar(offsx + 100, offsy + 53, LHOTBAR_WIDTH - 100, 10, chp, fhp, COLOR_ENEMY, COLOR_ALLY);
 	//Show Earth HP If there's earth
@@ -612,13 +630,6 @@ gboolean gameinit() {
 			return FALSE;
 		}
 	}
-	//Initialize Chat Message Slots
-	for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {
-		ChatMessages[i][0] = 0;
-	}
-	check_data(); //Data Check
-	//load fonts
-	loadfont("Ubuntu Mono,monospace");
 	//Detect system locale
 	PangoLanguage* lang = pango_language_get_default();
 	const char* lang_c = pango_language_to_string(lang);
@@ -629,6 +640,13 @@ gboolean gameinit() {
 		g_print("Changed to English mode because of your locale setting: %s\n", lang_c);
 		LangID = LANGID_EN;
 	}
+	//Initialize Chat Message Slots
+	for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {
+		ChatMessages[i][0] = 0;
+	}
+	check_data(); //Data Check
+	//load fonts
+	loadfont("Ubuntu Mono,monospace");
 	//cairo_set_font_size(G, FONT_DEFAULT_SIZE);*/
 	set_font_size(FONT_DEFAULT_SIZE);
 	reset_game(); //reset game round

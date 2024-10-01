@@ -103,7 +103,7 @@ void connect_server(char* addrstr) {
 		NetworkSocket = -1;
 		return;
 	}
-	freeaddrinfo(res); //free Name Resolution result
+	freeaddrinfo(res); //free Name Resolution result 	
 	chatf("%s (%s)", getlocalizedstring(20), addrstr);
 	//g_print("Connection established: %s\n", addrstr);
 }

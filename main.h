@@ -14,14 +14,14 @@ main.h: integrated header file
 */
 
 //Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function updated or added (feature add), 3 will increase if function update (bugfix)
-#define VERSION_STRING "4.0.0-sep272024"
+#define VERSION_STRING "5.0.0-sep292024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 
 #define WINDOW_WIDTH 800 //Game width
 #define WINDOW_HEIGHT 600 //Game height
 #define MAP_WIDTH 5000 //map max width
 #define MAP_HEIGHT 5000 //map max height
-#define IMAGE_COUNT 34 //Preload image count
+#define IMAGE_COUNT 35 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define MAX_ZINDEX 3 //Max z-index
 #define COLOR_TEXTBG 0x60ffffff //Text background color (30% opaque white)
@@ -31,14 +31,15 @@ main.h: integrated header file
 #define COLOR_ENEMY 0xffff0000 //Enemy HP bar and marker color
 #define COLOR_ALLY 0xff00ffa0 //Enemy HP bar and marker color
 #define COLOR_UNUSABLE 0x60000000 //Gray out color
+#define COLOR_KUMO9_X24_PCANNON 0xc0ffffff //kumo9 x24 pcannon color
 #define MAX_CHAT_COUNT 5 //Maximum chat show count
 #define BUFFER_SIZE 1024 //Command, message buffer size
 #define CHAT_TIMEOUT 1000 //Chat message timeout
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
 #define ITEM_COUNT 5 //Max item id
-#define MAX_STRINGS 12 // Max string count
-#define MAX_TID 23 //max type id
+#define MAX_STRINGS 21 // Max string count
+#define MAX_TID 24 //max type id
 #define SKILL_COUNT 3 //Skill Count
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
 #define EARTH_RADAR_DIAM 500 //Earth radar diameter
@@ -56,6 +57,10 @@ main.h: integrated header file
 #define LHOTBAR_XOFF (WINDOW_WIDTH - LHOTBAR_WIDTH) //LOL hotbar X
 #define LHOTBAR_YOFF (WINDOW_HEIGHT - 100) //LOL hotbar Y
 #define OBJID_INVALID -1
+#define CHARACTER_TIMER_COUNT 4
+#define KUMO9_X24_MISSILE_RANGE 500
+#define KUMO9_X24_LASER_RANGE 600
+#define KUMO9_X24_PCANNON_RANGE 1000
 
 //Image ID Definition for special purposes
 #define IMG_ITEM_UNUSABLE 13 //Cross icon, this means item is unusable
@@ -73,6 +78,14 @@ main.h: integrated header file
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <errno.h>
 
 //Language ID
 typedef enum {
@@ -113,7 +126,8 @@ typedef enum {
 	TID_MONEY_GENE = 19,
 	TID_RESEARCHMENT_CENTRE = 20,
 	TID_POWERPLANT = 21,
-	TID_KUMO9_X24_LASER = 22
+	TID_KUMO9_X24_LASER = 22,
+	TID_KUMO9_X24_PCANNON = 23
 } obj_type_t;
 
 //TEAMID
@@ -153,18 +167,12 @@ typedef struct {
 	double sx; //object speed
 	double sy;
 	int32_t aiming_target; //holding stalking object id
-	int32_t timer0; //automatically decreases to 0
-	int32_t timer1;
-	int32_t timer2;
-	int32_t timer3;
+	int32_t timers[CHARACTER_TIMER_COUNT];
 	int32_t hitdiameter; //when objects are within sum of both hit diameters, hitdetection will trigger
 	int32_t parentid; //source id
 	int32_t timeout; //lifespan, automatically decreased, dies when 0
 	double damage; //given damage when hit
-	int32_t timer0fill; //If timerNfill and timerN are not 0, show progress bar
-	int32_t timer1fill; //on bottom of characters. the progress bars have value
-	int32_t timer2fill; //timerN / timerNfill.
-	int32_t timer3fill;
+	int32_t srcid; //Object source id, holds who made this attack.
 } GameObjs_t;
 
 //constant information of characters
@@ -188,7 +196,16 @@ typedef struct {
 	int32_t portraitimgid;
 	int32_t portraitimg_dead_id;
 	obj_type_t associatedtid;
+	int32_t *skillinittimers;
+	int32_t *skillranges;
 } PlayableInfo_t;
+
+//NetowrkPacketType
+typedef enum {
+	NETPACKET_CHANGE_PLAYABLE_SPEED = 0,
+	NETPACKET_PLACE_ITEM = 1,
+	NETPACKET_USE_SKILL = 2
+} networkpackettype_t;
 
 //main.c
 void activate(GtkApplication*, gpointer);
@@ -245,13 +262,15 @@ gboolean is_range(int32_t, int32_t, int32_t);
 gboolean is_range_number(double, double, double);
 int32_t randint(int32_t, int32_t);
 void get_image_size(int32_t, double*, double*);
+void double2bytes(double, uint8_t*, int32_t);
+void int322bytes(int32_t, uint8_t*, int32_t);
 
 //gamesys.c
 void local2map(double, double, double*, double*);
 void getlocalcoord(int32_t, double*, double*);
 void chat(char*);
 void chatf(const char*, ...);
-int32_t add_character(int32_t, double, double);
+int32_t add_character(obj_type_t, double, double, int32_t);
 double get_distance(int32_t, int32_t);
 void set_speed_for_following(int32_t);
 void set_speed_for_going_location(int32_t, double, double, double);
@@ -273,15 +292,22 @@ double get_distance_raw(double, double, double, double);
 void showerrorstr(int32_t);
 void select_next_item();
 void select_prev_item();
+void spawn_playable();
 
 //info.c
 void lookup(obj_type_t, LookupResult_t*);
 void check_data();
 const char *getlocalizedstring(int32_t);
 const char *getlocalizeditemdesc(int32_t);
+const char *getlocalizedcharactername(int32_t);
 void lookup_playable(int32_t, PlayableInfo_t*);
 
 //aiproc.c
 void procai();
 gboolean procobjhit(int32_t, int32_t, LookupResult_t, LookupResult_t);
-void damage_object(int32_t, double, int32_t);
+void damage_object(int32_t, int32_t);
+
+//network.c
+void net_send_packet(networkpackettype_t, ...);
+void connect_server(char*);
+void close_connection(int32_t);

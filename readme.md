@@ -80,9 +80,7 @@ by typing `gdb gvsbuild-zundamon.exe` from your cmd.exe after building game.
   as external library directory. Configre your IDE to do it.   
   In VisualStudio, please put `.lib` in each entries.   
 - If your IDE supports makefile, makefile will do library importing automatically.   
-- Turn off all warnings and code security checks, if there is no makefile support.   
-- MSVC can not process code to establish variable length buffer on
-  stack. and some code must be fixed.    
+- Turn off all warnings and code security checks, if there is no makefile support.    
    
 # Thanks
 - You
@@ -93,106 +91,7 @@ by typing `gdb gvsbuild-zundamon.exe` from your cmd.exe after building game.
 - gvsbuild https://github.com/wingtk/gvsbuild
 
 only adwaita legacy and programs are licensed by CC,   
-do not redistribute or use out of game without perm    
+for other resources, do not redistribute or use out of game without perm    
 
-# にほんご
-
-#ズンダモンゲーム
-Copyright (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0   
-https://ko-fi.com/kumohakase (kofi) や     
-https://www.patreon.com/kumohakasemk8 (pateron) を通じて私を   
-サポートすることを検討してください   
-kumohakaseは、このソフトウェアパッケージを使用した場合の   
-データの損失/エラーについて責任を負いません。   
-
-# オペレーション 
-- `T`       : チャット 
-- `/`       ：コマンド
-- `A/S`      : アイテム切り替え
-- `D`        : アイテム使用
-- `スペース` : 移動on off
-- `J/K/L/I`  : MOVE (未実装) 
-- `Q/W/E`    : スキル(未実装)
-
-(1)マウスホイールでもアイテムを循環させることができます。   
-(2)アイテムは右クリックでもご利用いただけます。   
-(3)左クリックでも動きをon offすることができます   
-
-# コマンドヘルプ
-- `/en`              : 英語に切り替える
-- `/jp`              : 日本語に切り替えます
-- `/chfont fontname` : fontnameで指定されたフォントリストの読み込み、「,」で区切られる。
-- `/version`         : バージョン文字列を表示する
-- `/credit`          : クレジット文字列を表示
-- `/reset`           : ゲームリセット
-
-# Windowsの準備
-1. gvsbuild( https://github.com/wingtk/gvsbuild )をダウンロードします  
-   リリースビルドをダウンロードしてください。   
-2. `gvsbuild\bin`内のすべてのDLLファイルを、ゲームの実行可能ファイルが
-    あるディレクトリにコピーします。    
-    (DLL をコピーする代わりに `gvsbuild/bin` を PATH    
-    に追加することもできます。しかしもしデバッグしたいならPATHに追加してください)   
-3. Microsoft Visual C++ 再頒布可能パッケージのダウンロード   
-   (https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)   
-   インストールします。   
-4. ゲームの実行可能ファイルをダブルクリックしてお楽しみください。
-
-# linux の準備
-1. gtk4 だけが必要です。たぶん、ほとんどのLinuxはすでにそれを持っています。
-   
-# Windowsでのビルド (Cygwin)
-1. cygwinを準備します。 `make` `gcc-g++` `gdb` ( `gdb` はデバッグしたいなら)   
-   をインストールしてください。cygwinの `bin` ディレクトリをPATHに追加すること   
-   も忘れないでください。   
-2. gvsbuildを `gvsbuild` という名前のディレクトリに展開し、makefileがあるディレクトリに移動します。
-3. `make gvsbuild` を実行します。
-4. cygwinディレクトリをPATHに追加しないと、実行した時にcygwin1.dll見つかりませんというエラー   
-  が表示されるでしょう。   
-   
-gdbが入ってPATHが適切にセットされていれば、ゲームをビルドしたのちに、    
-`gdb gvsbuild-zundagame.exe` と打てばコマンドラインからデバッグできます。    
-
-# IDEによるデバッグ(ヒントのみ、私はIDEが嫌いです :/)
-- 適切なインクルードディレクトリを追加します。必要なディレクトリは、次の方法で取得できます    
-  `gvsbuild/bin/pkg-config gtk4 --cflags` と入力します。    
-  今のところ、必要なディレクトリは次のとおりです。   
- 
-```
- "gvsbuild/include/gtk-4.0",
- "gvsbuild/include/pango-1.0",
- "gvsbuild/include/fribidi",
- "gvsbuild/include/harfbuzz",
- "gvsbuild/include/gdk-pixbuf-2.0",
- "gvsbuild/include/cairo",
- "gvsbuild/include/freetype2",
- "gvsbuild/include/libpng16",
- "gvsbuild/include/pixman-1",
- "gvsbuild/include/graphene-1.0",
- "gvsbuild/lib/graphene-1.0/include",
- "gvsbuild/include",
- "gvsbuild/include/glib-2.0",
- "gvsbuild/lib/glib-2.0/include"
-```
- 
-- IDE が makefile をサポートしていない場合は、適切な外部ライブラリを追加します。    
-  必要な外部ライブラリを取得するには、`gvsbuild/bin/pkg-config --libs` と入力します。    
-- IDE が makefile をサポートしていない場合、リンカは `gvsbuild/lib` をロードする必要   
-  があります 外部ライブラリディレクトリとして。それを行うようにIDEを構成します。   
-- VisualStudioでは、各ライブラリの最後に `.lib` を入れてください。   
-- IDEがmakefileをサポートしている場合、makefileは自動的にライブラリのインポートを行います。   
-- すべての警告とコードのセキュリティチェックをオフにします (Makefile がサポートされていない場合)。  
-- MSVC は、可変長バッファーをスタックに積むコードを処理できません
-  よって、一部のコードを修正する必要があります。    
-
-# ありがとう 
-- あなた
-- Gtk4 https://www.gtk.org/
-- ずんだもん (C) 2024 SSS合同会社 https://zunko.jp/ 
-- ずんだもん (イメージ) (C) 2024 https://twitter.com/sakamoto_ahr 坂本アヒル
-- Adwaitaアイコンテーマ https://github.com/GNOME/adwaita-icon-theme
-- gvsbuild https://github.com/wingtk/gvsbuild
-- duckduckgo翻訳システム https://duckduckgo.com/
-
-プログラムとadwaitalegacy以外はCCライセンスの適用外です。     
-許可なく再頒布やゲーム外使用をしないでください   
+#日本語
+https://github-com.translate.goog/kumohakasemk9/zundabakagame?_x_tr_sl=auto&_x_tr_tl=ja&_x_tr_hl=ja&_x_tr_pto=wapp

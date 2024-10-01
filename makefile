@@ -13,9 +13,9 @@
 
 CC=gcc
 CFLAGSEXTRA=`pkg-config --cflags gtk4`
-CFLAGS=-g3 $(CFLAGSEXTRA)
+CFLAGS=-g3 -Wconversion $(CFLAGSEXTRA)
 LDFLAGS=`pkg-config --libs gtk4`
-OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o
+OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o network.o
 OUTNAME=zundagame
 PKGCTX=*.c main.h readme.md *.png makefile
 

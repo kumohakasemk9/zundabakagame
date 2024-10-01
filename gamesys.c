@@ -48,6 +48,8 @@ extern gboolean ProgramExiting;
 extern int32_t MapTechnologyLevel;
 extern int32_t SKILLCOOLDOWNS[SKILL_COUNT];
 extern int32_t MapEnergyLevel;
+//extern LOLSkillKeyState_t SkillKeyStates[SKILL_COUNT];
+extern int32_t SkillKeyState;
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -71,60 +73,88 @@ void getlocalcoord(int32_t i, double *x, double *y) {
 }
 
 //Add character into game object buffer, returns -1 if fail.
-//tid (character id), x, y(initial pos)
-int32_t add_character(int32_t tid, double x, double y) {
+//tid (character id), x, y(initial pos), parid (parent object id)
+int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
+	int32_t newid = -1;
+	//Get empty slot id
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		if(Gobjs[i].tid != TID_NULL) { continue; } //Skip occupied slot
-		LookupResult_t t;
-		lookup(tid, &t);
-		Gobjs[i].imgid = t.initimgid;
-		Gobjs[i].tid = tid;
-		Gobjs[i].x = x;
-		Gobjs[i].y = y;
-		Gobjs[i].hp = (double)t.inithp;
-		Gobjs[i].sx = 0;
-		Gobjs[i].sy = 0;
-		Gobjs[i].aiming_target = OBJID_INVALID;
-		Gobjs[i].timer0 = 0;
-		Gobjs[i].timer1 = 0;
-		Gobjs[i].timer2 = 0;
-		Gobjs[i].hitdiameter = t.inithitdiameter;
-		Gobjs[i].timeout = t.timeout;
-		Gobjs[i].damage = t.damage;
-		Gobjs[i].timer0fill = 0;
-		Gobjs[i].timer1fill = 0;
-		Gobjs[i].timer2fill = 0;
-		Gobjs[i].timer3fill = 0;
-		//MISSLIE, bullet and laser will try to aim closest enemy unit
-		if(tid == TID_MISSILE || tid == TID_ALLYBULLET || tid == TID_ENEMYBULLET) {
-			//Set initial target
-			int32_t r = find_nearest_unit(i, DISTANCE_INFINITY, UNITTYPE_FACILITY | UNITTYPE_BULLET_INTERCEPTABLE | UNITTYPE_UNIT);
-			if(r != -1) {
-				Gobjs[i].aiming_target = r;
-				set_speed_for_following(i);
-			} else {
-				Gobjs[i].tid = TID_NULL;
-				g_print("gamesys.c: add_character(): object destroyed, no target found. id:%d\n", i);
-			}
-		}
-		switch(tid) {
-		case TID_EARTH:
-			Gobjs[i].hp = 1; //For initial scene
-			break;
-		case TID_ZUNDAMON3:
-			aim_earth(i); //find earth and attempt to approach it
-			break;
-		case TID_ENEMYBASE:
-			//tid = 1, zundamon star
-			//find earth and attempt to approach it
-			aim_earth(i);
-			Gobjs[i].hp = 1; //For initial scene
-			break;
-		}
-		return i;
+		newid = i;
+		break;
 	}
-	die("gamesys.c: add_character(): Gameobj is full!\n");
-	return 0;
+	if(newid == -1) {
+		die("gamesys.c: add_character(): Gameobj is full!\n");
+		return 0;
+	}
+	//Add new character
+	LookupResult_t t;
+	lookup(tid, &t);
+	Gobjs[newid].imgid = t.initimgid;
+	Gobjs[newid].tid = tid;
+	Gobjs[newid].x = x;
+	Gobjs[newid].y = y;
+	Gobjs[newid].hp = (double)t.inithp;
+	Gobjs[newid].sx = 0;
+	Gobjs[newid].sy = 0;
+	Gobjs[newid].aiming_target = OBJID_INVALID;
+	for(uint8_t i = 0; i < CHARACTER_TIMER_COUNT; i++) {
+		Gobjs[newid].timers[i] = 0;
+	}
+	Gobjs[newid].hitdiameter = t.inithitdiameter;
+	Gobjs[newid].timeout = t.timeout;
+	Gobjs[newid].damage = t.damage;
+	//set srcid
+	if(is_range(parid, 0, MAX_OBJECT_COUNT - 1) ) {
+		//Set src id to parid if Gobjs[parid] is UNITTYPE_UNIT or UNITTYPE_FACILITY
+		//Otherwise inherit from parent.
+		if(is_range(Gobjs[parid].tid, 0, MAX_TID - 1) ) {
+			LookupResult_t t2;
+			lookup(Gobjs[parid].tid, &t2);
+			if(t2.objecttype == UNITTYPE_UNIT || t2.objecttype == UNITTYPE_FACILITY) {
+				Gobjs[newid].srcid = parid;
+			} else {
+				Gobjs[newid].srcid = Gobjs[parid].srcid;
+			}
+		} else {
+			Gobjs[newid].srcid = Gobjs[parid].srcid;
+		}
+	} else {
+		Gobjs[newid].srcid = -1;
+	}
+	Gobjs[newid].parentid = parid;
+	//MISSLIE, bullet and laser will try to aim closest enemy unit
+	if(tid == TID_MISSILE || tid == TID_ALLYBULLET || tid == TID_ENEMYBULLET || tid == TID_KUMO9_X24_MISSILE) {
+		//Set initial target
+		int32_t r;
+		if(tid == TID_KUMO9_X24_MISSILE) {
+			r = find_random_unit(newid, KUMO9_X24_MISSILE_RANGE, UNITTYPE_FACILITY | UNITTYPE_UNIT);
+		} else {
+			r = find_nearest_unit(newid, DISTANCE_INFINITY, UNITTYPE_FACILITY | UNITTYPE_BULLET_INTERCEPTABLE | UNITTYPE_UNIT);
+		}
+		if(r != -1) {
+			Gobjs[newid].aiming_target = r;
+			set_speed_for_following(newid);
+		} else {
+			Gobjs[newid].tid = TID_NULL;
+			g_print("add_character(): object destroyed, no target found.\n");
+		}
+	}
+	switch(tid) {
+	case TID_EARTH:
+		Gobjs[newid].hp = 1; //For initial scene
+		break;
+	case TID_ENEMYBASE:
+		//tid = 1, zundamon star
+		//find earth and attempt to approach it
+		aim_earth(newid);
+		Gobjs[newid].hp = 1; //For initial scene
+		break;
+	case TID_KUMO9_X24_PCANNON:
+		//Kumo9's pcanon aims nearest facility
+		Gobjs[newid].aiming_target = find_nearest_unit(newid, KUMO9_X24_PCANNON_RANGE, UNITTYPE_FACILITY);
+		break;
+	}
+	return newid;
 }
 
 //Add chat message
@@ -139,6 +169,7 @@ void chat(char* c) {
 		die("gamesys.c: chat() failed: message too long.\n");
 	}
 	strcpy(ChatMessages[0], c);
+	g_print("[chat] %s\n", c);
 }
 
 void chatf(const char* p, ...) {
@@ -317,7 +348,7 @@ gboolean gametick(gpointer data) {
 	//If game is not in playing state, do special process
 	switch(GameState) {
 	case GAMESTATE_INITROUND:
-		//Slowly increase enemy base and the earth hp
+		//Starting animation: Slowly increase enemy base and the earth hp
 		for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 			if(Gobjs[i].tid == TID_EARTH || Gobjs[i].tid == TID_ENEMYBASE) {
 				LookupResult_t t;
@@ -344,10 +375,7 @@ gboolean gametick(gpointer data) {
 		//Init game in 5 sec.
 		StateChangeTimer++;
 		//Pause playable character
-		if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
-			Gobjs[PlayingCharacterID].sx = 0;
-			Gobjs[PlayingCharacterID].sy = 0;
-		}
+		CharacterMove = FALSE;
 		if(StateChangeTimer > 500) {
 			reset_game();
 			return TRUE; //Not doing AI proc after init game, or bug.
@@ -357,15 +385,13 @@ gboolean gametick(gpointer data) {
 		//Respawn in 10 sec
 		StateChangeTimer--;
 		if(StateChangeTimer == 0) {
-			PlayingCharacterID = add_character(TID_KUMO9_X24_ROBOT, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
-			CharacterMove = FALSE;
+			spawn_playable();
 			GameState = GAMESTATE_PLAYING;
 		}
 		break;
 	}
-	if(GameState == GAMESTATE_PLAYING) {
-		//Process Playable Character Operation
-		if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1)) { proc_playable_op(); }
+	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
+		proc_playable_op();
 	}
 	//Care about cooldown timer
 	for(uint8_t i = 0; i < ITEM_COUNT; i++) {
@@ -387,8 +413,13 @@ void proc_playable_op() {
 		g_print("proc_playable_op(): Player TID is -1??\n");
 		return;
 	}
-	if(CharacterMove) {
-		//If CharacterMove == TRUE, playable character will follow mouse
+	PlayableInfo_t plinf;
+	lookup_playable(CurrentPlayableCharacterID, &plinf);
+	//Move Playable character
+	double tx = 0, ty = 0;
+	static double prevtx = 0, prevty = 0;
+	if(CharacterMove && GameState == GAMESTATE_PLAYING) {
+		//If CharacterMove == TRUE, and PALYING state, playable character will follow mouse
 		//Set player move speed
 		double cx, cy;
 		double playerspd = 1.0 + (MapTechnologyLevel * 0.5);
@@ -397,33 +428,44 @@ void proc_playable_op() {
 		dx = constrain_number(CursorX, cx - 100, cx + 100) - (cx - 100);
 		dy = constrain_number(CursorY, cy - 100, cy + 100) - (cy - 100);
 		//g_print("%f, %f, %f, %f\n", dx, dy, cx, cy);
-		Gobjs[PlayingCharacterID].sx = scale_number(dx, 200, playerspd * 2) - playerspd;
-		Gobjs[PlayingCharacterID].sy = playerspd - scale_number(dy, 200, playerspd * 2);
-	} else {
-		Gobjs[PlayingCharacterID].sx = 0;
-		Gobjs[PlayingCharacterID].sy = 0;
+		tx = scale_number(dx, 200, playerspd * 2) - playerspd;
+		ty = playerspd - scale_number(dy, 200, playerspd * 2);
+	}
+	Gobjs[PlayingCharacterID].sx = tx;
+	Gobjs[PlayingCharacterID].sy = ty;
+	if(prevtx != tx || prevty != ty) {
+		//Speed changed
+		net_send_packet(NETPACKET_CHANGE_PLAYABLE_SPEED, tx, ty);
+		prevtx = tx;
+		prevty = ty;
 	}
 	//Set camera location to display playable character in the center of display.
 	CameraX = constrain_number(Gobjs[PlayingCharacterID].x - (WINDOW_WIDTH / 2.0), 0, MAP_WIDTH - WINDOW_WIDTH);
 	CameraY = constrain_number(Gobjs[PlayingCharacterID].y - (WINDOW_HEIGHT / 2.0), 0, MAP_HEIGHT - WINDOW_HEIGHT);
-	//Process skill keys
-	const keyflags_t SKILLKFLG[SKILL_COUNT] = {KEY_F1, KEY_F2, KEY_F3};
-	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
-		if( (KeyFlags & SKILLKFLG[i]) && SkillCooldownTimers[i] == 0) {
-			SkillCooldownTimers[i] = SKILLCOOLDOWNS[i];
-			switch(i) {
-			case 0:
-				Gobjs[PlayingCharacterID].timer1 = 200;
-				Gobjs[PlayingCharacterID].timer1fill = 200;
-				break;
-			case 1:
-				Gobjs[PlayingCharacterID].timer2 = 500;
-				Gobjs[PlayingCharacterID].timer2fill = 500;
-				break;
-			case 2:
-				Gobjs[PlayingCharacterID].timer3 = 500;
-				Gobjs[PlayingCharacterID].timer3fill = 500;
-				break;
+	//Process skill keys if playing
+	if(GameState == GAMESTATE_PLAYING) {
+		const keyflags_t SKILLKFLG[SKILL_COUNT] = {KEY_F1, KEY_F2, KEY_F3};
+		for(uint8_t i = 0; i < SKILL_COUNT; i++) {
+			if(KeyFlags & SKILLKFLG[i]) {
+				//KeyPress
+				//Remember pressed skill key if cooldown is 0 and no other skill key pressed
+				if(SkillKeyState == -1 && SkillCooldownTimers[i] == 0) {SkillKeyState = i;}
+				//if(SkillCooldownTimers[i] != 0) {chat(getlocalizedstring(10));}
+			} else {
+				//KeyRelease
+				if(SkillKeyState == i) {
+					//Dedicated key pressed before
+					SkillKeyState = -1;
+					//Activate Skill
+					Gobjs[PlayingCharacterID].timers[i + 1] = plinf.skillinittimers[i];
+					net_send_packet(NETPACKET_USE_SKILL, i);
+					//Reset Skill CD
+					if(DebugMode) {
+						SkillCooldownTimers[i] = 100;
+					} else {
+						SkillCooldownTimers[i] = plinf.skillcooldowns[i];
+					}
+				}
 			}
 		}
 	}
@@ -443,10 +485,12 @@ void use_item() {
 	}
 	//Check for price
 	if(ITEMPRICES[SelectingItemID] > Money && !DebugMode) {
+		//chat(getlocalizedstring(10) );
 		return;
 	}
 	//Check for cooldown
 	if(ItemCooldownTimers[SelectingItemID] != 0 && !DebugMode) {
+		//chat(getlocalizedstring(10) );
 		return;
 	}
 	//Buy facility
@@ -475,12 +519,14 @@ gboolean buy_facility(int32_t fid) {
 		lookup(Gobjs[i].tid, &t);
 		if(t.objecttype == UNITTYPE_FACILITY) {
 			if(get_distance_raw(Gobjs[i].x, Gobjs[i].y, mx, my) < 500) {
-				showerrorstr(0);
+				//showerrorstr(0);
+				chat(getlocalizedstring(0));
 				return FALSE;
 			}
 		}
 	}
-	add_character(tid, mx, my);
+	add_character(tid, mx, my, OBJID_INVALID);
+	net_send_packet(NETPACKET_PLACE_ITEM, tid, mx, my);
 	return TRUE;
 }
 
@@ -506,12 +552,14 @@ void debug_add_character() {
 	if(DebugMode) {
 		double mx, my;
 		local2map(CursorX, CursorY, &mx, &my);
-		add_character(AddingTID, mx, my);
+		add_character(AddingTID, mx, my, OBJID_INVALID);
+		net_send_packet(NETPACKET_PLACE_ITEM, mx, my);
 	}
 }
 
 void start_command_mode(gboolean c) {
 	KeyFlags = 0;
+	SkillKeyState = -1;
 	if(c) {
 		strcpy(CommandBuffer, "/");
 		CommandCursor = 1;
@@ -552,7 +600,8 @@ void execcmd() {
 		if(is_range(i, 0, MAX_TID - 1) ) {
 			AddingTID = (uint8_t)i;
 		} else {
-			showerrorstr(1);
+			//showerrorstr(1);
+			chat(getlocalizedstring(1));
 		}
 	} else if(strcmp(CommandBuffer, "/reset") == 0) {
 		reset_game();
@@ -561,8 +610,11 @@ void execcmd() {
 	} else if(strcmp(CommandBuffer, "/en") == 0) {
 		LangID = LANGID_EN;
 	} else if(memcmp(CommandBuffer, "/chfont ", 8) == 0) {
-		//cairo_select_font_face(G, &CommandBuffer[8], CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
 		loadfont(&CommandBuffer[8]);
+	} else if(memcmp(CommandBuffer, "/connect ", 9) == 0) {
+		connect_server(&CommandBuffer[9]);
+	} else if(strcmp(CommandBuffer, "/disconnect") == 0) {
+		close_connection(-1);
 	} else {
 		chat(CommandBuffer);
 	}
@@ -647,16 +699,14 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 }
 
 void reset_game() {
-	PlayableInfo_t t;
-	lookup_playable(CurrentPlayableCharacterID, &t);
 	GameState = GAMESTATE_INITROUND;
 	MapTechnologyLevel = 0;
 	MapEnergyLevel = 0;
 	Money = 0;
 	SelectingItemID = -1;
-	CharacterMove = FALSE;
 	CameraX = 0;
 	CameraY = 0;
+	SkillKeyState = -1;
 	//Init Skill state and timer
 	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
 		SkillCooldownTimers[i] = 0;
@@ -669,11 +719,21 @@ void reset_game() {
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		Gobjs[i].tid = TID_NULL;
 	}
-	EarthID = add_character(TID_EARTH, 200, 200);
-	add_character(TID_ENEMYBASE, MAP_WIDTH - 200, MAP_HEIGHT - 200);
-	add_character(TID_ENEMYBASE, MAP_WIDTH - 200, MAP_HEIGHT - 500);
-	add_character(TID_ENEMYBASE, MAP_WIDTH - 500, MAP_HEIGHT - 200);
-	PlayingCharacterID = add_character(t.associatedtid, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
+	EarthID = add_character(TID_EARTH, 200, 200, OBJID_INVALID);
+	add_character(TID_ENEMYBASE, MAP_WIDTH - 200, MAP_HEIGHT - 200, OBJID_INVALID);
+	add_character(TID_ENEMYBASE, MAP_WIDTH - 200, MAP_HEIGHT - 500, OBJID_INVALID);
+	add_character(TID_ENEMYBASE, MAP_WIDTH - 500, MAP_HEIGHT - 200, OBJID_INVALID);
+	spawn_playable();
+}
+
+//Spawn playable character
+void spawn_playable() {
+	PlayableInfo_t t;
+	lookup_playable(CurrentPlayableCharacterID, &t);
+	CharacterMove = FALSE;
+	double x = WINDOW_WIDTH / 2, y = WINDOW_HEIGHT / 2;
+	PlayingCharacterID = add_character(t.associatedtid, x, y, OBJID_INVALID);
+	net_send_packet(NETPACKET_PLACE_ITEM, t.associatedtid, x, y);
 }
 
 //Set object to aim the earth
