@@ -79,12 +79,14 @@ main.h: integrated header file
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
+#ifndef WIN32
+	#include <sys/socket.h>
+	#include <netinet/in.h>
+	#include <netinet/tcp.h>
+	#include <sys/types.h>
+	#include <sys/socket.h>
+	#include <netdb.h>
+#endif
 #include <errno.h>
 
 //Language ID

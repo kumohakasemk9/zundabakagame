@@ -159,10 +159,12 @@ int main(int argc, char *argv[]) {
 	s = g_application_run(G_APPLICATION(Application), argc, argv);
 	//Finalize
 	ProgramExiting = TRUE;
-	//Close Network Connection
-	if(NetworkSocket != -1) {
-		close(NetworkSocket);
-	}
+	#ifndef WIN32
+		//Close Network Connection
+		if(NetworkSocket != -1) {
+			close(NetworkSocket);
+		}
+	#endif
 	//Unload images
 	for(uint8_t i = 0; i < IMAGE_COUNT; i++) {
 		if(Plimgs[i] != NULL) {
