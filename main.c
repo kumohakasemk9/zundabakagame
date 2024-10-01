@@ -61,7 +61,6 @@ PangoLayout *Gpangolayout = NULL;
 int32_t MapTechnologyLevel = 0;
 int32_t MapEnergyLevel = 0;
 int32_t MapRequiredEnergyLevel = 0;
-int NetworkSocket = -1;
 
 //LOLSkillKeyState_t SkillKeyStates[SKILL_COUNT];
 
@@ -159,12 +158,10 @@ int main(int argc, char *argv[]) {
 	s = g_application_run(G_APPLICATION(Application), argc, argv);
 	//Finalize
 	ProgramExiting = TRUE;
-	#ifndef WIN32
-		//Close Network Connection
-		if(NetworkSocket != -1) {
-			close(NetworkSocket);
-		}
-	#endif
+	//Close Network Connection
+	if(is_open_tcp_socket() == 0) {
+		close_tcp_socket();
+	}
 	//Unload images
 	for(uint8_t i = 0; i < IMAGE_COUNT; i++) {
 		if(Plimgs[i] != NULL) {

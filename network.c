@@ -15,12 +15,10 @@ network.c: process network packets
 
 #include "main.h"
 
-extern int NetworkSocket;
-
 //Send packet to other clients, parameters change according to pkttype.
 void net_send_packet(networkpackettype_t pkttype, ...) {
 	uint8_t pktbuf[1024];
-	uint8_t pktlen = 0;
+	size_t pktlen = 0;
 	va_list varg;
 	//first packet byte always pkttype
 	pktbuf[0] = (uint8_t)pkttype;
@@ -50,88 +48,52 @@ void net_send_packet(networkpackettype_t pkttype, ...) {
 	break;
 	}
 	va_end(varg);
-	#ifndef WIN32
-		//Send Packet
-		if(pktlen != 0 && NetworkSocket != -1) {
-			if(send(NetworkSocket, pktbuf, pktlen, 0) != pktlen) {
-				//If error occured, close connection
-				int32_t e = errno;
-				g_print("Packet send error: %s\n", strerror(e) );
-				close_connection(e);
-			}
-		}
-	#endif
+	//Send packet if socket connected
+	if(is_open_tcp_socket() == 0) {
+		send_tcp_socket(pktbuf, pktlen);
+	}
 }
 
 //Connect to specified address
 void connect_server(char* addrstr) {
-	#ifndef WIN32
-		//Return if already connected
-		if(NetworkSocket != -1) {
-			chat(getlocalizedstring(10) ); //Unavailable
-			//g_print("Already connected.\n");
-			return;
-		}
-		chat(getlocalizedstring(17) ); //Attempting to connect
-		//g_print("Attempting to connect to %s\n", addrstr);
-		//Create socket
-		NetworkSocket = socket(AF_INET, SOCK_STREAM, 0);
-		if(NetworkSocket < 0) {
-			die("connect_server(): creating socket failed.\n");
-			return;
-		}
-		//If there's :xxxxx, process it as a port name
-		char *portnum = "25566"; //default port
-		char *t = strchr(addrstr, ':');
-		if(t != NULL) {
-			*t = 0;
-			portnum = t + 1;
-		}
-		//Hostname resolution and conversion
-		struct addrinfo *res;
-		if(getaddrinfo(addrstr, portnum, NULL, &res) != 0) {
-			int t = errno;
-			chatf("%s (%s)", getlocalizedstring(18), strerror(t) );
-			//g_print("Name Resolution failed: %s\n", strerror(t) );
-			close(NetworkSocket);
-			NetworkSocket = -1;
-			return;
-		}
-		//Connect
-		if(connect(NetworkSocket, res->ai_addr, res->ai_addrlen) != 0) {
-			int t = errno;
-			chatf("%s (%s)", getlocalizedstring(18), strerror(t) );
-			//g_print("Connect failed: %s\n", strerror(t) );
-			close(NetworkSocket);
-			NetworkSocket = -1;
-			return;
-		}
-		freeaddrinfo(res); //free Name Resolution result 	
-		chatf("%s (%s)", getlocalizedstring(20), addrstr);
-		//g_print("Connection established: %s\n", addrstr);
-	#else
-		g_print("This feature is not supported in WIN32 yet.\n");
-	#endif
+	//If already connected, return
+	if(is_open_tcp_socket() == 0) {
+		chat(getlocalizedstring(10) ); //Unavailable
+		g_print("connect_server(): Already connected.\n");
+		return;
+	}
+	//If addrstr has port number (2nd arg), divide addrstr into host and port then 
+	//override default port
+	char s_port[10] = "25566";
+	char s_host[64];
+	size_t siz_hostname;
+	char *t = g_utf8_strchr(addrstr, g_utf8_strlen(addrstr, 65535), 0x20); //find whitespace
+	if(t != NULL) {
+		//hostname port
+		strncpy(s_port, t + 1, sizeof(s_port) );
+		s_port[sizeof(s_port) - 1] = 0; //Additional Security
+		siz_hostname = constrain_i32(t - addrstr, 0, sizeof(s_host) - 1);
+	} else {
+		siz_hostname = g_utf8_strlen(addrstr, sizeof(s_host) - 1);
+	}
+	memcpy(s_host, addrstr, siz_hostname);
+	s_host[siz_hostname] = 0;
+	chatf("%s %s", getlocalizedstring(17), addrstr); //Attempting to connect
+	g_print("Attempting to connect to host=%s port=%s\n", s_host, s_port);
+	//Connect
+	if(make_tcp_socket(s_host, s_port) != 0) {
+		chat(getlocalizedstring(18) );
+		return;
+	}
+	chat(getlocalizedstring(20) );
 }
 
 //Close connection with reason
 void close_connection(int32_t reason) {
-	#ifndef WIN32
-		if(NetworkSocket == -1) {
-			chat(getlocalizedstring(10) ); //Unavailable
-			g_print("Not connected.\n");
-			return;
-		}
-		close(NetworkSocket);
-		NetworkSocket = -1;
-		if(reason != -1) {
-			chatf("%s (%s)", getlocalizedstring(19), strerror(reason) );
-			g_print("Closed connection with reason : %s\n", strerror(reason) );
-		} else {
-			chat(getlocalizedstring(19) );
-			g_print("Closed connection.\n");
-		}
-	#else
-		g_print("This feature is not supported in WIN32 yet.\n");
-	#endif
+	if(is_open_tcp_socket() == 0) {
+		close_tcp_socket();
+		chat(getlocalizedstring(19) );
+	} else {
+		chat(getlocalizedstring(10) );
+	}
 }

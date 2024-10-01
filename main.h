@@ -79,14 +79,6 @@ main.h: integrated header file
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
-#ifndef WIN32
-	#include <sys/socket.h>
-	#include <netinet/in.h>
-	#include <netinet/tcp.h>
-	#include <sys/types.h>
-	#include <sys/socket.h>
-	#include <netdb.h>
-#endif
 #include <errno.h>
 
 //Language ID
@@ -313,3 +305,9 @@ void damage_object(int32_t, int32_t);
 void net_send_packet(networkpackettype_t, ...);
 void connect_server(char*);
 void close_connection(int32_t);
+
+//osdep.c
+int32_t make_tcp_socket(char*, char*);
+int32_t close_tcp_socket();
+int32_t send_tcp_socket(uint8_t*, size_t);
+int32_t is_open_tcp_socket();
