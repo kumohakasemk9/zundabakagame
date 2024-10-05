@@ -242,10 +242,10 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 //InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout, requirepowerlevel
 const int32_t NUMINFO[MAX_TID][9] = {
 	{ 0, 10000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //0 Earth
-	{ 1, 20000, TEAMID_ENEMY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //1 Zundamon Star
-	{ 2,   100, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //2 Zundamon
-	{ 3,   300, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //3 Spicy Zundamon
-	{ 4,   500, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //4 Mad Zundamon
+	{ 1, 10000, TEAMID_ENEMY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //1 Zundamon Star
+	{ 2,   200, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //2 Zundamon
+	{ 3,   600, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //3 Spicy Zundamon
+	{ 4,  1000, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //4 Mad Zundamon
 	{ 5,    70, TEAMID_ENEMY, 2,    0, UNITTYPE_BULLET_INTERCEPTABLE,  50,  300,  0}, //5 Zundamon space mine
 	{ 6,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 200,    0,  2}, //6 Pit
 	{ 7,  7000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 200,    0, 10}, //7 Fort
@@ -263,8 +263,8 @@ const int32_t NUMINFO[MAX_TID][9] = {
 	{26,  3000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0, 15}, //19 Money generater facility
 	{27,  3000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  4}, //20 researchment facility
 	{29,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //21 power plant
-	{-1,     0,  TEAMID_ALLY, 2,    1,               UNITTYPE_BULLET, 600,  500,  0}, //22 Kumo9-x24-robot-laser
-	{-1,     0,  TEAMID_ALLY, 2, 2000,               UNITTYPE_BULLET,   0,  300,  0}  //23 Kumo9-x24-robot-pcanon
+	{-1,     0,  TEAMID_ALLY, 2,    5,               UNITTYPE_BULLET, 600,  500,  0}, //22 Kumo9-x24-robot-laser
+	{-1,     0,  TEAMID_ALLY, 2, 1000,               UNITTYPE_BULLET,   0,  300,  0}  //23 Kumo9-x24-robot-pcanon
 };
 
 //MaxSpeeds, damage
