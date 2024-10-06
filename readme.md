@@ -13,7 +13,7 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 - `d`       : use item
 - `space`   : switch movement
 - `j/k/l/i` : move (unimplemented)
-- `q/w/e`   : skill (unimplemented)
+- `q/w/e`   : skill
    
 (1) You can cycle items also by mouse wheel.   
 (2) You can use item also by right click.   
