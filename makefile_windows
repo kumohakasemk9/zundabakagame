@@ -33,13 +33,14 @@ LIBS=-L$(GVSBUILD_ROOT)/lib -lgtk-4 -lpangocairo-1.0 -lpangowin32-1.0 -lpango-1.
 CFLAGS=-g3 -Wconversion $(GVSBUILD_INCLUDES)
 OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o network.o osdep.o
 OUTNAME=zundagame-win64
-PKGCTX=*.c main.h readme.md *.png makefile
+PKGCTX=readme.md img adwaitalegacy $(OUTNAME).exe
+PKGNAME=zundagame-windows.zip
 
 all: $(OBJS)
 	$(CC) $^ -lm $(LIBS) -o $(OUTNAME)
 
 release:
-	7z a game.zip $(PKGCTX)
+	7z a $(PKGNAME) $(PKGCTX)
 
 clean:
-	rm -f $(OBJS) $(OUTNAME)
+	rm -f $(OBJS) $(OUTNAME).exe $(PKGNAME)

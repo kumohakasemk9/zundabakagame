@@ -18,7 +18,7 @@ LDFLAGS=`pkg-config --libs gtk4`
 OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o network.o osdep.o
 OUTNAME=zundagame
 RELEASEOUT=game.tar.gz
-PKGCTX=*.c main.h readme.md *.png makefile
+PKGCTX=readme.md img adwaitalegacy $(OUTNAME)
 
 all: $(OBJS)
 	$(CC) $^ -lm $(LDFLAGS) -o $(OUTNAME)
