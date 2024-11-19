@@ -14,40 +14,71 @@ network.c: process network packets
 */
 
 #include "main.h"
+#include "zunda-server.h"
+
+//Packet receiver handler
+void net_recv_handler() {
+	uint8_t recvdata[NET_RX_BUFFER_SIZE];
+	int32_t r;
+	r = recv_tcp_socket(recvdata, NET_RX_BUFFER_SIZE);
+	if(r == 0) {
+		g_print("net_recv_handler(): Disconnect detected.\n");
+		close_tcp_socket();
+		return;
+	}
+	if(r < 0) {
+		g_print("net_recv_handler(): Socket recv() error detected.\n");
+		close_tcp_socket();
+		return;
+	}
+	g_print("net_recv_handler():Received %d bytes: ", r);
+	for(int32_t i = 0; i < r; i++) {
+		g_print("%02x ", recvdata[i]);
+	}
+	g_print("\n");
+}
 
 //Send packet to other clients, parameters change according to pkttype.
 void net_send_packet(networkpackettype_t pkttype, ...) {
 	uint8_t pktbuf[1024];
 	size_t pktlen = 0;
 	va_list varg;
-	//first packet byte always pkttype
-	pktbuf[0] = (uint8_t)pkttype;
+	pktbuf[0] = (uint8_t)NP_ADD_EVENT; //1st byte: eventadd server command
+	pktbuf[1] = (uint8_t)pkttype; //2nd byte: event type
 	va_start(varg, pkttype);
 	//make packet
+
 	switch(pkttype) {
 	case NETPACKET_CHANGE_PLAYABLE_SPEED:
 		double tx = (double)va_arg(varg, double);
 		double ty = (double)va_arg(varg, double);
-		double2bytes(tx, pktbuf, 1);
-		double2bytes(ty, pktbuf, 9);
+		double2bytes(tx, pktbuf, 2);
+		double2bytes(ty, pktbuf, 10);
 		pktlen = 17;
 	break;
 	case NETPACKET_PLACE_ITEM:
 		int32_t tid = (int32_t)va_arg(varg, int);
 		double x = (double)va_arg(varg, double);
 		double y = (double)va_arg(varg, double);
-		int322bytes(tid, pktbuf, 1);
-		double2bytes(x, pktbuf, 5);
-		double2bytes(y, pktbuf, 13);
+		int322bytes(tid, pktbuf, 2);
+		double2bytes(x, pktbuf, 6);
+		double2bytes(y, pktbuf, 14);
 		pktlen = 21;
 	break;
 	case NETPACKET_USE_SKILL:
 		int32_t skillid = (int32_t)va_arg(varg, int);
-		int322bytes(skillid, pktbuf, 1);
+		int322bytes(skillid, pktbuf, 2);
 		pktlen = 5;
 	break;
 	}
 	va_end(varg);
+	//debug
+	//g_print("net_send_packet(): ");
+	//for(int32_t i = 0; i < pktlen; i++) {
+	//	g_print("%02x ", pktbuf[i]);
+	//}
+	//g_print("\n");
+	
 	//Send packet if socket connected
 	if(is_open_tcp_socket() == 0) {
 		send_tcp_socket(pktbuf, pktlen);

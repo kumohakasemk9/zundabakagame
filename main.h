@@ -14,7 +14,7 @@ main.h: integrated header file
 */
 
 //Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function updated or added (feature add), 3 will increase if function update (bugfix)
-#define VERSION_STRING "5.0.0-sep292024"
+#define VERSION_STRING "5.1.0-19nov2024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 
 #define WINDOW_WIDTH 800 //Game width
@@ -34,6 +34,7 @@ main.h: integrated header file
 #define COLOR_KUMO9_X24_PCANNON 0xc0ffffff //kumo9 x24 pcannon color
 #define MAX_CHAT_COUNT 5 //Maximum chat show count
 #define BUFFER_SIZE 1024 //Command, message buffer size
+#define NET_RX_BUFFER_SIZE 8192 //Network buffer size for receiving
 #define CHAT_TIMEOUT 1000 //Chat message timeout
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
@@ -305,9 +306,12 @@ void damage_object(int32_t, int32_t);
 void net_send_packet(networkpackettype_t, ...);
 void connect_server(char*);
 void close_connection(int32_t);
+void net_recv_handler();
 
 //osdep.c
 int32_t make_tcp_socket(char*, char*);
 int32_t close_tcp_socket();
 int32_t send_tcp_socket(uint8_t*, size_t);
 int32_t is_open_tcp_socket();
+int32_t install_io_handler();
+int32_t recv_tcp_socket(uint8_t*, size_t);

@@ -152,6 +152,11 @@ gboolean mousescroll_handler(GtkWidget* wid, gdouble dx, gdouble dy, gpointer us
 
 int main(int argc, char *argv[]) {
 	int s;
+	//Install network IO handler
+	if(install_io_handler() != 0) {
+		printf("Could not prepare for network play!\n");
+		return 1;
+	}
 	//Create new GUI
 	Application = gtk_application_new("kumotechmadlab.kumohakase.zundamonbakage", G_APPLICATION_DEFAULT_FLAGS);
 	g_signal_connect(Application, "activate", G_CALLBACK(activate), NULL);

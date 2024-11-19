@@ -24,6 +24,11 @@ osdep.c: os dependent codes
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/types.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <string.h>
+
+void netio_handler(int);
 
 int ConnectionSocket = -1;
 
@@ -60,6 +65,12 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 		ConnectionSocket = -1;
 	}
 	freeaddrinfo(addr);
+	//Make socket async, set handler
+	if(fcntl(ConnectionSocket, F_SETFL, O_ASYNC) == -1 || fcntl(ConnectionSocket, F_SETOWN, getpid() ) == -1) {
+		g_print("make_tcp_socket(): setting socket option failed.\n");
+		close(ConnectionSocket);
+		ConnectionSocket = -1;
+	}
 	if(ConnectionSocket == -1) {
 		return -1;
 	}
@@ -83,7 +94,7 @@ int32_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 		g_print("send_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
-	if(send(ConnectionSocket, ctx, ctxlen, 0) != ctxlen) {
+	if(send(ConnectionSocket, ctx, ctxlen, MSG_NOSIGNAL) != ctxlen) {
 		g_print("send_tcp_socket(): send failed. Closing current connection.\n");
 		close_tcp_socket();
 		return -1;
@@ -97,6 +108,26 @@ int32_t is_open_tcp_socket() {
 	return 0;
 }
 
+void netio_handler(int) {
+	net_recv_handler();
+}
+
+//Install IO Handler, Returns 0 if succeed
+int32_t install_io_handler() {
+	struct sigaction sig;
+	memset(&sig, 0, sizeof(struct sigaction) );
+	sig.sa_handler = netio_handler;
+	return sigaction(SIGIO, &sig, NULL);
+}
+
+//Receive bytes from connected server, returns read bytes
+int32_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
+	if(is_open_tcp_socket() == -1) {
+		g_print("recv_tcp_socket(): socket is not open!\n");
+		return -1;
+	}
+	return recv(ConnectionSocket, ctx, ctxlen, 0);
+}
 #else
 //Windows codes
 #include <winsock2.h>
@@ -179,6 +210,18 @@ int32_t send_tcp_socket(uint8_t *ctx, size_t ctxlen) {
 int32_t is_open_tcp_socket() {
 	if(ConnectionSocket == INVALID_SOCKET) { return -1; }
 	return 0;
-} 
+}
+
+int32_t install_io_handler(void (*)() ) {
+	return 0;
+}
+
+int32_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
+	if(is_open_tcp_socket() == -1) {
+		g_print("recv_tcp_socket(): socket is not open!\n");
+		return -1;
+	}
+	return recv(ConnectionSocket, ctx, ctxlen, 0);
+}
 
 #endif
