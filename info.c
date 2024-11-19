@@ -241,7 +241,7 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 
 //InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout, requirepowerlevel
 const int32_t NUMINFO[MAX_TID][9] = {
-	{ 0, 10000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //0 Earth
+	{ 0,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //0 Earth
 	{ 1, 10000, TEAMID_ENEMY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //1 Zundamon Star
 	{ 2,   200, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //2 Zundamon
 	{ 3,   600, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //3 Spicy Zundamon

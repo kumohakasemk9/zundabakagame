@@ -289,7 +289,9 @@ void procai() {
 					}
 					if(dstinfo.teamid == TEAMID_ALLY && (dstinfo.objecttype & UNITTYPE_UNIT ) ) {
 						//Ally incoming (recover them)
-						Gobjs[j].hp = constrain_number(Gobjs[j].hp + 1, 0, dstinfo.inithp);
+						if(Gobjs[j].hp != 0) { //BUGFIX: the earth tries to recover dead one, causes deathlog spam
+							Gobjs[j].hp = constrain_number(Gobjs[j].hp + 1, 0, dstinfo.inithp);
+						}
 					}
 				}
 				break;
@@ -316,7 +318,9 @@ void procai() {
 					//Pit radar
 					if(dstinfo.teamid == TEAMID_ALLY && (dstinfo.objecttype & UNITTYPE_UNIT) ) {
 						//Recover Ally
-						Gobjs[j].hp = constrain_number(Gobjs[j].hp + 2, 0, dstinfo.inithp);
+						if(Gobjs[j].hp != 0) {
+							Gobjs[j].hp = constrain_number(Gobjs[j].hp + 2, 0, dstinfo.inithp);
+						}
 					}
 				}
 				break;
