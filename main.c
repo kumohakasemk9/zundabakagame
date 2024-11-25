@@ -15,52 +15,57 @@ main.c: main window process, game process (keyevents) and drawing
 TODO List
 add lol style death/kill anouncement
 add getCurrentPlayableCharacterId()
-add objsrcid
 Make me ahri
 Make it multiplay - Integrate with kumo auth system
+Port it to allegro
+character ditch information structure
 */
 
 #include "main.h"
 
+GtkApplication *Application; //Application
 cairo_surface_t *Gsfc; //GameScreen surface
 cairo_t* G; //Gamescreen cairo context
 GtkWidget *GameDrawingArea; //Gamescreen drawing area
 cairo_surface_t *Plimgs[IMAGE_COUNT]; //Preloaded images
-GtkApplication *Application; //Application
 GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game Objects
 int32_t CameraX = 0, CameraY = 0; //Camera Position
-extern const char* IMGPATHES[];
+extern const char* IMGPATHES[]; //preload image pathes
 int32_t CommandCursor = -1; //Command System Related
 char CommandBuffer[BUFFER_SIZE];
 int32_t ChatTimeout = 0; //Remaining time to show chat
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chat message buffer
 GdkClipboard* GClipBoard;
-obj_type_t AddingTID;
+obj_type_t AddingTID; //For debug mode
 int32_t CursorX, CursorY; //Current Cursor Pos
 gboolean DebugMode = FALSE;
 gamestate_t GameState;
 int32_t PlayingCharacterID = -1; //Current Playable Character type ID
 int32_t EarthID; //Current Earth ID
-int32_t Money;
+int32_t Money; //Current map money amount
 gboolean CharacterMove; //Character Moving on/off
 int32_t SelectingItemID;
 extern const int32_t ITEMPRICES[ITEM_COUNT];
 extern const int32_t ITEMIMGIDS[ITEM_COUNT];
 langid_t LangID = LANGID_JP;
-int32_t RecentErrorId = -1;
-int32_t ErrorShowTimer = 0;
+//int32_t RecentErrorId = -1;
+//int32_t ErrorShowTimer = 0;
 int32_t StateChangeTimer;
 int32_t ItemCooldownTimers[ITEM_COUNT];
 GtkGesture* MouseGestureCatcher;
 int32_t SkillCooldownTimers[SKILL_COUNT];
 int32_t CurrentPlayableCharacterID = 0; //Current Playable Character ID
 keyflags_t KeyFlags;
-int32_t SkillKeyState;
-gboolean ProgramExiting = FALSE;
-PangoLayout *Gpangolayout = NULL;
-int32_t MapTechnologyLevel = 0;
-int32_t MapEnergyLevel = 0;
-int32_t MapRequiredEnergyLevel = 0;
+int32_t SkillKeyState; //Keyflag for skill keys
+gboolean ProgramExiting = FALSE; //Program Exit flag
+PangoLayout *Gpangolayout = NULL; //For drawing font
+int32_t MapTechnologyLevel = 0; //Current map technology level (Increases when google placed)
+int32_t MapEnergyLevel = 0; //Current map energy level (Increases when powerplants placed)
+int32_t MapRequiredEnergyLevel = 0; //Current map required energy level (Increases when facilities placed except power plants)
+char SMPUsername[UNAME_SIZE], SMPPassword[PASSWD_SIZE]; //Multiplayer Credentials
+int32_t SubthreadMessageReq = -1;
+smpstatus_t SMPStatus = NETWORK_DISCONNECTED; //Server Connection Status
+int32_t Difficulty = 1; //Current game difficulty
 
 //LOLSkillKeyState_t SkillKeyStates[SKILL_COUNT];
 
@@ -78,8 +83,8 @@ void darea_paint(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpoin
 	cairo_paint(cr);
 }
 
-//Called when app started
-void activate(GtkApplication* app, gpointer user_data) {
+//Make Game UI and connect events.
+void activate(GtkApplication *app) {
 	//Prepare game screen
 	GameDrawingArea = gtk_drawing_area_new();
 	gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(GameDrawingArea), WINDOW_WIDTH);
@@ -151,20 +156,22 @@ gboolean mousescroll_handler(GtkWidget* wid, gdouble dx, gdouble dy, gpointer us
 }
 
 int main(int argc, char *argv[]) {
+	memcmp(SMPUsername, 0, UNAME_SIZE);
+	memset(SMPPassword, 0, PASSWD_SIZE);
 	int s;
 	//Install network IO handler
 	if(install_io_handler() != 0) {
 		printf("Could not prepare for network play!\n");
 		return 1;
 	}
-	//Create new GUI
-	Application = gtk_application_new("kumotechmadlab.kumohakase.zundamonbakage", G_APPLICATION_DEFAULT_FLAGS);
+	//Create GTK application instance
+	Application = gtk_application_new("com.kumotech.kumohakase403.zundabakage", G_APPLICATION_NON_UNIQUE);
 	g_signal_connect(Application, "activate", G_CALLBACK(activate), NULL);
 	s = g_application_run(G_APPLICATION(Application), argc, argv);
 	//Finalize
 	ProgramExiting = TRUE;
 	//Close Network Connection
-	if(is_open_tcp_socket() == 0) {
+	if(SMPStatus != NETWORK_DISCONNECTED) {
 		close_tcp_socket();
 	}
 	//Unload images
@@ -175,7 +182,6 @@ int main(int argc, char *argv[]) {
 	}
 	//Those variables will created before possible call event of die();
 	//and no NULL check needed because they must be initialized.
-	g_object_unref(Application);
 	g_object_unref(Gpangolayout);
 	cairo_destroy(G);
 	cairo_surface_destroy(Gsfc);
@@ -429,7 +435,7 @@ void draw_info() {
 		}
 	}
 	//Draw Error Message if there are error
-	if(ErrorShowTimer != 0 && RecentErrorId != -1) {
+	/*if(ErrorShowTimer != 0 && RecentErrorId != -1) {
 		chcolor(COLOR_TEXTERROR, TRUE);
 		if(!is_range(RecentErrorId, 0, MAX_STRINGS - 1) ) {
 			die("draw_info(): bad RecentErrorId!\n");
@@ -437,6 +443,7 @@ void draw_info() {
 		}
 		drawstring_title(WINDOW_WIDTH / 2, (char*)getlocalizedstring(RecentErrorId), FONT_DEFAULT_SIZE);
 	}
+	*/
 	//Draw Message when GAMESTATE != PLAYING
 	if(GameState != GAMESTATE_PLAYING) {
 		chcolor(COLOR_TEXTCMD, TRUE);

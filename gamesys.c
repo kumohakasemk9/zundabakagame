@@ -15,6 +15,13 @@ gamesys.c: game process and related functions
 
 #include "main.h"
 
+//For packet data conversion
+#ifndef WIN32
+	#include <arpa/inet.h>
+#else
+	#include <winsock.h>
+#endif
+
 
 extern char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE];
 extern int32_t ChatTimeout;
@@ -36,8 +43,8 @@ extern gboolean CharacterMove;
 extern int32_t SelectingItemID;
 extern const int32_t ITEMPRICES[ITEM_COUNT];
 extern const int32_t FTIDS[ITEM_COUNT];
-extern int32_t ErrorShowTimer;
-extern int32_t RecentErrorId;
+//extern int32_t ErrorShowTimer;
+//extern int32_t RecentErrorId;
 extern langid_t LangID;
 extern int32_t ItemCooldownTimers[ITEM_COUNT];
 extern int32_t ITEMCOOLDOWNS[ITEM_COUNT];
@@ -50,18 +57,38 @@ extern int32_t SKILLCOOLDOWNS[SKILL_COUNT];
 extern int32_t MapEnergyLevel;
 //extern LOLSkillKeyState_t SkillKeyStates[SKILL_COUNT];
 extern int32_t SkillKeyState;
+extern char SMPUsername[UNAME_SIZE], SMPPassword[PASSWD_SIZE];
+extern int32_t SubthreadMessageReq;
+char SubthreadMSGCTX[BUFFER_SIZE];
+extern smpstatus_t SMPStatus;
+extern ssize_t RXSMPEventLen, TXSMPEventLen;
+extern uint8_t RXSMPEventBuffer[SMP_EVENT_BUFFER_SIZE], TXSMPEventBuffer[SMP_EVENT_BUFFER_SIZE];
+extern int32_t SMPcid;
+extern int32_t Difficulty;
+
+//Request to show chat message from another thread (this can not be nested)
+void chat_request(char* ctx) {
+	strncpy(SubthreadMSGCTX, ctx, BUFFER_SIZE);
+	SubthreadMSGCTX[BUFFER_SIZE - 1] = 0; //for additional security
+	SubthreadMessageReq = 1;
+}
+
+//Request to show chat message from another thread, but formatstr (this can not be nested)
+void chatf_request(const char* ctx, ...) {
+	va_list varg;
+	char t[BUFFER_SIZE];
+	va_start(varg, ctx);
+	vsnprintf(t, BUFFER_SIZE, ctx, varg);
+	va_end(varg);
+	t[BUFFER_SIZE - 1] = 0; //for additional security
+	chat_request(t);
+}
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
 	*mapx = CameraX + localx;
 	*mapy = CameraY + (WINDOW_HEIGHT - localy);
 }
-
-//Translate map coordinate into local coordinate
-//void map2local(double mapx, double mapy, double* localx, double *localy) {
-//	*localx = mapx - CameraX;
-//	*localy = WINDOW_HEIGHT - (mapy - CameraY);
-//}
 
 void getlocalcoord(int32_t i, double *x, double *y) {
 	if(!is_range(i, 0, MAX_OBJECT_COUNT - 1)){
@@ -97,6 +124,7 @@ int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
 	Gobjs[newid].sx = 0;
 	Gobjs[newid].sy = 0;
 	Gobjs[newid].aiming_target = OBJID_INVALID;
+	Gobjs[newid].cid = -1;
 	for(uint8_t i = 0; i < CHARACTER_TIMER_COUNT; i++) {
 		Gobjs[newid].timers[i] = 0;
 	}
@@ -340,11 +368,237 @@ int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilte
 	}
 }
 
+//Process SMP packet
+void process_smp() {
+	double *double_p;
+	int32_t *int32_p;
+	event_hdr_t *hdr;
+	if(RXSMPEventLen > 0) {
+		//Process SMP Event
+		int32_t ptr = 0;
+		while(ptr < RXSMPEventLen) {
+			int32_t rem = RXSMPEventLen - ptr;
+			//Parse event record header
+			if(rem < sizeof(event_hdr_t) ) {
+				g_print("process_smp(): Too short event record.\n");
+				chat(getlocalizedstring(TEXT_SMP_ERROR) );
+				close_connection_silent();
+				return;
+			}
+			hdr = (event_hdr_t*)&RXSMPEventBuffer[ptr];
+			int32_t cid = hdr->cid;
+			int32_t evlen = ntohs(hdr->evlen);
+			int32_t reclen = evlen + sizeof(event_hdr_t);
+			int32_t evhead = ptr + sizeof(event_hdr_t);
+			if(rem < reclen) {
+				g_print("process_smp(): Too short event record.\n");
+				chat(getlocalizedstring(TEXT_SMP_ERROR) );
+				close_connection_silent();
+				return;
+			}
+			//Ignore packet from myself
+			if(cid != SMPcid) {
+				process_smp_events(&RXSMPEventBuffer[evhead], evlen, cid);
+			}
+			ptr += reclen;
+		}
+		RXSMPEventLen = 0;
+	}
+	//RXSMPEventLen will be -1 if there's no NP_EXCHANGE_EVENT response, in this case, wait
+	if(RXSMPEventLen != -1) {
+		net_server_send_cmd(NP_EXCHANGE_EVENTS);
+		RXSMPEventLen = -1;
+	}
+}
+
+//Stack packet into event buffer for future sending
+void stack_packet(event_type_t etype, ...) {
+	va_list varg;
+	size_t pktlen;
+	uint8_t *poff = &TXSMPEventBuffer[TXSMPEventLen];
+	va_start(varg, etype);
+	//Write packet content
+	if(etype == EV_CHANGE_PLAYABLE_SPEED) {	
+		//Playable speed change packet
+		float tx = (float)va_arg(varg, double);
+		float ty = (float)va_arg(varg, double);
+		ev_changeplayablespeed_t ev = {
+			.evtype = (uint8_t)etype,
+			.sx = tx,
+			.sy = ty
+		};
+		pktlen = sizeof(ev_changeplayablespeed_t);
+		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+			memcpy(poff, &ev, pktlen);
+		}
+	} else if(etype == EV_PLACE_ITEM) {
+		//item place packet
+		uint8_t tid = (uint8_t)va_arg(varg, int);
+		uint16_t x = (uint16_t)va_arg(varg, double);
+		uint16_t y = (uint16_t)va_arg(varg, double);
+		ev_placeitem_t ev = {
+			.evtype = (uint8_t)etype,
+			.tid = tid,
+			.x = htons(x),
+			.y = htons(y)
+		};
+		pktlen = sizeof(ev_placeitem_t);
+		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+			memcpy(poff, &ev, pktlen);
+		}
+	} else if(etype == EV_USE_SKILL) {
+		//skill using packet
+		uint8_t skillid = (uint8_t)va_arg(varg, int);
+		ev_useskill_t ev = {
+			.evtype = (uint8_t)etype,
+			.skillid = skillid
+		};
+		pktlen = sizeof(ev_useskill_t);
+		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+			memcpy(poff, &ev, pktlen);
+		}
+	} else if(etype == EV_CHAT) {
+		//chat packet
+		char* ctx = (char*)va_arg(varg, char*);
+		uint16_t chatplen = sizeof(ctx);
+		ev_chat_t ev = {
+			.evtype = etype,
+			.clen = htons(chatplen)
+		};
+		if(is_range(chatplen, 0, NET_CHAT_LIMIT - 1) ) {
+			pktlen = sizeof(ev_chat_t) + chatplen;
+		} else {
+			g_print("net_send_packet(): CHAT: too long message\n");
+			pktlen = 0;
+		}
+		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+			memcpy(poff, &ev, sizeof(ev_chat_t) );
+			memcpy(&poff[TXSMPEventLen + sizeof(ev_chat_t)], &ev, chatplen);
+		}
+	} else {
+		g_print("net_send_packet(): unknown packet type.\n");
+		pktlen = 0;
+	}
+	va_end(varg);
+	if(TXSMPEventLen + pktlen >= SMP_EVENT_BUFFER_SIZE) {
+		g_print("net_stack_packet(): TX SMP buffer overflow.\n");
+		close_connection_silent();
+		chat_request(getlocalizedstring(TEXT_SMP_ERROR) );
+	} else {
+		TXSMPEventLen += pktlen;
+	}
+}
+
+//Process smp events (evbuf: content, evlen: length, cid: event owner id)
+void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
+	//Decode packet
+	int32_t evp = 0;
+	while(evp < evlen) {
+		ssize_t remaining = evlen - evp;
+		if(evbuf[evp] == EV_CHANGE_PLAYABLE_SPEED) {
+			if(remaining < sizeof(ev_changeplayablespeed_t) ) {
+				g_print("process_smp_events(): Too short EV_CHANGE_PLAYABLE_SPEED packet, decoder will terminate.\n");
+				return;
+			}
+			ev_changeplayablespeed_t *ev = (ev_changeplayablespeed_t*)&evbuf[evp];
+			double sx = (double)ev->sx;
+			double sy = (double)ev->sy;
+			evp += sizeof(ev_changeplayablespeed_t);
+			//Security check
+			if(is_range(sx, -10, 10) && is_range(sy, -10, 10)) {
+				//Find playable character that has packet owner's cid
+				int32_t objid = -1;
+				for(int32_t i = 0; i < MAX_OBJECT_COUNT; i++) {
+					if(Gobjs[i].tid != TID_NULL && Gobjs[i].cid == cid && is_playable_character(Gobjs[i].tid) ) {
+						Gobjs[i].sx = sx;
+						Gobjs[i].sy = sy;
+						break;
+					}
+				}
+			} else {
+				g_print("process_smp_events(): CHANGE_PLAYABLE_SPEED: packet check failed.\n");
+			}
+		} else if(evbuf[evp] == EV_PLACE_ITEM) {
+			if(remaining < sizeof(ev_placeitem_t) ) {
+				g_print("process_smp_events(): Too short EV_PLACE_ITEM packet, decoder will terminate.\n");
+				return;
+			}
+			//ItemPlace on other client
+			ev_placeitem_t *ev = (ev_placeitem_t*)&evbuf[evp];
+			obj_type_t tid = (obj_type_t)ev->tid;
+			double x = (double)ntohs(ev->x);
+			double y = (double)ntohs(ev->y);
+			evp += sizeof(ev_placeitem_t);
+			//Security check
+			if(is_range(x, 0, MAP_WIDTH) && is_range(y, 0, MAP_HEIGHT) && is_range(tid, 0, MAX_TID - 1) ) {
+				//Place object and set client id
+				int32_t objid = add_character(tid, x, y, -1);
+				Gobjs[objid].cid = cid;
+			} else {
+				g_print("process_smp_events(): PLACE_ITEM: packet check failed.\n");
+			}
+		} else if(evbuf[evp] == EV_USE_SKILL) {
+			if(remaining < sizeof(ev_useskill_t) ) {
+				g_print("process_smp_events(): Too short EV_USE_SKILL packet, decoder will terminate.\n");
+				return;
+			}
+			//UseSkill on other client
+			ev_useskill_t *ev = (ev_useskill_t*)&evbuf[evp];
+			uint8_t skillid = ev->skillid;
+			evp += sizeof(ev_useskill_t);
+			//Security check
+			if(is_range(skillid, 0, SKILL_COUNT - 1) ) {
+				g_print("process_smp_events(): USESKILL: cid=%d, skillid=%d.\n", cid, skillid);
+			} else {
+				g_print("process_smp_events(): USESKILL: packet check failed.\n");
+			}
+		} else if(evbuf[evp] == EV_CHAT) {
+			if(remaining < sizeof(ev_chat_t) ) {
+				g_print("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
+				return;
+			}
+			//Chat on other client
+			ev_chat_t *ev = (ev_chat_t*)&evbuf[evp];
+			char ctx[BUFFER_SIZE];
+			ssize_t cpktlen = (ssize_t)ntohs(ev->clen);
+			char* netchat = (char*)&evbuf[evp + sizeof(ev_chat_t)];
+			if(remaining < sizeof(ev_chat_t) + cpktlen) {
+				g_print("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
+				return;
+			}
+			evp += sizeof(ev_chat_t) + cpktlen;
+			//Security check
+			if(is_range(cpktlen, 0, NET_CHAT_LIMIT - 1) ) {
+				memcpy(ctx, netchat, cpktlen);
+				ctx[cpktlen] = 0; //Terminate string with NUL
+				chatf("[CID%d] %s", cid, ctx);
+			} else {
+				g_print("procss_smp_events(): CHAT: packet too large.\n");
+			}
+		} else if(evbuf[evp] == EV_RESET) {
+			g_print("process_smp_events(): Round reset request from cid%d\n", cid);
+			reset_game();
+		} else {
+			g_print("process_smp_events(): Unknown event type, decorder terminated.\n");
+			break;
+		}
+	}
+}
+
 gboolean gametick(gpointer data) {
 	//gametick, called for every 10mS
 	//Take care of chat timeout and timers
 	if(ChatTimeout != 0) { ChatTimeout--; }
-	if(ErrorShowTimer != 0) { ErrorShowTimer--; }
+	//if(ErrorShowTimer != 0) { ErrorShowTimer--; }
+	//Process subthread message request
+	if(SubthreadMessageReq != -1) {
+		chat(SubthreadMSGCTX);
+		SubthreadMessageReq = -1;
+	}
+	//SMP Processing
+	if(SMPStatus == NETWORK_LOGGEDIN) {
+		process_smp();
+	}
 	//If game is not in playing state, do special process
 	switch(GameState) {
 	case GAMESTATE_INITROUND:
@@ -435,7 +689,9 @@ void proc_playable_op() {
 	Gobjs[PlayingCharacterID].sy = ty;
 	if(prevtx != tx || prevty != ty) {
 		//Speed changed
-		net_send_packet(NETPACKET_CHANGE_PLAYABLE_SPEED, tx, ty);
+		if(SMPStatus == NETWORK_LOGGEDIN) {
+			stack_packet(EV_CHANGE_PLAYABLE_SPEED, tx, ty);
+		}
 		prevtx = tx;
 		prevty = ty;
 	}
@@ -458,7 +714,9 @@ void proc_playable_op() {
 					SkillKeyState = -1;
 					//Activate Skill
 					Gobjs[PlayingCharacterID].timers[i + 1] = plinf.skillinittimers[i];
-					net_send_packet(NETPACKET_USE_SKILL, i);
+					if(SMPStatus == NETWORK_LOGGEDIN) {
+						stack_packet(EV_USE_SKILL, i); //if logged in to SMP server, notify event instead
+					}
 					//Reset Skill CD
 					if(DebugMode) {
 						SkillCooldownTimers[i] = 100;
@@ -526,7 +784,10 @@ gboolean buy_facility(int32_t fid) {
 		}
 	}
 	add_character(tid, mx, my, OBJID_INVALID);
-	net_send_packet(NETPACKET_PLACE_ITEM, tid, mx, my);
+	//If connected to remote server, notify item place.
+	if(SMPStatus == NETWORK_LOGGEDIN) {
+		stack_packet(EV_PLACE_ITEM, tid, mx, my);
+	}
 	return TRUE;
 }
 
@@ -553,7 +814,7 @@ void debug_add_character() {
 		double mx, my;
 		local2map(CursorX, CursorY, &mx, &my);
 		add_character(AddingTID, mx, my, OBJID_INVALID);
-		net_send_packet(NETPACKET_PLACE_ITEM, mx, my);
+		stack_packet(EV_PLACE_ITEM, mx, my);
 	}
 }
 
@@ -600,8 +861,35 @@ void execcmd() {
 		if(is_range(i, 0, MAX_TID - 1) ) {
 			AddingTID = (uint8_t)i;
 		} else {
-			//showerrorstr(1);
-			chat(getlocalizedstring(1));
+			chat(getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		}
+	} else if(memcmp(CommandBuffer, "/difficulty ", 12) == 0) {
+		//Changing difficulty
+		int32_t i = (int32_t)strtol(&CommandBuffer[12], NULL, 10);
+		if(is_range(i, 1, MAX_DIFFICULTY) ) {
+			Difficulty = (uint8_t)i;
+		} else {
+			chat(getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		}
+	} else if(memcmp(CommandBuffer, "/user ", 6) == 0) {
+		//Set remote user (auto sent when connected to server.)
+		if(strlen(&CommandBuffer[6]) >= UNAME_SIZE) {
+			chat(getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Invalid parameter
+		} else {
+			strcpy(SMPUsername, &CommandBuffer[6]);
+		}
+	} else if(memcmp(CommandBuffer, "/pwd ", 5) == 0) {
+		//Set remote user (auto sent when connected to server.)
+		if(strlen(&CommandBuffer[5]) >= UNAME_SIZE) {
+			chat(getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Invalid parameter
+		} else {
+			strcpy(SMPPassword, &CommandBuffer[5]);
+		}
+	} else if(strcmp(CommandBuffer, "/getuser") == 0) {
+		if(strlen(SMPUsername) != 0) {
+			chatf("getuser: %s", SMPUsername);
+		} else {
+			chat(getlocalizedstring(TEXT_UNAVAILABLE) ); //unavailable
 		}
 	} else if(strcmp(CommandBuffer, "/reset") == 0) {
 		reset_game();
@@ -614,9 +902,12 @@ void execcmd() {
 	} else if(memcmp(CommandBuffer, "/connect ", 9) == 0) {
 		connect_server(&CommandBuffer[9]);
 	} else if(strcmp(CommandBuffer, "/disconnect") == 0) {
-		close_connection(-1);
+		close_connection(0);
 	} else {
 		chat(CommandBuffer);
+		if(SMPStatus == NETWORK_LOGGEDIN) {
+			stack_packet(EV_CHAT, CommandBuffer);
+		}
 	}
 }
 
@@ -699,6 +990,7 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 }
 
 void reset_game() {
+	const double START_POS = 200;
 	GameState = GAMESTATE_INITROUND;
 	MapTechnologyLevel = 0;
 	MapEnergyLevel = 0;
@@ -719,10 +1011,18 @@ void reset_game() {
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		Gobjs[i].tid = TID_NULL;
 	}
-	EarthID = add_character(TID_EARTH, 200, 200, OBJID_INVALID);
-	add_character(TID_ENEMYBASE, MAP_WIDTH - 200, MAP_HEIGHT - 200, OBJID_INVALID);
-	add_character(TID_ENEMYBASE, MAP_WIDTH - 200, MAP_HEIGHT - 500, OBJID_INVALID);
-	add_character(TID_ENEMYBASE, MAP_WIDTH - 500, MAP_HEIGHT - 200, OBJID_INVALID);
+	EarthID = add_character(TID_EARTH, START_POS, START_POS, OBJID_INVALID);
+	//Place enemy zundamon basee according to difficulty,
+	//Everytime difficulty increases, the base is placed in top left, bottom left, topright corner
+	//If difficulty is over or equal 4, placing starts on top left corner again, but they must
+	//have enough distance from existing enemy base.
+	for(int32_t i = 1; i <= Difficulty; i++) {
+		const double EDGE_X = MAP_WIDTH - 200;
+		const double EDGE_Y = MAP_HEIGHT - 200;
+		double X[MAX_DIFFICULTY] = {EDGE_X, EDGE_X, START_POS, EDGE_X - 500, EDGE_X - 500};
+		double Y[MAX_DIFFICULTY] = {EDGE_Y, START_POS, EDGE_Y, EDGE_Y, START_POS};
+		add_character(TID_ENEMYBASE, X[i - 1], Y[i - 1], OBJID_INVALID);
+	}
 	spawn_playable();
 }
 
@@ -733,7 +1033,9 @@ void spawn_playable() {
 	CharacterMove = FALSE;
 	double x = WINDOW_WIDTH / 2, y = WINDOW_HEIGHT / 2;
 	PlayingCharacterID = add_character(t.associatedtid, x, y, OBJID_INVALID);
-	net_send_packet(NETPACKET_PLACE_ITEM, t.associatedtid, x, y);
+	if(SMPStatus == NETWORK_LOGGEDIN) {
+		stack_packet(EV_PLACE_ITEM, t.associatedtid, x, y);
+	}
 }
 
 //Set object to aim the earth
@@ -747,8 +1049,9 @@ void aim_earth(int32_t i) {
 		}
 	set_speed_for_following(i);
 }
-
+/*
 void showerrorstr(int32_t errorid) {
 	RecentErrorId = errorid;
 	ErrorShowTimer = ERROR_SHOW_TIMEOUT;
 }
+*/

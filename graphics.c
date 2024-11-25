@@ -55,12 +55,6 @@ void fillcircle(double x, double y, double diam) {
 	cairo_fill(G);
 }
 
-//draw hollow circle that has center point on x, y with diameter diam
-//void hollowcircle(double x, double y, double diam) {
-//	cairo_arc(G, x, y, diam / 2.0, 0, 2.0 * M_PI);
-//	cairo_stroke(G);
-//}
-
 //draw string ctx in pos x, y
 void drawstring(double x, double y, char* ctx) {
 	pango_layout_set_text(Gpangolayout, ctx, -1);

@@ -75,16 +75,6 @@ void utf8_substring(char* src, int32_t st, int32_t ed, char *dst, int32_t dstlen
 	dst[subl] = '\0';
 }
 
-//convert double to uint8_t[8] and store into buf (offset offs)
-void double2bytes(double ctx, uint8_t *buf, int32_t offs) {
-	memcpy(&buf[offs], &ctx, 8);
-}
-
-//convert int32_t to uint8_t[4] and store into buf (offset offs)
-void int322bytes(int32_t ctx, uint8_t *buf, int32_t offs) {
-	memcpy(&buf[offs], &ctx, 4);
-}
-
 //insert string src at index pos to dst, returns FALSE if insufficient src space. (length dstlen restricted)
 gboolean utf8_insertstring(char *dst, char *src, int32_t pos, int32_t dstlen) {
 	uint16_t l = (uint16_t)strlen(src);

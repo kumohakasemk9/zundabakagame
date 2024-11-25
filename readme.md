@@ -26,6 +26,8 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 - `/version`         : Show version string
 - `/credit`          : Show credit string
 - `/reset`           : Round reset
+- `/user username`   : Set your username for SMP
+- `/pwd password`    : Set your password for SMP
    
 # Prepareation for Windows
 0. Get releases for Windows.

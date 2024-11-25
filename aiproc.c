@@ -461,20 +461,26 @@ void damage_object(int32_t dstid, int32_t srcid) {
 		//If enemy unit is dead, give money to ally team
 		switch(Gobjs[dstid].tid) {
 		case TID_ZUNDAMON1:
-			Money += 3;
+			Money += 5;
 			break;
 		case TID_ZUNDAMON2:
-			Money += 7;
+			Money += 10;
 			break;
 		case TID_ZUNDAMON3:
-			Money += 13;
+			Money += 20;
 			break;
 		case TID_ENEMYBASE:
-			Money += 50;
+			Money += 100;
+			break;
+		case TID_ZUNDAMON_KAMIKAZE:
+			Money += 4;
+			break;
+		case TID_ZUNDAMONMINE:
+			Money += 1;
 			break;
 		}
 		//Write deathlog if facilities or unit dead
-		if(dstinfo.objecttype == UNITTYPE_FACILITY || dstinfo.objecttype == UNITTYPE_UNIT) {
+		if(dstinfo.objecttype == UNITTYPE_FACILITY || is_playable_character(Gobjs[dstid].tid) ) {
 			int32_t killerid = Gobjs[srcid].srcid;
 			//printlog("Object %d (srcid=%d) killed %d.\n", srcid, killerid, dstid);
 			//Minecraft style death log
@@ -485,10 +491,6 @@ void damage_object(int32_t dstid, int32_t srcid) {
 				case TID_ENEMYEXPLOSION:
 					//blown up
 					deathreasonid = 11;
-					break;
-				case TID_ALLYBULLET:
-					//Bee hived
-					deathreasonid = 12;
 					break;
 				case TID_ENEMYBULLET:
 					//Zundad

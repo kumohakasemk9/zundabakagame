@@ -39,7 +39,8 @@ const char* JP_STRINGS[MAX_STRINGS] = {
 	"サーバーに接続しています",
 	"接続できませんでした",
 	"サーバーから切断しました",
-	"サーバーとの接続を確立しました"
+	"サーバーとの接続を確立しました",
+	"エラーのためサーバーから切断します。"
 };
 
 const char *EN_STRINGS[MAX_STRINGS] = {
@@ -63,7 +64,8 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"Connecting to server",
 	"Server connection failed.",
 	"Disconnected from server.",
-	"Connection established."
+	"Connection established.",
+	"Disconnected from server, errored."
 };
 
 //TID names LUT
@@ -244,11 +246,11 @@ const int32_t NUMINFO[MAX_TID][9] = {
 	{ 0,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //0 Earth
 	{ 1, 10000, TEAMID_ENEMY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //1 Zundamon Star
 	{ 2,   200, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //2 Zundamon
-	{ 3,   600, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //3 Spicy Zundamon
-	{ 4,  1000, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //4 Mad Zundamon
+	{ 3,   300, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //3 Spicy Zundamon
+	{ 4,   500, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //4 Mad Zundamon
 	{ 5,    70, TEAMID_ENEMY, 2,    0, UNITTYPE_BULLET_INTERCEPTABLE,  50,  300,  0}, //5 Zundamon space mine
 	{ 6,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 200,    0,  2}, //6 Pit
-	{ 7,  7000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 200,    0, 10}, //7 Fort
+	{ 7, 15000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 200,    0, 10}, //7 Fort
 	{ 8,    20,  TEAMID_ALLY, 2,    0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  300,  0}, //8 Missile
 	{-1,     0,  TEAMID_ALLY, 2,    1,               UNITTYPE_BULLET, 100,    0,  0}, //9 AllyExplosion
 	{-1,     0, TEAMID_ENEMY, 2,    1,               UNITTYPE_BULLET, 100,    0,  0}, //10 EnemyExplosion
@@ -426,4 +428,12 @@ const char* getlocalizedcharactername(int32_t did) {
 		return JP_TID_NAMES[did];
 	}
 	return EN_TID_NAMES[did];
+}
+
+//Return 1 if tid is playable character id.
+int32_t is_playable_character(obj_type_t tid) {
+	if(tid == TID_KUMO9_X24_ROBOT) {
+		return 1;
+	}
+	return 0;
 }

@@ -27,6 +27,7 @@ osdep.c: os dependent codes
 #include <fcntl.h>
 #include <signal.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 void netio_handler(int);
 
@@ -35,7 +36,7 @@ int ConnectionSocket = -1;
 //Open and connect tcp socket to hostname and port
 int32_t make_tcp_socket(char* hostname, char* port) {
 	//If already connected, this function will fail.
-	if(is_open_tcp_socket() == 0) {
+	if(ConnectionSocket != -1) {
 		g_print("make_tcp_socket(): already connected.\n");
 		return -1;
 	}
@@ -65,21 +66,21 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 		ConnectionSocket = -1;
 	}
 	freeaddrinfo(addr);
+	if(ConnectionSocket == -1) {
+		return -1;
+	}
 	//Make socket async, set handler
 	if(fcntl(ConnectionSocket, F_SETFL, O_ASYNC) == -1 || fcntl(ConnectionSocket, F_SETOWN, getpid() ) == -1) {
 		g_print("make_tcp_socket(): setting socket option failed.\n");
 		close(ConnectionSocket);
 		ConnectionSocket = -1;
 	}
-	if(ConnectionSocket == -1) {
-		return -1;
-	}
 	return 0;
 }
 
 //Close current connection
 int32_t close_tcp_socket() {
-	if(is_open_tcp_socket() == -1) {
+	if(ConnectionSocket == -1) {
 		g_print("close_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
@@ -90,7 +91,7 @@ int32_t close_tcp_socket() {
 
 //Send bytes to connected server
 int32_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
-	if(is_open_tcp_socket() == -1) {
+	if(ConnectionSocket == -1) {
 		g_print("send_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
@@ -99,12 +100,6 @@ int32_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 		close_tcp_socket();
 		return -1;
 	}
-	return 0;
-}
-
-//Returns 0 if connected, -1 if closed
-int32_t is_open_tcp_socket() {
-	if(ConnectionSocket < 0) { return -1; }
 	return 0;
 }
 
@@ -122,12 +117,13 @@ int32_t install_io_handler() {
 
 //Receive bytes from connected server, returns read bytes
 int32_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
-	if(is_open_tcp_socket() == -1) {
+	if(ConnectionSocket == -1) {
 		g_print("recv_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	return recv(ConnectionSocket, ctx, ctxlen, 0);
 }
+
 #else
 //Windows codes
 #include <winsock2.h>
@@ -185,7 +181,7 @@ int32_t make_tcp_socket(char *hostname, char* port) {
 }
 
 int32_t close_tcp_socket() {
-	if(is_open_tcp_socket() == INVALID_SOCKET) {
+	if(ConnectionSocket == INVALID_SOCKET) {
 		g_print("close_tcp_socket() win32: Socket is not open.\n");
 		return -1;
 	}
@@ -196,7 +192,7 @@ int32_t close_tcp_socket() {
 }
 
 int32_t send_tcp_socket(uint8_t *ctx, size_t ctxlen) {
-	if(is_open_tcp_socket() == INVALID_SOCKET) {
+	if(ConnectionSocket == INVALID_SOCKET) {
 		g_print("send_tcp_socket() win32: Socket is not open.\n");
 		return -1;
 	}
@@ -207,17 +203,12 @@ int32_t send_tcp_socket(uint8_t *ctx, size_t ctxlen) {
 	}
 }
 
-int32_t is_open_tcp_socket() {
-	if(ConnectionSocket == INVALID_SOCKET) { return -1; }
-	return 0;
-}
-
 int32_t install_io_handler(void (*)() ) {
 	return 0;
 }
 
 int32_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
-	if(is_open_tcp_socket() == -1) {
+	if(ConnectionSocket == INVALID_SOCKET) {
 		g_print("recv_tcp_socket(): socket is not open!\n");
 		return -1;
 	}

@@ -13,10 +13,12 @@ Zundamon is from https://zunko.jp/
 main.h: integrated header file
 */
 
-//Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function updated or added (feature add), 3 will increase if function update (bugfix)
-#define VERSION_STRING "5.1.0-19nov2024"
+//Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function added (feature add), 3 will increase if function update (bugfix)
+#define VERSION_STRING "7.0.0-25nov2024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 
+#define MAX_DIFFICULTY 5
+#define NET_CHAT_LIMIT 512 //Network chat length limit
 #define WINDOW_WIDTH 800 //Game width
 #define WINDOW_HEIGHT 600 //Game height
 #define MAP_WIDTH 5000 //map max width
@@ -35,11 +37,13 @@ main.h: integrated header file
 #define MAX_CHAT_COUNT 5 //Maximum chat show count
 #define BUFFER_SIZE 1024 //Command, message buffer size
 #define NET_RX_BUFFER_SIZE 8192 //Network buffer size for receiving
+#define NET_TX_BUFFER_SIZE 8192 //Network buffer size for transmitting
+#define SMP_EVENT_BUFFER_SIZE 8192 //SMP Event buffer size
 #define CHAT_TIMEOUT 1000 //Chat message timeout
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
 #define ITEM_COUNT 5 //Max item id
-#define MAX_STRINGS 21 // Max string count
+#define MAX_STRINGS 22 // Max string count
 #define MAX_TID 24 //max type id
 #define SKILL_COUNT 3 //Skill Count
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
@@ -74,6 +78,12 @@ main.h: integrated header file
 #define IMG_STAT_ENERGY_GOOD 31 //Energy icon (good)
 #define IMG_STAT_ENERGY_BAD 32 //Energy icon (insufficient energy)
 
+//Some localized string IDs
+#define TEXT_DISCONNECTED 19
+#define TEXT_BAD_COMMAND_PARAM 1
+#define TEXT_UNAVAILABLE 10
+#define TEXT_SMP_ERROR 21
+
 #include <gtk/gtk.h>
 #include <math.h>
 #include <stdio.h>
@@ -81,6 +91,8 @@ main.h: integrated header file
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+
+#include "zunda-server.h"
 
 //Language ID
 typedef enum {
@@ -125,6 +137,14 @@ typedef enum {
 	TID_KUMO9_X24_PCANNON = 23
 } obj_type_t;
 
+//Network status
+typedef enum {
+	NETWORK_DISCONNECTED = 0,
+	NETWORK_CONNECTING = 1,
+	NETWORK_CONNECTED = 2,
+	NETWORK_LOGGEDIN = 3
+} smpstatus_t;
+
 //TEAMID
 typedef enum {
 	TEAMID_ALLY = 0, //Ally team id
@@ -168,6 +188,7 @@ typedef struct {
 	int32_t timeout; //lifespan, automatically decreased, dies when 0
 	double damage; //given damage when hit
 	int32_t srcid; //Object source id, holds who made this attack.
+	int32_t cid; //Source client ID for SMP
 } GameObjs_t;
 
 //constant information of characters
@@ -195,15 +216,8 @@ typedef struct {
 	int32_t *skillranges;
 } PlayableInfo_t;
 
-//NetowrkPacketType
-typedef enum {
-	NETPACKET_CHANGE_PLAYABLE_SPEED = 0,
-	NETPACKET_PLACE_ITEM = 1,
-	NETPACKET_USE_SKILL = 2
-} networkpackettype_t;
-
 //main.c
-void activate(GtkApplication*, gpointer);
+void activate(GtkApplication*);
 void darea_paint(GtkDrawingArea*, cairo_t*, int, int, gpointer);
 void draw_game_main();
 void draw_ui();
@@ -224,7 +238,6 @@ void draw_lolhotbar(double, double);
 //graphics.c
 void drawline(double, double, double, double, double);
 void fillcircle(double, double, double);
-//void hollowcircle(double, double, double);
 void drawstring(double, double, char*);
 void set_font_size(int32_t);
 void loadfont(const char*);
@@ -257,8 +270,6 @@ gboolean is_range(int32_t, int32_t, int32_t);
 gboolean is_range_number(double, double, double);
 int32_t randint(int32_t, int32_t);
 void get_image_size(int32_t, double*, double*);
-void double2bytes(double, uint8_t*, int32_t);
-void int322bytes(int32_t, uint8_t*, int32_t);
 
 //gamesys.c
 void local2map(double, double, double*, double*);
@@ -284,10 +295,15 @@ void commandmode_keyhandler(guint, GdkModifierType);
 void reset_game();
 void aim_earth(int32_t);
 double get_distance_raw(double, double, double, double);
-void showerrorstr(int32_t);
+//void showerrorstr(int32_t);
 void select_next_item();
 void select_prev_item();
 void spawn_playable();
+void chat_request(char*);
+void chatf_request(const char*, ...);
+void process_smp();
+void process_smp_events(uint8_t*, size_t, int32_t);
+void stack_packet(event_type_t, ...);
 
 //info.c
 void lookup(obj_type_t, LookupResult_t*);
@@ -296,6 +312,7 @@ const char *getlocalizedstring(int32_t);
 const char *getlocalizeditemdesc(int32_t);
 const char *getlocalizedcharactername(int32_t);
 void lookup_playable(int32_t, PlayableInfo_t*);
+int32_t is_playable_character();
 
 //aiproc.c
 void procai();
@@ -303,15 +320,15 @@ gboolean procobjhit(int32_t, int32_t, LookupResult_t, LookupResult_t);
 void damage_object(int32_t, int32_t);
 
 //network.c
-void net_send_packet(networkpackettype_t, ...);
 void connect_server(char*);
 void close_connection(int32_t);
 void net_recv_handler();
+void net_server_send_cmd(server_command_t, ...);
+void close_connection_silent();
 
 //osdep.c
 int32_t make_tcp_socket(char*, char*);
 int32_t close_tcp_socket();
 int32_t send_tcp_socket(uint8_t*, size_t);
-int32_t is_open_tcp_socket();
 int32_t install_io_handler();
 int32_t recv_tcp_socket(uint8_t*, size_t);

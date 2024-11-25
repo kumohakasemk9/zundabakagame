@@ -14,82 +14,106 @@ network.c: process network packets
 */
 
 #include "main.h"
-#include "zunda-server.h"
+
+#ifndef WIN32
+	#include <arpa/inet.h>
+#else
+	#include <winsock.h>
+#endif
+
+extern char SMPUsername[UNAME_SIZE], SMPPassword[PASSWD_SIZE];
+extern smpstatus_t SMPStatus;
+ssize_t RXSMPEventLen, TXSMPEventLen; //Current Event Sizes
+uint8_t RXSMPEventBuffer[SMP_EVENT_BUFFER_SIZE], TXSMPEventBuffer[SMP_EVENT_BUFFER_SIZE]; //SMP Event Buffer
+int32_t SMPsalt; //Filled when connected
+int32_t SMPcid; //My client id
 
 //Packet receiver handler
 void net_recv_handler() {
+	//BUG: 2 send sonetimes integrated to one recv event
+	//This will break packet interchange mechanism.
 	uint8_t recvdata[NET_RX_BUFFER_SIZE];
 	int32_t r;
 	r = recv_tcp_socket(recvdata, NET_RX_BUFFER_SIZE);
 	if(r == 0) {
 		g_print("net_recv_handler(): Disconnect detected.\n");
-		close_tcp_socket();
+		chat_request(getlocalizedstring(TEXT_DISCONNECTED) );
+		close_connection_silent();
 		return;
 	}
 	if(r < 0) {
 		g_print("net_recv_handler(): Socket recv() error detected.\n");
-		close_tcp_socket();
+		chatf_request("%s %s", getlocalizedstring(TEXT_SMP_ERROR), strerror(errno) );
+		close_connection_silent();
 		return;
 	}
-	g_print("net_recv_handler():Received %d bytes: ", r);
-	for(int32_t i = 0; i < r; i++) {
-		g_print("%02x ", recvdata[i]);
-	}
-	g_print("\n");
-}
+	//Handle packet
+	if(recvdata[0] == NP_RESP_DISCONNECT) {
+		//Disconnect packet
+		char reason[NET_RX_BUFFER_SIZE];
+		memcpy(reason, &recvdata[1], r);
+		reason[r] = 0;
+		g_print("net_recv_handler(): Disconnect request: %s\n", reason);
+		//Request to show chat message 
+		chatf_request("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
+		close_connection_silent();
+	} else if(recvdata[0] == NP_GREETINGS) {
+		//greetings response
+		//Data length check
+		if(r != sizeof(np_greeter_t) ) {
+			g_print("net_recv_handler(): Bat greetings packet.\n");
+			chat_request(getlocalizedstring(TEXT_SMP_ERROR) );
+			close_connection_silent();
+			return;
+		}
+		np_greeter_t *p = (np_greeter_t*)recvdata;
+		SMPcid = p->cid;
+		SMPsalt = ntohl(p->salt);
+		g_print("net_recv_handler(): Server greeter received. CID=%d Salt=%d\n", SMPcid, SMPsalt);
+		net_server_send_cmd(NP_LOGIN_WITH_PASSWORD); //Send credentials
+	} else if(recvdata[0] == NP_LOGIN_WITH_PASSWORD) {
+		if(r == 2 && recvdata[1] == '+') {
+			//Login command successful response
+			SMPStatus = NETWORK_LOGGEDIN;
+			g_print("net_recv_handler(): Login successful response.\n");
+		} else {
+			g_print("net_recv_handler(): Bad login response\n");
+			chat_request(getlocalizedstring(TEXT_SMP_ERROR) );
+			close_connection_silent();
+			return;
 
-//Send packet to other clients, parameters change according to pkttype.
-void net_send_packet(networkpackettype_t pkttype, ...) {
-	uint8_t pktbuf[1024];
-	size_t pktlen = 0;
-	va_list varg;
-	pktbuf[0] = (uint8_t)NP_ADD_EVENT; //1st byte: eventadd server command
-	pktbuf[1] = (uint8_t)pkttype; //2nd byte: event type
-	va_start(varg, pkttype);
-	//make packet
-
-	switch(pkttype) {
-	case NETPACKET_CHANGE_PLAYABLE_SPEED:
-		double tx = (double)va_arg(varg, double);
-		double ty = (double)va_arg(varg, double);
-		double2bytes(tx, pktbuf, 2);
-		double2bytes(ty, pktbuf, 10);
-		pktlen = 17;
-	break;
-	case NETPACKET_PLACE_ITEM:
-		int32_t tid = (int32_t)va_arg(varg, int);
-		double x = (double)va_arg(varg, double);
-		double y = (double)va_arg(varg, double);
-		int322bytes(tid, pktbuf, 2);
-		double2bytes(x, pktbuf, 6);
-		double2bytes(y, pktbuf, 14);
-		pktlen = 21;
-	break;
-	case NETPACKET_USE_SKILL:
-		int32_t skillid = (int32_t)va_arg(varg, int);
-		int322bytes(skillid, pktbuf, 2);
-		pktlen = 5;
-	break;
-	}
-	va_end(varg);
-	//debug
-	//g_print("net_send_packet(): ");
-	//for(int32_t i = 0; i < pktlen; i++) {
-	//	g_print("%02x ", pktbuf[i]);
-	//}
-	//g_print("\n");
-	
-	//Send packet if socket connected
-	if(is_open_tcp_socket() == 0) {
-		send_tcp_socket(pktbuf, pktlen);
+		}
+	} else if(recvdata[0] == NP_EXCHANGE_EVENTS) {
+		//Exchange event response
+		if(r >= SMP_EVENT_BUFFER_SIZE) {
+			g_print("net_recv_handler(): GetEvent: Buffer overflow.\n");
+			close_connection_silent();
+			chat_request(getlocalizedstring(TEXT_SMP_ERROR) );
+		}
+		memcpy(RXSMPEventBuffer, &recvdata[1], r - 1);
+		RXSMPEventLen = r - 1;
+	} else {
+		close_connection_silent();
+		chat_request(getlocalizedstring(TEXT_SMP_ERROR) );
+		g_print("net_recv_handler(): Unknown Packet (%d): ", r);
+		for(int32_t i = 0; i < r; i++) {
+			g_print("%02x ", recvdata[i]);
+		}
+		g_print("\n");
 	}
 }
 
 //Connect to specified address
 void connect_server(char* addrstr) {
+	//If credential not set, return
+	if(strlen(SMPUsername) == 0 || strlen(SMPPassword) == 0) {
+		chat(getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
+		g_print("connect_server(): Empty credentials.\n");
+		return;
+	}
 	//If already connected, return
-	if(is_open_tcp_socket() == 0) {
-		chat(getlocalizedstring(10) ); //Unavailable
+	if(SMPStatus != NETWORK_DISCONNECTED) {
+		chat(getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
 		g_print("connect_server(): Already connected.\n");
 		return;
 	}
@@ -110,21 +134,71 @@ void connect_server(char* addrstr) {
 	memcpy(s_host, addrstr, siz_hostname);
 	s_host[siz_hostname] = 0;
 	chatf("%s %s", getlocalizedstring(17), addrstr); //Attempting to connect
-	g_print("Attempting to connect to host=%s port=%s\n", s_host, s_port);
-	//Connect
+	g_print("connect_server(): Attempting to connect to host=%s port=%s\n", s_host, s_port);
+	RXSMPEventLen = 0;
+	TXSMPEventLen = 0;
+	SMPStatus = NETWORK_CONNECTING;
+	//Connect (TODO: this will block main thread, use another thread instead.)
 	if(make_tcp_socket(s_host, s_port) != 0) {
-		chat(getlocalizedstring(18) );
+		chat(getlocalizedstring(18) ); //can not connect
+		SMPStatus = NETWORK_DISCONNECTED;
 		return;
 	}
-	chat(getlocalizedstring(20) );
+	chat(getlocalizedstring(20) ); //connected
+	SMPStatus = NETWORK_CONNECTED;
 }
 
-//Close connection with reason
+//Close connection with reason (Is it working as expected?)
 void close_connection(int32_t reason) {
-	if(is_open_tcp_socket() == 0) {
-		close_tcp_socket();
-		chat(getlocalizedstring(19) );
+	if(SMPStatus != NETWORK_DISCONNECTED) {
+		if(reason == 1) {
+			chatf("%s %s", getlocalizedstring(TEXT_SMP_ERROR), strerror(errno) );
+		} else {
+			chat(getlocalizedstring(19) );
+		}
+		close_connection_silent();
 	} else {
 		chat(getlocalizedstring(10) );
+	}
+}
+
+//Close connection but do not announce.
+void close_connection_silent() {
+	if(SMPStatus != NETWORK_DISCONNECTED) {
+		close_tcp_socket();
+		SMPStatus = NETWORK_DISCONNECTED;
+	}
+}
+
+//Send Command to server
+void net_server_send_cmd(server_command_t cmd, ...) {
+	uint8_t cmdbuf[NET_TX_BUFFER_SIZE];
+	size_t ctxlen = 0;
+	//Combine with command
+	cmdbuf[0] = (uint8_t)cmd;
+	switch(cmd) {
+	case NP_EXCHANGE_EVENTS:
+		if(TXSMPEventLen + 1 >= NET_TX_BUFFER_SIZE) {
+			g_print("net_server_send_cmd(): ADD_EVENT: Packet buffer overflow.\n");
+			close_connection_silent();
+			chat_request(getlocalizedstring(TEXT_SMP_ERROR) );
+			return;
+		}
+		memcpy(&cmdbuf[1], TXSMPEventBuffer, TXSMPEventLen);
+		ctxlen = TXSMPEventLen;
+		TXSMPEventLen = 0;
+		break;
+	case NP_LOGIN_WITH_PASSWORD:
+		strncpy(&cmdbuf[1], SMPUsername, NET_TX_BUFFER_SIZE - 1);
+		strncat(cmdbuf, ":", NET_TX_BUFFER_SIZE - 1);
+		strncat(cmdbuf, SMPPassword, NET_TX_BUFFER_SIZE - 1);
+		ctxlen = strlen(cmdbuf) - 1;
+	break;
+	default:
+		g_print("net_server_send_command(): Bad command.\n");
+		return;
+	}
+	if(send_tcp_socket(cmdbuf, ctxlen + 1) != 0) {
+		close_connection(1);
 	}
 }
