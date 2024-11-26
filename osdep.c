@@ -116,7 +116,7 @@ int32_t install_io_handler() {
 }
 
 //Receive bytes from connected server, returns read bytes
-int32_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
+ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	if(ConnectionSocket == -1) {
 		g_print("recv_tcp_socket(): socket is not open!\n");
 		return -1;
@@ -207,7 +207,7 @@ int32_t install_io_handler(void (*)() ) {
 	return 0;
 }
 
-int32_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
+ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	if(ConnectionSocket == INVALID_SOCKET) {
 		g_print("recv_tcp_socket(): socket is not open!\n");
 		return -1;

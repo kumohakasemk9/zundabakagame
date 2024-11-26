@@ -15,6 +15,7 @@ zunda-server.h: server client common definitions (like commands)
 #define PACKED __attribute__((packed))
 #define UNAME_SIZE 20 //max username length (includes zero)
 #define PASSWD_SIZE 16 //max password length (includes zero)
+#define SALT_LENGTH 16 //Server salt length
 
 //Server command definitions
 typedef enum {
@@ -43,7 +44,7 @@ typedef struct {
 typedef struct {
 	uint8_t pkttype; //NP_GREETINGS
 	uint8_t cid; //client id
-	uint32_t salt; //salt
+	uint8_t salt[SALT_LENGTH]; //salt
 } PACKED np_greeter_t;
 
 //Event packet
@@ -76,5 +77,7 @@ typedef struct {
 
 //Round reset request event
 typedef struct {
-	uint8_t evtype; //EV_RESET	
+	uint8_t evtype; //EV_RESET
+	uint32_t level_seed; //Seed for rand()
+	uint32_t level_difficulty; //Round difficulty
 } PACKED ev_reset_t;

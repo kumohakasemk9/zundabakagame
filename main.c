@@ -13,6 +13,14 @@ Zundamon is from https://zunko.jp/
 main.c: main window process, game process (keyevents) and drawing
 
 TODO List
+add join/leave notify in SMP system
+encrypt password with hash
+add function to find playable played by remote user
+implement remote skill activator
+show cid and username near playable when SMP
+nickname feature in SMP
+chat mute feature in SMP
+change difficulty algorithm (from increasing enemy to increase hp)
 add lol style death/kill anouncement
 add getCurrentPlayableCharacterId()
 Make me ahri
@@ -66,8 +74,10 @@ char SMPUsername[UNAME_SIZE], SMPPassword[PASSWD_SIZE]; //Multiplayer Credential
 int32_t SubthreadMessageReq = -1;
 smpstatus_t SMPStatus = NETWORK_DISCONNECTED; //Server Connection Status
 int32_t Difficulty = 1; //Current game difficulty
-
+SMPProfile_t *SMPProfs = NULL; //SMP Profiles (Username and connection info)
 //LOLSkillKeyState_t SkillKeyStates[SKILL_COUNT];
+int32_t SMPProfCount = 0; //loaded SMP Profiles Count
+int32_t SelectedSMPProf = 0; //Selected SMP Profile index
 
 //Paint event of Drawing Area, called for every 30mS
 void darea_paint(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data) {
@@ -155,21 +165,91 @@ gboolean mousescroll_handler(GtkWidget* wid, gdouble dx, gdouble dy, gpointer us
 	return TRUE;
 }
 
+//Read SMP Credentials from file
+void read_creds() {
+	FILE* f = fopen("credentials.txt", "r");
+	char buf[BUFFER_SIZE];
+	if(f == NULL) {
+		g_print("Can not open credentials.txt: %s\n", strerror(errno) );
+		return;
+	}
+	int lineno = 0;
+	while(fgets(buf, BUFFER_SIZE, f) != NULL) {
+		buf[BUFFER_SIZE - 1] = 0; //For Additional security
+		lineno++;
+		char *t = buf;
+		int32_t err = 0;
+		SMPProfile_t t_rec;
+		for(int32_t i = 0; i < 4; i++) {
+			const size_t rec_size[] = {HOSTNAME_SIZE, PORTNAME_SIZE, UNAME_SIZE, PASSWD_SIZE};
+			char *rec_ptr[] = {t_rec.host, t_rec.port, t_rec.usr, t_rec.pwd};
+			//Find splitter letter
+			char *t2 = strchr(t, '\t');
+			//Last record will be finished by newline character
+			if(i == 3) {
+				#ifdef __linux__
+					t2 = strchr(t, '\n');
+				#else
+					t2 = strchr(t, '\r');
+				#endif
+			}
+			if(t2 == NULL) {
+				g_print("read_creds(): credentials.txt:%d: No splitter letter, parsing skipped for the line.\n", lineno);
+				err = 1;
+				break;
+			}
+			//Measure distance to the letter
+			size_t reclen = (size_t)t2 - (size_t)t;
+			if(reclen >= rec_size[i]) {
+				g_print("read_creds(): credentials.txt:%d: Record size overflow, persing skipped for the line.\n", lineno);
+				err = 1;
+				break;
+			}
+			if(reclen == 0) {
+				g_print("read_creds(): credentials.txt:%d: Empty record detected, parsing skipped for this line.\n", lineno);
+				err = 1;
+				break;
+			}
+			//Copy string from t to the splitter letter into elem
+			memcpy(rec_ptr[i], t, reclen);
+			rec_ptr[i][reclen] = 0;
+			t = &t2[1]; //Set next record finding position right after the splitter letter
+		}
+		if(err) {
+			continue;
+		}
+		g_print("SMP Credential %d: Host: %s, Port: %s, User: %s\n", SMPProfCount, t_rec.host, t_rec.port, t_rec.usr);
+		//If no error occurs, allocate memory for new record and copy.
+		if(SMPProfs == NULL) {
+			SMPProfs = g_malloc(sizeof(SMPProfile_t) );
+		} else {
+			SMPProfs = g_realloc(SMPProfs, sizeof(SMPProfile_t) * (size_t)(SMPProfCount + 1) );
+		}
+		memcpy(&SMPProfs[SMPProfCount], &t_rec, sizeof(SMPProfile_t) );
+		SMPProfCount++;
+	}
+	fclose(f);
+}
+
 int main(int argc, char *argv[]) {
 	memcmp(SMPUsername, 0, UNAME_SIZE);
 	memset(SMPPassword, 0, PASSWD_SIZE);
 	int s;
 	//Install network IO handler
 	if(install_io_handler() != 0) {
-		printf("Could not prepare for network play!\n");
+		printf("main(): Could not prepare for network play!\n");
 		return 1;
 	}
+	read_creds();
 	//Create GTK application instance
 	Application = gtk_application_new("com.kumotech.kumohakase403.zundabakage", G_APPLICATION_NON_UNIQUE);
 	g_signal_connect(Application, "activate", G_CALLBACK(activate), NULL);
 	s = g_application_run(G_APPLICATION(Application), argc, argv);
 	//Finalize
 	ProgramExiting = TRUE;
+	if(SMPProfs != NULL) {
+		g_free(SMPProfs);
+	}
 	//Close Network Connection
 	if(SMPStatus != NETWORK_DISCONNECTED) {
 		close_tcp_socket();

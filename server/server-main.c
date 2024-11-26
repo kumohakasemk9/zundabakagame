@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdarg.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -12,18 +13,22 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
+
+#include <openssl/sha.h>
 
 #define MAX_CLIENTS 20
 #define LIMIT_ADD_EVENT 512
 #define SIZE_EVENT_BUFFER 8192
 #define SIZE_NET_BUFFER 512
+#define SHA512_DIGEST_LEN (512 / 8)
 
-#include </home/owner/harddisk_home/MyPrograms/zundamon-game/zunda-server.h>
+#include <zunda-server.h>
 
 //User Information Struct
 typedef struct {
 	char usr[UNAME_SIZE];
-	char pwd[PASSWD_SIZE];
+	uint8_t loginkey[SHA512_DIGEST_LEN];
 } userinfo_t;
 
 //Client information struct
@@ -34,7 +39,7 @@ typedef struct  {
 	int closereq; //Close request flag
 	int inread; //MUTEX
 	int bufcur; //current event buffer cursor
-	int uid;
+	int uid; //logged in user id, -1 if not logged in
 } cliinfo_t;
 
 int ServerSocket;
@@ -44,7 +49,7 @@ uint8_t EventBuffer[SIZE_EVENT_BUFFER];
 int EBptr = 0;
 userinfo_t *UserInformations = NULL;
 int UserCount = 0;
-int ServerSalt;
+uint8_t ServerSalt[SALT_LENGTH];
 
 void INTHwnd(int);
 void IOHwnd(int);
@@ -59,10 +64,14 @@ void LoginWithPassword(uint8_t*, int, int);
 void DisconnectWithReason(int, char*);
 void SendGreetingsPacket(int);
 void EventBufferGC();
+void Log(int, const char*, ...);
 
 int main(int argc, char *argv[]) {
 	//TODO: Timeout mechanism
-	ServerSalt = random();
+	//Generate salt for user credential cipher
+	for(int i = 0; i < SALT_LENGTH; i++) {
+		ServerSalt[i] = random() % 0x100;
+	}
 	for(int i = 0; i < MAX_CLIENTS; i++) { C[i].fd = -1; }
 	//Install signal
 	if(InstallSignal(SIGINT, INTHwnd) == -1 || InstallSignal(SIGIO, IOHwnd) == -1) {
@@ -142,10 +151,15 @@ int main(int argc, char *argv[]) {
 		} else {
 			UserInformations = realloc(UserInformations, sizeof(userinfo_t) * (UserCount + 1) );
 		}
+		//Store username
 		memcpy(UserInformations[UserCount].usr, b, usernamelen);
 		UserInformations[UserCount].usr[usernamelen] = 0;
-		memcpy(UserInformations[UserCount].pwd, &pwdpos[1], passwdlen);
-		UserInformations[UserCount].pwd[passwdlen] = 0;
+		//Store loginkey in this session SHA512 of (username+password+salt)
+		uint8_t rawdat[UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH];
+		memcpy(rawdat, b, usernamelen);
+		memcpy(&rawdat[usernamelen], &pwdpos[1], passwdlen);
+		memcpy(&rawdat[usernamelen+passwdlen], ServerSalt, SALT_LENGTH);
+		SHA512(rawdat, usernamelen + passwdlen + SALT_LENGTH, UserInformations[UserCount].loginkey);
 		UserCount++;
 	}
 	fclose(f_pwdfile);
@@ -159,13 +173,13 @@ int main(int argc, char *argv[]) {
 	//Server loop
 	printf("Server started at *:%d\n", portnum);
 	while(ProgramExit == 0) {
-		int clients_noreading++; //non connecting clients and non reading clients total
+		int clients_noreading; //non connecting clients and non reading clients total
 		for(int i = 0; i < MAX_CLIENTS; i++) {
 			if(C[i].fd != -1 && C[i].inread == 0) {
-				clients_nonreading++;
+				clients_noreading++;
 				//Process close request
 				if(C[i].closereq == 1) {
-					printf("[%d]: Closing connection.\n", i);
+					Log(i, "Closing connection.\n");
 					close(C[i].fd);
 					C[i].fd = -1;
 				}
@@ -191,6 +205,25 @@ int main(int argc, char *argv[]) {
 
 void INTHwnd(int) {
 	ProgramExit = 1;
+}
+
+void Log(int cid, const char* ptn, ...) {
+	struct timeval t;
+	double td;
+	gettimeofday(&t, NULL);
+	td = t.tv_sec + ( (double)t.tv_usec / 1000000.0);
+	printf("[%.3f]", td);
+	if(0 <= cid && cid <= MAX_CLIENTS - 1 && C[cid].fd != -1) {
+		printf("<%d", cid);
+		if(0 <= C[cid].uid && C[cid].uid <= UserCount) {
+			printf("/%s", UserInformations[C[cid].uid].usr);
+		}
+		printf(">");
+	}
+	va_list varg;
+	va_start(varg, ptn);
+	vprintf(ptn, varg);
+	va_end(varg);
 }
 
 int InstallSignal(int s, void (*sh)() ) {
@@ -245,10 +278,10 @@ void NewClient() {
 			C[i].closereq = 0;
 			C[i].inread = 0;
 			C[i].fd = client;
-			printf("[%d]: new connection from %s:%d.\n", i, inet_ntoa(ip), prt);
+			Log(i, "New connection from %s:%d.\n", inet_ntoa(ip), prt);
 			if(MakeAsync(client) == -1) {
 				DisconnectWithReason(i, "Error.");
-				printf("[%d]: MakeAsync() failed.\n", i);
+				Log(i, "MakeAsync() failed.\n");
 			}
 			C[i].ip = ip;
 			C[i].port = prt;
@@ -275,27 +308,24 @@ void ClientReceive(int cid) {
 		C[cid].inread = 0;
 		return;
 	} else if(r == -1) {
-		printf("[%d]: read() failed: %s. Closing connection.\n", cid, strerror(errno) );
+		Log(cid, "read() failed: %s. Closing connection.\n", strerror(errno) );
 		C[cid].closereq = 1;
 		C[cid].inread = 0;
 		return;
 	}
 	//Execute command handler according to command type
 	switch(b[0]) {
-		case NP_ADD_EVENT:
-			AddEvent(&b[1], r - 1, cid);
-		break;
-		case NP_GET_EVENTS:
+		case NP_EXCHANGE_EVENTS:
+			if(r - 1 > 0) {
+				AddEvent(&b[1], r - 1, cid);
+			}
 			GetEvent(cid);
 		break;
 		case NP_LOGIN_WITH_PASSWORD:
 			LoginWithPassword(&b[1], r - 1, cid);
 		break;
-		//case NP_GREETINGS:
-		//	SendGreetingsPacket(cid);
-		//break;
 		default:
-			printf("[%d]: Unknown command (%d): ", cid, r);
+			Log(cid, "Unknown command (%d): ", r);
 			for(int i = 0; i < r; i++) {
 				printf("%02x ", b[i]);
 			}
@@ -309,9 +339,9 @@ void ClientReceive(int cid) {
 void SendGreetingsPacket(int cid) {
 	np_greeter_t p = {
 		.pkttype = NP_GREETINGS,
-		.cid = cid,
-		.salt = htonl(ServerSalt)
+		.cid = cid
 	};
+	memcpy(&p.salt, ServerSalt, SALT_LENGTH);
 	send(C[cid].fd, &p, sizeof(np_greeter_t), MSG_NOSIGNAL);
 }
 
@@ -321,7 +351,7 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 		.evlen = htons(dlen)
 	};
 	if(C[cid].uid == -1) {
-		printf("[%d]: AddEvent: Login first.\n", cid);
+		Log(cid, "AddEvent: Login first.\n");
 		DisconnectWithReason(cid, "Bad command.");
 		return;
 	}
@@ -331,25 +361,26 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 			memcpy(&EventBuffer[EBptr], &hdr, sizeof(hdr) );
 			memcpy(&EventBuffer[EBptr + sizeof(hdr)], d, dlen);
 			EBptr += addlen;
-			printf("[%d]: AddEvent: Event Added, Head:%d\n",cid, EBptr);
+			Log(cid, "AddEvent: Event Added, Head:%d\n", EBptr);
 		} else {
-			printf("[%d]: AddEvent: EventBuffer overflow.\n", cid);
+			Log(cid, "AddEvent: EventBuffer overflow.\n");
 		}
 	} else {
-		printf("[%d]: AddEvent: Too long event.\n", cid);
+		Log(cid, "AddEvent: Too long event. (%d)\n", dlen);
 		DisconnectWithReason(cid, "Too long event.");
 	}
 }
 
 void GetEvent(int cid) {
 	char tb[SIZE_EVENT_BUFFER + 1];
-	tb[0] = NP_GET_EVENTS;
+	tb[0] = NP_EXCHANGE_EVENTS;
 	int elen = EBptr - C[cid].bufcur;
 	memcpy(&tb[1], &EventBuffer[C[cid].bufcur], elen);
 	C[cid].bufcur += elen;
 	//Send out data
 	send(C[cid].fd, tb, elen + 1, MSG_NOSIGNAL);
 	EventBufferGC();
+	Log(cid, "GetEvent()\n");
 }
 
 void EventBufferGC() {
@@ -389,39 +420,34 @@ void EventBufferGC() {
 
 void LoginWithPassword(uint8_t* dat, int dlen, int cid) {
 	char* pwdpos;
+	if(dlen != SHA512_DIGEST_LEN) {
+		Log(cid, "LoginWithPassword: Wrong packet length.\n");
+		DisconnectWithReason(cid, "Bad command.");
+		return;
+	}
 	if(C[cid].uid != -1) {
-		printf("[%d]: LoginWithPassword: Already logged in.\n", cid);
+		Log(cid, "LoginWithPassword: Already logged in.\n");
 		send(C[cid].fd, "p+", 2, MSG_NOSIGNAL);
 		return;
 	}
-	pwdpos = memchr(dat, ':', dlen);
-	if(pwdpos == NULL) {
-		//packet format error
-		printf("[%d]: LoginWithPassword: Malformed packet!!\n", cid);
-		DisconnectWithReason(cid, "Bad command.");
-		return;
+/*
+	Log(cid, "Attemped to log in with key: ");
+	for(int i = 0; i < dlen; i++) {
+		printf("%02x ", dat[i]);
 	}
-	//Parameter length check
-	int usrlen = (uint8_t*)pwdpos - dat;
-	int pwdlen = dlen - usrlen - 1;
-	if(usrlen >= UNAME_SIZE || pwdlen >= PASSWD_SIZE) {
-		printf("[%d]: LoginWithPassword: Too long credential!!\n", cid);
-		DisconnectWithReason(cid, "Bad command.");
-		return;
-	}
+	printf("\n");
+*/
 	//Find matching credentials
 	for(int i = 0; i < UserCount; i++) {
-		char* user = UserInformations[i].usr;
-		char* pass = UserInformations[i].pwd;
-		if(memcmp(user, dat, strlen(user) ) == 0 && memcmp(pass, &pwdpos[1], strlen(pass) ) == 0 ) {
-			printf("[%d]: LoginWithPassword: Logged in as user %s(ID=%d)\n", cid, UserInformations[i].usr, i);
+		if(memcmp(UserInformations[i].loginkey, dat, SHA512_DIGEST_LEN ) == 0) {
+			Log(cid, "LoginWithPassword: Logged in as user %s(ID=%d)\n", UserInformations[i].usr, i);
 			C[cid].uid = i;
 			send(C[cid].fd, "p+", 2, MSG_NOSIGNAL);
 			return;
 		}
 	}
 	//Close connection if login failed
-	printf("[%d]: LoginWithPassword: No matching credential.\n", cid);
+	Log(cid, "LoginWithPassword: No matching credential.\n");
 	DisconnectWithReason(cid, "Login failure.");
 }
 
@@ -432,7 +458,7 @@ void DisconnectWithReason(int cid, char* reason) {
 	if(rlen < SIZE_NET_BUFFER - 1) {
 		memcpy(&sendbuf[1], reason, rlen);
 	} else {
-		printf("[%d]: DisconnectWithReason: Buffer overflow.\n");
+		Log(cid, "DisconnectWithReason: Buffer overflow.\n");
 		memcpy(&sendbuf[1], "OVERFLOW", 8);
 		rlen = 8;
 	}

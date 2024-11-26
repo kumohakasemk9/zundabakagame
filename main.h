@@ -17,7 +17,7 @@ main.h: integrated header file
 #define VERSION_STRING "7.0.0-25nov2024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 
-#define MAX_DIFFICULTY 5
+#define MAX_DIFFICULTY 5 //Max difficulty
 #define NET_CHAT_LIMIT 512 //Network chat length limit
 #define WINDOW_WIDTH 800 //Game width
 #define WINDOW_HEIGHT 600 //Game height
@@ -61,11 +61,13 @@ main.h: integrated header file
 #define LHOTBAR_WIDTH ( ( SKILL_COUNT * 54) + 100)
 #define LHOTBAR_XOFF (WINDOW_WIDTH - LHOTBAR_WIDTH) //LOL hotbar X
 #define LHOTBAR_YOFF (WINDOW_HEIGHT - 100) //LOL hotbar Y
-#define OBJID_INVALID -1
+#define OBJID_INVALID -1 //Special object number, means pointing nothing
 #define CHARACTER_TIMER_COUNT 4
 #define KUMO9_X24_MISSILE_RANGE 500
 #define KUMO9_X24_LASER_RANGE 600
 #define KUMO9_X24_PCANNON_RANGE 1000
+#define HOSTNAME_SIZE 64 //SMPServerInfo_t host record max len
+#define PORTNAME_SIZE 6 //SMPServerInfo_t port record max len
 
 //Image ID Definition for special purposes
 #define IMG_ITEM_UNUSABLE 13 //Cross icon, this means item is unusable
@@ -79,10 +81,10 @@ main.h: integrated header file
 #define IMG_STAT_ENERGY_BAD 32 //Energy icon (insufficient energy)
 
 //Some localized string IDs
-#define TEXT_DISCONNECTED 19
-#define TEXT_BAD_COMMAND_PARAM 1
-#define TEXT_UNAVAILABLE 10
-#define TEXT_SMP_ERROR 21
+#define TEXT_DISCONNECTED 19 //Disconnected from server
+#define TEXT_BAD_COMMAND_PARAM 1 //Bad command parameter
+#define TEXT_UNAVAILABLE 10 //Command or item unavailable
+#define TEXT_SMP_ERROR 21 //Disconnected because error in SMP routine
 
 #include <gtk/gtk.h>
 #include <math.h>
@@ -191,6 +193,14 @@ typedef struct {
 	int32_t cid; //Source client ID for SMP
 } GameObjs_t;
 
+//SMP Information
+typedef struct {
+	char host[HOSTNAME_SIZE]; //Hostname
+	char port[PORTNAME_SIZE]; //Port Number
+	char usr[UNAME_SIZE]; //Username
+	char pwd[PASSWD_SIZE]; //Password
+} SMPProfile_t;
+
 //constant information of characters
 typedef struct {
 	int32_t initimgid; //initial image id
@@ -222,6 +232,7 @@ void darea_paint(GtkDrawingArea*, cairo_t*, int, int, gpointer);
 void draw_game_main();
 void draw_ui();
 void draw_info();
+void read_creds();
 gboolean keypress_handler(GtkWidget*, guint, guint, GdkModifierType, gpointer);
 void keyrelease_handler(GtkWidget*, guint, guint, GdkModifierType, gpointer);
 void mousemotion_handler(GtkWidget*, gdouble, gdouble, gpointer);
@@ -259,7 +270,7 @@ double constrain_number(double, double, double);
 uint32_t constrain_ui32(uint32_t, uint32_t, uint32_t);
 int32_t constrain_i32(int32_t, int32_t, int32_t);
 void utf8_substring(char*, int32_t, int32_t, char*, int32_t);
-gboolean utf8_insertstring(char*, char*, int32_t, int32_t);
+gboolean utf8_insertstring(char*, char*, int32_t, gsize);
 void die(const char*, ...);
 int32_t get_font_height();
 int32_t get_string_width(char*);
@@ -320,10 +331,10 @@ gboolean procobjhit(int32_t, int32_t, LookupResult_t, LookupResult_t);
 void damage_object(int32_t, int32_t);
 
 //network.c
-void connect_server(char*);
+void connect_server();
 void close_connection(int32_t);
 void net_recv_handler();
-void net_server_send_cmd(server_command_t, ...);
+void net_server_send_cmd(server_command_t);
 void close_connection_silent();
 
 //osdep.c
@@ -331,4 +342,4 @@ int32_t make_tcp_socket(char*, char*);
 int32_t close_tcp_socket();
 int32_t send_tcp_socket(uint8_t*, size_t);
 int32_t install_io_handler();
-int32_t recv_tcp_socket(uint8_t*, size_t);
+ssize_t recv_tcp_socket(uint8_t*, size_t);

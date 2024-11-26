@@ -59,7 +59,7 @@ void utf8_substring(char* src, int32_t st, int32_t ed, char *dst, int32_t dstlen
 	char* s;
 	char* e;
 	uint32_t subl;
-	ed = constrain_i32(ed, 0, g_utf8_strlen(src, 65535) ); //Restrict ed not to be greater than src letter count
+	ed = constrain_i32(ed, 0, (int32_t)g_utf8_strlen(src, 65535) ); //Restrict ed not to be greater than src letter count
 	if(st > ed || dstlen < 2) {
 		die("utf8_substring() failed. Parameters error: st=%d, ed=%d, dstlen=%d\n", st, ed, dstlen);
 		return;
@@ -76,10 +76,10 @@ void utf8_substring(char* src, int32_t st, int32_t ed, char *dst, int32_t dstlen
 }
 
 //insert string src at index pos to dst, returns FALSE if insufficient src space. (length dstlen restricted)
-gboolean utf8_insertstring(char *dst, char *src, int32_t pos, int32_t dstlen) {
+gboolean utf8_insertstring(char *dst, char *src, int32_t pos, gsize dstlen) {
 	uint16_t l = (uint16_t)strlen(src);
 	//Restrict pos 
-	pos = constrain_i32(pos, 0, g_utf8_strlen(dst, 65535) );
+	pos = constrain_i32(pos, 0, (int32_t)g_utf8_strlen(dst, 65535) );
 	//Check if processed string is shorter than dstlen bytes
 	if(strlen(dst) + l + 1 > dstlen) {
 		return FALSE;
@@ -142,13 +142,13 @@ int32_t get_font_height() {
 
 //shorten string to fit in width wid, returns shorten string length, stores actual width to widr if not NULL
 int32_t shrink_string(char *ctx, int32_t wid, int32_t* widr) {
-	int32_t l = g_utf8_strlen(ctx, 65535);
+	int32_t l = (int32_t)g_utf8_strlen(ctx, 65535);
 	return shrink_substring(ctx, wid, 0, l, widr);
 }
 
 //substring version of shrink_string()
 int32_t shrink_substring(char *ctx, int32_t wid, int32_t st, int32_t ed, int32_t* widr) {
-	int32_t l = constrain_i32(ed, 0, g_utf8_strlen(ctx, 65535) );
+	int32_t l = constrain_i32(ed, 0, (int32_t)g_utf8_strlen(ctx, 65535) );
 	int32_t w = wid + 10;
 	//Delete one letter from ctx in each loops, continue until string width fits in wid
 	while(l > 0) {
