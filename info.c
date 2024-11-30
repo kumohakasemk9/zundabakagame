@@ -40,7 +40,9 @@ const char* JP_STRINGS[MAX_STRINGS] = {
 	"接続できませんでした",
 	"サーバーから切断しました",
 	"サーバーとの接続を確立しました",
-	"エラーのためサーバーから切断します。"
+	"エラーのためサーバーから切断します。",
+	"がゲームに参加しました",
+	"がゲームから切断しました"
 };
 
 const char *EN_STRINGS[MAX_STRINGS] = {
@@ -65,7 +67,9 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"Server connection failed.",
 	"Disconnected from server.",
 	"Connection established.",
-	"Disconnected from server, errored."
+	"Disconnected from server, errored.",
+	"joined in the game.",
+	"left from the game."
 };
 
 //TID names LUT
@@ -436,4 +440,14 @@ int32_t is_playable_character(obj_type_t tid) {
 		return 1;
 	}
 	return 0;
+}
+
+//Find playable that associated with tid, returns -1 if not found.
+int32_t find_playable_id_from_tid(obj_type_t tid) {
+	for(int32_t i = 0; i < PLAYABLE_CHARACTERS_COUNT; i++) {
+		if(tid == (obj_type_t)PLAYABLE_INFORMATION[i][0]) {
+			return i;
+		}
+	}
+	return -1;
 }

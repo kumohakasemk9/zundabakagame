@@ -14,11 +14,10 @@ main.h: integrated header file
 */
 
 //Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function added (feature add), 3 will increase if function update (bugfix)
-#define VERSION_STRING "7.0.0-25nov2024"
+#define VERSION_STRING "8.0.0-25nov2024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 
 #define MAX_DIFFICULTY 5 //Max difficulty
-#define NET_CHAT_LIMIT 512 //Network chat length limit
 #define WINDOW_WIDTH 800 //Game width
 #define WINDOW_HEIGHT 600 //Game height
 #define MAP_WIDTH 5000 //map max width
@@ -43,7 +42,7 @@ main.h: integrated header file
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
 #define ITEM_COUNT 5 //Max item id
-#define MAX_STRINGS 22 // Max string count
+#define MAX_STRINGS 24 // Max string count
 #define MAX_TID 24 //max type id
 #define SKILL_COUNT 3 //Skill Count
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
@@ -190,7 +189,6 @@ typedef struct {
 	int32_t timeout; //lifespan, automatically decreased, dies when 0
 	double damage; //given damage when hit
 	int32_t srcid; //Object source id, holds who made this attack.
-	int32_t cid; //Source client ID for SMP
 } GameObjs_t;
 
 //SMP Information
@@ -225,6 +223,15 @@ typedef struct {
 	int32_t *skillinittimers;
 	int32_t *skillranges;
 } PlayableInfo_t;
+
+//Remote player information
+typedef struct {
+	int32_t cid; //Client Id
+	char usr[UNAME_SIZE]; //Client username
+	int32_t pid; //Playable character id
+	int32_t playable_objid; //Client side object id of playable character
+	int32_t respawn_timer; //Client playable character respawn timer, -1 if don't need to respawn.
+} SMPPlayers_t;
 
 //main.c
 void activate(GtkApplication*);
@@ -283,6 +290,7 @@ int32_t randint(int32_t, int32_t);
 void get_image_size(int32_t, double*, double*);
 
 //gamesys.c
+void use_skill(int32_t, int32_t, PlayableInfo_t);
 void local2map(double, double, double*, double*);
 void getlocalcoord(int32_t, double*, double*);
 void chat(char*);
@@ -306,15 +314,12 @@ void commandmode_keyhandler(guint, GdkModifierType);
 void reset_game();
 void aim_earth(int32_t);
 double get_distance_raw(double, double, double, double);
-//void showerrorstr(int32_t);
 void select_next_item();
 void select_prev_item();
-void spawn_playable();
+void spawn_playable_me();
+int32_t spawn_playable(int32_t);
 void chat_request(char*);
 void chatf_request(const char*, ...);
-void process_smp();
-void process_smp_events(uint8_t*, size_t, int32_t);
-void stack_packet(event_type_t, ...);
 
 //info.c
 void lookup(obj_type_t, LookupResult_t*);
@@ -324,6 +329,13 @@ const char *getlocalizeditemdesc(int32_t);
 const char *getlocalizedcharactername(int32_t);
 void lookup_playable(int32_t, PlayableInfo_t*);
 int32_t is_playable_character();
+int32_t find_playable_id_from_tid(int32_t);
+
+//smp.h
+void process_smp();
+void process_smp_events(uint8_t*, size_t, int32_t);
+void stack_packet(event_type_t, ...);
+int32_t lookup_smp_player_from_cid(int32_t);
 
 //aiproc.c
 void procai();

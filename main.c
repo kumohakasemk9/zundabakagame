@@ -13,11 +13,7 @@ Zundamon is from https://zunko.jp/
 main.c: main window process, game process (keyevents) and drawing
 
 TODO List
-add join/leave notify in SMP system
-encrypt password with hash
-add function to find playable played by remote user
-implement remote skill activator
-show cid and username near playable when SMP
+avoid blocking main thread by connect()
 nickname feature in SMP
 chat mute feature in SMP
 change difficulty algorithm (from increasing enemy to increase hp)
@@ -26,7 +22,7 @@ add getCurrentPlayableCharacterId()
 Make me ahri
 Make it multiplay - Integrate with kumo auth system
 Port it to allegro
-character ditch information structure
+change Character constant information structure to each function getters
 */
 
 #include "main.h"
@@ -70,7 +66,6 @@ PangoLayout *Gpangolayout = NULL; //For drawing font
 int32_t MapTechnologyLevel = 0; //Current map technology level (Increases when google placed)
 int32_t MapEnergyLevel = 0; //Current map energy level (Increases when powerplants placed)
 int32_t MapRequiredEnergyLevel = 0; //Current map required energy level (Increases when facilities placed except power plants)
-char SMPUsername[UNAME_SIZE], SMPPassword[PASSWD_SIZE]; //Multiplayer Credentials
 int32_t SubthreadMessageReq = -1;
 smpstatus_t SMPStatus = NETWORK_DISCONNECTED; //Server Connection Status
 int32_t Difficulty = 1; //Current game difficulty
@@ -78,6 +73,7 @@ SMPProfile_t *SMPProfs = NULL; //SMP Profiles (Username and connection info)
 //LOLSkillKeyState_t SkillKeyStates[SKILL_COUNT];
 int32_t SMPProfCount = 0; //loaded SMP Profiles Count
 int32_t SelectedSMPProf = 0; //Selected SMP Profile index
+SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //SMP Remote player information
 
 //Paint event of Drawing Area, called for every 30mS
 void darea_paint(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data) {
@@ -232,8 +228,6 @@ void read_creds() {
 }
 
 int main(int argc, char *argv[]) {
-	memcmp(SMPUsername, 0, UNAME_SIZE);
-	memset(SMPPassword, 0, PASSWD_SIZE);
 	int s;
 	//Install network IO handler
 	if(install_io_handler() != 0) {
@@ -364,9 +358,18 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 		}
 		draw_hpbar(x, y - 7, w, 5, Gobjs[idx].hp, t.inithp, COLOR_TEXTCHAT, cc);
 	}
-	//Timer bar for kumo9-x24's W skill
+	//In SMP: If the object is playable and from foreign client (SMP), draw name tag
+	if(SMPStatus == NETWORK_LOGGEDIN && is_playable_character(Gobjs[idx].tid) ) {
+		for(int32_t i = 0; i < MAX_CLIENTS; i++) {
+			if(SMPPlayerInfo[i].cid != -1 && SMPPlayerInfo[i].playable_objid == idx) {
+				drawstring_inwidth(x, y - 50, SMPPlayerInfo[i].usr, (int32_t)w, TRUE);
+				break;
+			}
+		}
+	}
 	double bary = y + h + 2;
-	if(Gobjs[idx].tid == TID_KUMO9_X24_ROBOT) {
+	if(is_playable_character(Gobjs[idx].tid) ) {
+		//Timer bar for skill
 		for(uint8_t i = 0; i < SKILL_COUNT; i++) {
 			if(Gobjs[idx].timers[i + 1] != 0) {
 				PlayableInfo_t plinfo;
@@ -577,6 +580,13 @@ void draw_info() {
 	//Show current Energy level
 	chcolor(ttxtclr, TRUE);
 	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 32, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
+	//Show Current SMP Status
+	chcolor(COLOR_TEXTCMD, TRUE);
+	if(SMPStatus == NETWORK_DISCONNECTED) {
+		drawstring(STATUS_XOFF + 70, IHOTBAR_YOFF, "local");
+	} else {
+		drawstring(STATUS_XOFF + 70, IHOTBAR_YOFF, "SMP");
+	}
 }
 
 void draw_lolhotbar(double offsx, double offsy) {

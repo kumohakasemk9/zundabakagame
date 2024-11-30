@@ -6,5 +6,5 @@ OUT=server
 $(OUT): $(OBJS)
 	$(CC) `pkg-config --libs openssl` $^ -o $(OUT)
 
-clear:
+clean:
 	rm -f $(OUT) $(OBJS)

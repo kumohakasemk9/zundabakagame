@@ -133,7 +133,7 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 SOCKET ConnectionSocket = INVALID_SOCKET;
 
 int32_t make_tcp_socket(char *hostname, char* port) {
-	if(is_open_tcp_socket() == 0) {
+	if(ConnectionSocket != INVALID_SOCKET) {
 		g_print("make_tcp_socket() win32: Already connected\n");
 		return -1;
 	}

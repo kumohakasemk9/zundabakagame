@@ -30,6 +30,7 @@ int32_t SMPcid; //My client id
 extern int32_t SMPProfCount;
 extern SMPProfile_t *SMPProfs;
 extern int32_t SelectedSMPProf;
+extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
 
 //Packet receiver handler
 void net_recv_handler() {
@@ -62,15 +63,22 @@ void net_recv_handler() {
 		close_connection_silent();
 	} else if(recvdata[0] == NP_GREETINGS) {
 		//greetings response
+		//Security update: avoid sending credentials for multiple times
+		if(SMPcid != -1) {
+			g_print("net_recv_handler(): Duplicate greetings packet.\n");
+			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			close_connection_silent();
+			return;
+		}
 		//Data length check
 		if(r != sizeof(np_greeter_t) ) {
-			g_print("net_recv_handler(): Bat greetings packet.\n");
+			g_print("net_recv_handler(): Too short greetings packet.\n");
 			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
 		np_greeter_t *p = (np_greeter_t*)recvdata;
-		SMPcid = p->cid;
+		SMPcid = (int32_t)p->cid;
 		memcpy(SMPsalt, p->salt, SALT_LENGTH);
 		g_print("net_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
 		g_print("net_recv_handler(): Salt: ");
@@ -80,17 +88,36 @@ void net_recv_handler() {
 		g_print("\n");
 		net_server_send_cmd(NP_LOGIN_WITH_PASSWORD); //Send credentials
 	} else if(recvdata[0] == NP_LOGIN_WITH_PASSWORD) {
-		if(r == 2 && recvdata[1] == '+') {
-			//Login command successful response
-			SMPStatus = NETWORK_LOGGEDIN;
-			g_print("net_recv_handler(): Login successful response.\n");
-		} else {
+		//Login response: returns current userlist
+		int32_t p = 1;
+		int32_t c = 0;
+		while(p < r && c < MAX_CLIENTS) {
+			//Convert header
+			userlist_hdr_t *uhdr = (userlist_hdr_t*)&recvdata[p];
+			int32_t csiz = sizeof(userlist_hdr_t) + uhdr->uname_len;
+			//Length check
+			if(p + csiz > r) {
+				g_print("net_recv_handler(): Bad login response\n");
+				chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+				close_connection_silent();
+				return;
+			}
+			//Fill client information
+			SMPPlayerInfo[c].cid = uhdr->cid;
+			SMPPlayerInfo[c].pid = 0;
+			SMPPlayerInfo[c].respawn_timer = -1;
+			memcpy(SMPPlayerInfo[c].usr, &recvdata[p + (int32_t)sizeof(userlist_hdr_t)], uhdr->uname_len);
+			c++;
+			p += csiz;
+		}
+		if(c >= MAX_CLIENTS) {
 			g_print("net_recv_handler(): Bad login response\n");
 			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
-
 		}
+		SMPStatus = NETWORK_LOGGEDIN;
+		g_print("net_recv_handler(): Login successful response.\n");
 	} else if(recvdata[0] == NP_EXCHANGE_EVENTS) {
 		//Exchange event response
 		if(r >= SMP_EVENT_BUFFER_SIZE) {
@@ -127,6 +154,10 @@ void connect_server() {
 	g_print("connect_server(): Attempting to connect to %s:%s\n", SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
 	RXSMPEventLen = 0;
 	TXSMPEventLen = 0;
+	SMPcid = -1;
+	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
+		SMPPlayerInfo[i].cid = -1;
+	}
 	SMPStatus = NETWORK_CONNECTING;
 	//Connect (TODO: this will block main thread, use another thread instead.)
 	if(make_tcp_socket(SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port) != 0) {
@@ -207,3 +238,4 @@ void net_server_send_cmd(server_command_t cmd) {
 		close_connection(1);
 	}
 }
+

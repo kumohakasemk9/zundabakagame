@@ -26,6 +26,8 @@ extern int32_t MapRequiredEnergyLevel;
 extern langid_t LangID;
 extern const char *EN_TID_NAMES[MAX_TID];
 extern gboolean CharacterMove;
+extern int32_t SMPStatus;
+extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
 
 void procai() {
 	//AI proc
@@ -53,6 +55,19 @@ void procai() {
 				PlayingCharacterID = -1;
 				GameState = GAMESTATE_DEAD;
 				StateChangeTimer = 1000;
+			} else {
+				//If SMP remote player is dead, respawn after several times
+				if(SMPStatus == NETWORK_LOGGEDIN) {
+					if(is_playable_character(Gobjs[i].tid) ) {
+						for(int32_t j = 0; j < MAX_CLIENTS; j++) {
+							if(SMPPlayerInfo[j].playable_objid == i) {
+								//Set specific player's SMP character respawn timer.
+								SMPPlayerInfo[j].respawn_timer = 1000;
+								break;
+							}
+						}
+					}
+				}
 			}
 			Gobjs[i].tid = TID_NULL;
 			continue; //Skip process for this object
@@ -443,6 +458,7 @@ gboolean procobjhit(int32_t src, int32_t dst, LookupResult_t srcinfo, LookupResu
 	return TRUE;
 }
 
+//Damage object id dstid by object id srcid
 void damage_object(int32_t dstid, int32_t srcid) {
 	if(!is_range(dstid, 0, MAX_OBJECT_COUNT - 1) || !is_range(srcid, 0, MAX_OBJECT_COUNT - 1) ) {
 		die("damage_object(): Bad parameter!\n");
@@ -507,19 +523,37 @@ void damage_object(int32_t dstid, int32_t srcid) {
 					deathreasonid = 15;
 					break;
 			}
+			char smpkiller[UNAME_SIZE + 2] = "", smpvictim[UNAME_SIZE + 2] = "";
+			//If SMP, show smp username
+			if(SMPStatus == NETWORK_LOGGEDIN) {
+				//If object SMP playable, get username of character owner
+				for(int32_t i = 0; i < MAX_CLIENTS; i++) {
+					if(SMPPlayerInfo[i].playable_objid == dstid) {
+						strcpy(smpvictim, " <");
+						strcat(smpvictim, SMPPlayerInfo[i].usr);
+						strcat(smpvictim, ">");
+					}
+					if(SMPPlayerInfo[i].playable_objid == srcid) {
+						strcpy(smpkiller, " <");
+						strcat(smpkiller, SMPPlayerInfo[i].usr);
+						strcat(smpkiller, ">");
+					}
+				}
+			}
+			//show death log
 			if(is_range(killerid, 0, MAX_OBJECT_COUNT - 1) && is_range(Gobjs[killerid].tid, 0, MAX_TID - 1) ){
 				int32_t killertid = Gobjs[killerid].tid;
 				if(LangID == LANGID_JP) {
-					chatf("%sは%sによって%s", getlocalizedcharactername(Gobjs[dstid].tid), getlocalizedcharactername(killertid), getlocalizedstring(deathreasonid));
+					chatf("%s%sは%s%sによって%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedcharactername(killertid), smpkiller, getlocalizedstring(deathreasonid));
 				} else {
-					chatf("%s is %s by %s", getlocalizedcharactername(Gobjs[dstid].tid), getlocalizedstring(deathreasonid), getlocalizedcharactername(killertid) );
+					chatf("%s%s is %s by %s%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedstring(deathreasonid), getlocalizedcharactername(killertid), smpkiller);
 				}
 				//printlog("Object %d is %s\n", killerid, EN_TID_NAMES[killertid]);
 			} else {
 				if(LangID == LANGID_JP) {
-					chatf("%sは%s", getlocalizedcharactername(Gobjs[dstid].tid), getlocalizedstring(deathreasonid) );
+					chatf("%s%sは%s%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedstring(deathreasonid) );
 				} else {
-					chatf("%s %s", getlocalizedcharactername(Gobjs[dstid].tid), getlocalizedstring(deathreasonid) );
+					chatf("%s%s %s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedstring(deathreasonid) );
 				}
 			}
 		}
