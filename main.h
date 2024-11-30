@@ -355,3 +355,6 @@ int32_t close_tcp_socket();
 int32_t send_tcp_socket(uint8_t*, size_t);
 int32_t install_io_handler();
 ssize_t recv_tcp_socket(uint8_t*, size_t);
+#ifdef WIN32
+	void windows_recv_poll();
+#endif

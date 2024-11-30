@@ -215,4 +215,19 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	return recv(ConnectionSocket, ctx, ctxlen, 0);
 }
 
+//Poll wait for windows, it is temporarily solution!
+void windows_recv_poll() {
+	if(ConnectionSocket == INVALID_SOCKET) {
+		return;
+	}
+	WSAPOLLFD pfd = {
+		.fd = ConnectionSocket,
+		.events = POLLRDNORM,
+		.revents = 0
+	};
+	if(WSAPoll(&pfd, 1, 0) > 0) {
+		net_recv_handler();
+	}
+}
+
 #endif
