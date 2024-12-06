@@ -47,7 +47,7 @@ int32_t close_tcp_socket() {
 		g_print("close_tcp_socket() win64: Connection already closed.\n");
 		return -1;
 	}
-	g_socket_close(GSock);
+	g_socket_close(GSock, NULL);
 	g_object_unref(GConn);
 	GConn = NULL;
 	return 0;
