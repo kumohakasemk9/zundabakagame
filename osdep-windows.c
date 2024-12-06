@@ -80,9 +80,13 @@ ssize_t recv_tcp_socket(uint8_t *ctx, size_t ctxlen) {
 
 //For windows, use poll strategy
 void poll_tcp_socket() {
-	if(GConn == NULL) { return; } //If not connected, return
+	if(GConn == NULL) {
+		g_print("poll_tcp_socket() win64: Connection is not open.\n");
+		return;
+	} //If not connected, return
 	//If there's any data, call network data receive handler
 	if(g_socket_condition_check(GSock, G_IO_IN) == G_IO_IN) {
 		net_recv_handler();
 	}
+	//g_print("poll_tcp_socket(): win64\n");
 }

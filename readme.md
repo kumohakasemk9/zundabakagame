@@ -33,7 +33,7 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 - `/disconnect`      : Disconnect from SMP server.  
 
 # About SMP   
-SMP support is linux only, and still incomplete and broken.   
+SMP support is still in development      
 You may experience very insane de-synced game like object   
 pops out of nowhere, etc ....   Before doing SMP, you need to   
 modify `credentials.txt` in the game directory. Please write one profile   
@@ -52,22 +52,22 @@ comes at last. (Do not eorry if you are in windows, in windows code, cr
 is recognized as newline instead.)   
    
 # Prepareation for Windows
-0. Get releases for Windows.
-1. Download gvsbuild ( https://github.com/wingtk/gvsbuild ), please choose releases,
-   not cloning repo.   
-2. Copy all DLL files in `gvsbuild\bin` to the directory having game executable.
-   (You also can add `gvsbuild/bin` to PATH instead of copying DLLs. If you want to debug
-   , you have to.)   
-3. Download Microsoft Visual C++ Redistributable   
+0. Get releases for Windows. I would pack all of required dlls inside releases.
+1. Download Microsoft Visual C++ Redistributable   
    ( https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170 )   
    and install.   
-4. Double click game executable and enjoy.
+2. Double click game executable and enjoy.
+    
+If dlls are missing, please download dlls from gvsbuild and cygwin   
+then copy all the dlls to the game directory (or specify dll path into PATH)   
+gvsbuild: https://github.com/wingtk/gvsbuild/releases (You need gtk4)
+cygwin: https://cygwin.com/   
+(install without no additional software, you can obtain `cygwin1.dll` from `C:\cygwin64\bin`)
    
 # Prepareation for linux
 1. You only need gtk4. Maybe most linux already have it.
    
 # Building in Windows (Cygwin + gcc)
-Cygwin build option is removed.   
 If you want to build in cygwin, install `gcc` and `make`    
 Then copy and edit `makefile_windows` for it (like include path and compiler name)     
 

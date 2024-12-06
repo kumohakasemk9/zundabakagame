@@ -356,7 +356,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				if(is_range(i, 0, MAX_CLIENTS) ) {
 					chatf("%s %s", SMPPlayerInfo[i].usr, getlocalizedstring(23) );
 					int32_t j = SMPPlayerInfo[i].playable_objid;
-					if(is_range(0, j, MAX_OBJECT_COUNT) ) {
+					if(is_range(0, j, MAX_OBJECT_COUNT - 1) ) {
 						Gobjs[j].tid = TID_NULL;
 					} else {
 						g_print("process_smp_events(): CID%d does not have playable character.\n", cid);
