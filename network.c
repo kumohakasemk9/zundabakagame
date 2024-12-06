@@ -15,12 +15,6 @@ network.c: process network packets
 
 #include "main.h"
 
-#ifndef WIN32
-	#include <arpa/inet.h>
-#else
-	#include <winsock.h>
-#endif
-
 extern smpstatus_t SMPStatus;
 size_t RXSMPEventLen; //Remote event len
 size_t TXSMPEventLen; //Client Event len

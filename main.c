@@ -183,11 +183,7 @@ void read_creds() {
 			char *t2 = strchr(t, '\t');
 			//Last record will be finished by newline character
 			if(i == 3) {
-				#ifdef __linux__
-					t2 = strchr(t, '\n');
-				#else
-					t2 = strchr(t, '\r');
-				#endif
+				t2 = strchr(t, '\n');
 			}
 			if(t2 == NULL) {
 				g_print("read_creds(): credentials.txt:%d: No splitter letter, parsing skipped for the line.\n", lineno);
