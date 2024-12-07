@@ -373,6 +373,10 @@ gboolean gametick(gpointer data) {
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		process_smp();
 	}
+	//For windows
+	if(SMPStatus != NETWORK_DISCONNECTED) {
+		poll_tcp_socket();
+	}
 	//If game is not in playing state, do special process
 	switch(GameState) {
 	case GAMESTATE_INITROUND:

@@ -49,8 +49,8 @@ void net_recv_handler() {
 	if(recvdata[0] == NP_RESP_DISCONNECT) {
 		//Disconnect packet
 		char reason[NET_RX_BUFFER_SIZE];
-		memcpy(reason, &recvdata[1], (size_t)r);
-		reason[r] = 0;
+		memcpy(reason, &recvdata[1], (size_t)r - 1);
+		reason[r - 1] = 0;
 		g_print("net_recv_handler(): Disconnect request: %s\n", reason);
 		//Request to show chat message 
 		chatf_request("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
