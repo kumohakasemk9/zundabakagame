@@ -19,13 +19,17 @@ main.h: integrated header file
 #include <pango/pangocairo.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <stdint.h>
 
 #include "zunda-server.h"
 #include "zunda-structs.h"
+
+//main.c
 
 //ui.c
 void game_paint();
@@ -73,6 +77,9 @@ int32_t is_range(int32_t, int32_t, int32_t);
 int32_t is_range_number(double, double, double);
 int32_t randint(int32_t, int32_t);
 void get_image_size(int32_t, double*, double*);
+size_t utf8_get_letter_bytelen(char*);
+int32_t utf8_strlen(char*);
+char *utf8_strlen_to_pointer(char*, int32_t);
 
 //gamesys.c
 void read_creds();

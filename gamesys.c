@@ -21,7 +21,6 @@ extern cairo_surface_t *GSsfc; //GameScreen drawer surface
 extern cairo_t *GS; //GameScreen Drawer
 cairo_surface_t *Plimgs[IMAGE_COUNT]; //Preloaded images
 extern const char* IMGPATHES[]; //preload image pathes
-PangoLayout *Gpangolayout = NULL; //For drawing font
 SMPProfile_t* t_SMPProf = NULL;
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE];
 int32_t ChatTimeout = 0;
@@ -65,6 +64,7 @@ extern int32_t SMPcid;
 int32_t StatusShowTimer;
 char StatusTextBuffer[BUFFER_SIZE];
 int32_t CommandBufferMutex = 0;
+PangoLayout *PangoL = NULL;
 
 //Request to show chat message from another thread (this can not be nested)
 void chat_request(char* ctx) {
@@ -827,10 +827,10 @@ int32_t gameinit() {
 
 	//Load images into memory.
 	printf("Loading image assets.\n");
-	for(guint i = 0; i < IMAGE_COUNT; i++) {
+	for(int32_t i = 0; i < IMAGE_COUNT; i++) {
 		Plimgs[i] = NULL;
 	}
-	for(guint i = 0; i < IMAGE_COUNT; i++) {
+	for(int32_t i = 0; i < IMAGE_COUNT; i++) {
 		Plimgs[i] = cairo_image_surface_create_from_png(IMGPATHES[i]);
 		if(cairo_surface_status(Plimgs[i]) != CAIRO_STATUS_SUCCESS) {
 			printf("gameinit(): Error loading %s\n", IMGPATHES[i]);
@@ -846,8 +846,9 @@ int32_t gameinit() {
 		LangID = LANGID_JP;
 	} else {
 		printf("Changed to English mode because of your locale setting: %s\n", lang_c);
-		LangID = LANGID_EN;
+		
 	}
+	LangID = LANGID_EN;
 	
 	//Initialize Chat Message Slots
 	for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {
@@ -856,6 +857,8 @@ int32_t gameinit() {
 	
 	check_data(); //Data Check
 
+	PangoL = pango_cairo_create_layout(G);
+	
 	//Setup font
 	loadfont("Ubuntu Mono,monospace");
 	set_font_size(FONT_DEFAULT_SIZE);
@@ -887,8 +890,8 @@ void do_finalize() {
 	}
 	
 	//Unload other resources
-	if(Gpangolayout != NULL) {
-		g_object_unref(Gpangolayout);
+	if(PangoL != NULL) {
+		g_object_unref(PangoL);
 	}
 	if(G != NULL) {
 		cairo_destroy(G);
@@ -1067,8 +1070,8 @@ void keypress_handler(char kc, specialkey_t ks) {
 			//BackSpace
 			if(CommandCursor > 0 && !CommandBufferMutex) {
 				CommandBufferMutex = 1;
-				char *s = g_utf8_offset_to_pointer(CommandBuffer, CommandCursor - 1); //String after Deletion
-				char *s2 = g_utf8_offset_to_pointer(CommandBuffer, CommandCursor); //String after current cursor
+				char *s = utf8_strlen_to_pointer(CommandBuffer, CommandCursor - 1); //String after Deletion
+				char *s2 = utf8_strlen_to_pointer(CommandBuffer, CommandCursor); //String after current cursor
 				//Shift left string
 				for(uint16_t i = 0; i < strlen(s) + 1; i++) {
 					s[i] = s2[i];
@@ -1081,7 +1084,7 @@ void keypress_handler(char kc, specialkey_t ks) {
 			if(CommandCursor > 0) {CommandCursor--;}
 		} else if(ks == SPK_RIGHT) {
 			//RightArrow
-			if(CommandCursor < g_utf8_strlen(CommandBuffer, 65535) ) {
+			if(CommandCursor < utf8_strlen(CommandBuffer) ) {
 				CommandCursor++;
 			}
 		} else if(kc == 0x16) {
@@ -1100,7 +1103,7 @@ void keypress_handler(char kc, specialkey_t ks) {
 					utf8_insertstring(CommandBuffer, s, CommandCursor, sizeof(CommandBuffer) );
 					CommandCursor += 1;
 				} else {
-					printf("main.c: commandmode_keyhandler(): Append letter failed: Buffer full.\n");
+					printf("commandmode_keyhandler(): Append letter failed: Buffer full.\n");
 				}
 				CommandBufferMutex = 0;
 			}

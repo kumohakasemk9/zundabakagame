@@ -10,7 +10,7 @@ Zundamon bakage powered by cairo, X11.
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
 
-graphics.c: drawing functions and ui drawing
+graphics.c: drawing functions
 */
 
 #include "main.h"
@@ -18,6 +18,7 @@ graphics.c: drawing functions and ui drawing
 double Fgcolor[4] = {1.0, 1.0, 1.0, 1.0}; //Selected FGcolor
 extern cairo_t* G; //Gamescreen cairo context
 extern cairo_surface_t* Plimgs[];
+extern PangoLayout *PangoL;
 
 //Draw hp bar at x, y with width w and height h, chp is current hp, fhp is full hp,
 //colorbg is background color, colorfg is foreground color.
@@ -65,10 +66,10 @@ void fillcircle(double x, double y, double diam) {
 
 //draw string ctx in pos x, y
 void drawstring(double x, double y, char* ctx) {
-	//pango_layout_set_text(Gpangolayout, ctx, -1);
-	cairo_move_to(G, x, y + get_font_height() - 2);
-	cairo_show_text(G, ctx);
-	//pango_cairo_show_layout(G, Gpangolayout);
+	pango_layout_set_text(PangoL, ctx, -1);
+	cairo_move_to(G, x, y); // + get_font_height() - 2);
+	//cairo_show_text(G, ctx);
+	pango_cairo_show_layout(G, PangoL);
 }
 
 //draw substring ctx (index sp to ed) in pos x, y
@@ -98,7 +99,7 @@ double drawstring_inwidth(double x, double y, char* ctx, int32_t wid, int32_t bg
 	double ty = y;
 	int32_t cp = 0;
 	int32_t ch = get_font_height();
-	uint16_t ml = (uint16_t)g_utf8_strlen(ctx, 65535);
+	int32_t ml = utf8_strlen(ctx);
 	while(cp < ml) {
 		//Write a adjusted string to fit in wid
 		int32_t a;
@@ -183,12 +184,17 @@ int32_t drawstring_title(double y, char* ctx, int32_t s) {
 
 //Set font size to s
 void set_font_size(int32_t s) {
-	cairo_set_font_size(G, (double)s);
+	
+	//cairo_set_font_size(G, (double)s);
 }
 
 //load fonts from fontlist and use it for text drawing
 void loadfont(const char* fontlist) {
-	cairo_select_font_face(G, "Ubuntu Mono", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+	PangoFontDescription *desc;
+	desc = pango_font_description_from_string (fontlist);
+	pango_layout_set_font_description (PangoL, desc);
+	pango_font_description_free (desc);
+	//cairo_select_font_face(G, "Ubuntu Mono", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
 }
 
 //draw polygon that has start point x,y and vertexes represented by x: points[2n], y: points[2n+1]

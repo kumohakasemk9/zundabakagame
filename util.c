@@ -15,10 +15,10 @@ util.c: utility functions
 
 #include "main.h"
 
+extern PangoLayout *PangoL;
 extern int32_t ProgramExiting;
-extern cairo_t* G;
+//extern cairo_t* G;
 extern cairo_surface_t* Plimgs[IMAGE_COUNT];
-extern PangoLayout* Gpangolayout;
 
 //Scales number v in range of 0 - ma to 0 - mp
 double scale_number(double v, double ma, double mp) {
@@ -58,13 +58,13 @@ void utf8_substring(char* src, int32_t st, int32_t ed, char *dst, int32_t dstlen
 	char* s;
 	char* e;
 	uint32_t subl;
-	ed = constrain_i32(ed, 0, (int32_t)g_utf8_strlen(src, 65535) ); //Restrict ed not to be greater than src letter count
+	ed = constrain_i32(ed, 0, (int32_t)utf8_strlen(src) ); //Restrict ed not to be greater than src letter count
 	if(st > ed || dstlen < 2) {
 		die("utf8_substring() failed. Parameters error: st=%d, ed=%d, dstlen=%d\n", st, ed, dstlen);
 		return;
 	}
-	s = g_utf8_offset_to_pointer(src, st);
-	e = g_utf8_offset_to_pointer(src, ed);
+	s = utf8_strlen_to_pointer(src, st);
+	e = utf8_strlen_to_pointer(src, ed);
 	subl = (uint32_t)(e - s);
 	if(subl + 1 > dstlen) {
 		die("util.c: utf8_substring() failed. No enough buffer for substring.\n");
@@ -78,7 +78,7 @@ void utf8_substring(char* src, int32_t st, int32_t ed, char *dst, int32_t dstlen
 int32_t utf8_insertstring(char *dst, char *src, int32_t pos, size_t dstlen) {
 	uint16_t l = (uint16_t)strlen(src);
 	//Restrict pos 
-	pos = constrain_i32(pos, 0, (int32_t)g_utf8_strlen(dst, 65535) );
+	pos = constrain_i32(pos, 0, (int32_t)utf8_strlen(dst) );
 	//Check if processed string is shorter than dstlen bytes
 	if(strlen(dst) + l + 1 > dstlen) {
 		return 1;
@@ -88,13 +88,16 @@ int32_t utf8_insertstring(char *dst, char *src, int32_t pos, size_t dstlen) {
 		return 1;
 	}
 	//backup string
-	char *b = g_malloc(dstlen);
-	char *s = g_utf8_offset_to_pointer(dst, pos);
+	char *b = malloc(dstlen);
+	if(b == NULL) {
+		die("utf8_insertstring(): String backup failed.\n");
+	}
+	char *s = utf8_strlen_to_pointer(dst, pos);
 	strcpy(b, s); //b = string after pos
 	//join string
 	memcpy(s, src, l); //copy src content after pos to original buffer
 	strcpy(&s[l], b); //copy b content after pos + l to original buffer
-	g_free(b);
+	free(b);
 	return 0;
 }
 
@@ -110,11 +113,11 @@ void die(const char *p, ...) {
 //Get how string ctx occupy width if drawn in current font
 int32_t get_string_width(char* ctx) {
 	int32_t w;
-	//pango_layout_set_text(Gpangolayout, ctx, -1);
-	//pango_layout_get_pixel_size(Gpangolayout, &w, NULL);
-	cairo_text_extents_t t;
-	cairo_text_extents(G, ctx, &t);
-	w = (int32_t)t.x_advance;
+	pango_layout_set_text(PangoL, ctx, -1);
+	pango_layout_get_pixel_size(PangoL, &w, NULL);
+	//cairo_text_extents_t t;
+	//cairo_text_extents(G, ctx, &t);
+	//w = (int32_t)t.x_advance;
 	return w;
 }
 
@@ -127,24 +130,24 @@ int32_t get_substring_width(char* ctx, int32_t st, int32_t ed) {
 
 //Get maximum letter height of current selected font.
 int32_t get_font_height() {
-	cairo_font_extents_t t;
+	//cairo_font_extents_t t;
 	int32_t h;
-	//pango_layout_set_text(Gpangolayout, "abcdefghijklmnopqrstuvwxyz", -1);
-	//pango_layout_get_pixel_size(Gpangolayout, NULL, &h);
-	cairo_font_extents(G, &t);
-	h = (int32_t)t.height;
+	pango_layout_set_text(PangoL, "abcdefghijklmnopqrstuvwxyz", -1);
+	pango_layout_get_pixel_size(PangoL, NULL, &h);
+	//cairo_font_extents(G, &t);
+	//h = (int32_t)t.height;
 	return h;
 }
 
 //shorten string to fit in width wid, returns shorten string length, stores actual width to widr if not NULL
 int32_t shrink_string(char *ctx, int32_t wid, int32_t* widr) {
-	int32_t l = (int32_t)g_utf8_strlen(ctx, 65535);
+	int32_t l = utf8_strlen(ctx);
 	return shrink_substring(ctx, wid, 0, l, widr);
 }
 
 //substring version of shrink_string()
 int32_t shrink_substring(char *ctx, int32_t wid, int32_t st, int32_t ed, int32_t* widr) {
-	int32_t l = constrain_i32(ed, 0, (int32_t)g_utf8_strlen(ctx, 65535) );
+	int32_t l = constrain_i32(ed, 0, utf8_strlen(ctx) );
 	int32_t w = wid + 10;
 	//Delete one letter from ctx in each loops, continue until string width fits in wid
 	while(l > 0) {
@@ -185,4 +188,44 @@ void get_image_size(int32_t imgid, double *w, double *h) {
 	}
 	*w = (double)cairo_image_surface_get_width(Plimgs[imgid]);
 	*h = (double)cairo_image_surface_get_height(Plimgs[imgid]);
+}
+
+size_t utf8_get_letter_bytelen(char *l) {
+	int32_t c = (int32_t)l[0];
+	if(is_range(c, 0, 127) ) {
+		return 1;
+	} else if(is_range(c, 194, 223) ) {
+		return 2;
+	} else if(is_range(c, 224, 239) ) {
+		return 3;
+	} else if(is_range(c, 240, 247) ) {
+		return 4;
+	}
+	printf("utf8_get_letter_bytelen(): Bad UTF8 sequence!\n");
+	return 1;
+}
+
+//UTF-8 compatible strlen
+int32_t utf8_strlen(char* ctx) {
+	int32_t r = 0;
+	size_t bp = 0;
+	while(r < BUFFER_SIZE) {
+		size_t e = utf8_get_letter_bytelen(&ctx[bp]);
+		bp += e;
+		r++;
+	}
+	return r;
+}
+
+//Get pointer that starts from letter index letterpos for utf8
+char *utf8_strlen_to_pointer(char *ctx, int32_t letterpos) {
+	int32_t r = 0;
+	size_t bp = 0;
+	int32_t t = constrain_i32(letterpos, 0, BUFFER_SIZE);
+	while(r < t) {
+		size_t e = utf8_get_letter_bytelen(&ctx[bp]);
+		bp += e;
+		r++;
+	}
+	return &ctx[bp];
 }

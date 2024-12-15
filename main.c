@@ -13,6 +13,7 @@ Zundamon is from https://zunko.jp/
 main.c: linux entry point, X11 funcs.
 
 TODO List
+support windows
 avoid blocking main thread by connect()
 nickname feature in SMP
 chat mute feature in SMP
@@ -32,6 +33,7 @@ change Character constant information structure to each function getters
 #include <cairo/cairo-xlib.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <signal.h>
 
 Display *Disp = NULL; //XDisplay
 Window Win; //XWindow
@@ -60,7 +62,7 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 		ProgramExiting = 1;
 	} else if(ev.type == Expose) { //Redraw
 		game_paint();
-		XClearArea(Disp, Win, 0, 0, 1, 1, TRUE); //request repaint
+		XClearArea(Disp, Win, 0, 0, 1, 1, True); //request repaint
 	} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
 		//Get key char andd sym
 		char r;
@@ -98,7 +100,7 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 		} else if(b == Button3) {
 			t = MB_RIGHT;
 		} else if(b == Button4) {
-			t == MB_UP;
+			t = MB_UP;
 		} else if(b == Button5) {
 			t = MB_DOWN;
 		}
@@ -171,7 +173,7 @@ int main(int argc, char *argv[]) {
 	}
 	
 	//Select event and message loop
-	Atom WM_DELETE_WINDOW = XInternAtom(Disp, "WM_DELETE_WINDOW", FALSE);
+	Atom WM_DELETE_WINDOW = XInternAtom(Disp, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(Disp, Win, &WM_DELETE_WINDOW, 1);
 	XSelectInput(Disp, Win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ExposureMask | PointerMotionMask);
 	while(ProgramExiting == 0) {
