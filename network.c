@@ -5,7 +5,7 @@ Please consider supporting me through ko-fi or pateron
 https://ko-fi.com/kumohakase
 https://www.patreon.com/kumohakasemk8
 
-Zundamon bakage powered by Gtk4
+Zundamon bakage powered by cairo, X11.
 
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
@@ -34,13 +34,13 @@ void net_recv_handler() {
 	ssize_t r;
 	r = recv_tcp_socket(recvdata, NET_RX_BUFFER_SIZE);
 	if(r == 0) {
-		g_print("net_recv_handler(): Disconnect detected.\n");
+		printf("net_recv_handler(): Disconnect detected.\n");
 		chat_request( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
 		close_connection_silent();
 		return;
 	}
 	if(r < 0) {
-		g_print("net_recv_handler(): Socket recv() error detected.\n");
+		printf("net_recv_handler(): Socket recv() error detected.\n");
 		chatf_request("%s %s", getlocalizedstring(TEXT_SMP_ERROR), strerror(errno) );
 		close_connection_silent();
 		return;
@@ -51,7 +51,7 @@ void net_recv_handler() {
 		char reason[NET_RX_BUFFER_SIZE];
 		memcpy(reason, &recvdata[1], (size_t)r - 1);
 		reason[r - 1] = 0;
-		g_print("net_recv_handler(): Disconnect request: %s\n", reason);
+		printf("net_recv_handler(): Disconnect request: %s\n", reason);
 		//Request to show chat message 
 		chatf_request("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
 		close_connection_silent();
@@ -59,14 +59,14 @@ void net_recv_handler() {
 		//greetings response
 		//Security update: avoid sending credentials for multiple times
 		if(SMPcid != -1) {
-			g_print("net_recv_handler(): Duplicate greetings packet.\n");
+			printf("net_recv_handler(): Duplicate greetings packet.\n");
 			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
 		//Data length check
 		if(r != sizeof(np_greeter_t) ) {
-			g_print("net_recv_handler(): Too short greetings packet.\n");
+			printf("net_recv_handler(): Too short greetings packet.\n");
 			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
@@ -74,12 +74,12 @@ void net_recv_handler() {
 		np_greeter_t *p = (np_greeter_t*)recvdata;
 		SMPcid = (int32_t)p->cid;
 		memcpy(SMPsalt, p->salt, SALT_LENGTH);
-		g_print("net_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
-		g_print("net_recv_handler(): Salt: ");
-		for(int32_t i = 0; i < SALT_LENGTH; i++) {
-			g_print("%02x", p->salt[i]);
-		}
-		g_print("\n");
+		printf("net_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
+		//printf("net_recv_handler(): Salt: ");
+		//for(int32_t i = 0; i < SALT_LENGTH; i++) {
+		//	printf("%02x", p->salt[i]);
+		//}
+		printf("\n");
 		net_server_send_cmd(NP_LOGIN_WITH_PASSWORD); //Send credentials
 	} else if(recvdata[0] == NP_LOGIN_WITH_PASSWORD) {
 		//Login response: returns current userlist
@@ -91,7 +91,7 @@ void net_recv_handler() {
 			int32_t csiz = sizeof(userlist_hdr_t) + uhdr->uname_len;
 			//Length check
 			if(p + csiz > r) {
-				g_print("net_recv_handler(): Bad login response\n");
+				printf("net_recv_handler(): Bad login response\n");
 				chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 				close_connection_silent();
 				return;
@@ -105,17 +105,17 @@ void net_recv_handler() {
 			p += csiz;
 		}
 		if(c >= MAX_CLIENTS) {
-			g_print("net_recv_handler(): Bad login response\n");
+			printf("net_recv_handler(): Bad login response\n");
 			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
 		SMPStatus = NETWORK_LOGGEDIN;
-		g_print("net_recv_handler(): Login successful response.\n");
+		printf("net_recv_handler(): Login successful response.\n");
 	} else if(recvdata[0] == NP_EXCHANGE_EVENTS) {
 		//Exchange event response
 		if(r >= SMP_EVENT_BUFFER_SIZE) {
-			g_print("net_recv_handler(): GetEvent: Buffer overflow.\n");
+			printf("net_recv_handler(): GetEvent: Buffer overflow.\n");
 			close_connection_silent();
 			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 		}
@@ -124,28 +124,29 @@ void net_recv_handler() {
 	} else {
 		close_connection_silent();
 		chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-		g_print("net_recv_handler(): Unknown Packet (%d): ", r);
+		printf("net_recv_handler(): Unknown Packet (%d): ", r);
 		for(int32_t i = 0; i < r; i++) {
-			g_print("%02x ", recvdata[i]);
+			printf("%02x ", recvdata[i]);
 		}
-		g_print("\n");
+		printf("\n");
 	}
 }
 
 //Connect to specified address
 void connect_server() {
 	if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
-		g_print("connect_server(): Bad profile number.\n", SMPProfCount);
+		printf("connect_server(): Bad profile number.\n", SMPProfCount);
 		return;
 	}
 	//If already connected, return
 	if(SMPStatus != NETWORK_DISCONNECTED) {
 		chat( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
-		g_print("connect_server(): Already connected.\n");
+		printf("connect_server(): Already connected.\n");
 		return;
 	}
-	chatf("%s %s", getlocalizedstring(17), SMPProfs[SelectedSMPProf].host); //Attempting to connect
-	g_print("connect_server(): Attempting to connect to %s:%s\n", SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
+	//chatf(); //Attempting to connect
+	showstatus("%s %s", getlocalizedstring(17), SMPProfs[SelectedSMPProf].host);
+	printf("connect_server(): Attempting to connect to %s:%s\n", SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
 	RXSMPEventLen = 0;
 	TXSMPEventLen = 0;
 	SMPcid = -1;
@@ -194,7 +195,7 @@ void net_server_send_cmd(server_command_t cmd) {
 	switch(cmd) {
 	case NP_EXCHANGE_EVENTS:
 		if(TXSMPEventLen + 1 >= NET_TX_BUFFER_SIZE) {
-			g_print("net_server_send_cmd(): ADD_EVENT: Packet buffer overflow.\n");
+			printf("net_server_send_cmd(): ADD_EVENT: Packet buffer overflow.\n");
 			close_connection_silent();
 			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			return;
@@ -205,10 +206,10 @@ void net_server_send_cmd(server_command_t cmd) {
 		break;
 	case NP_LOGIN_WITH_PASSWORD:
 		if(!is_range(SelectedSMPProf, 0, SMPProfCount) ) {
-			g_print("net_server_send_command(): NP_LOGIN_WITH_PASSWORD: Bad SMPSelectedProf number!!\n");
+			printf("net_server_send_command(): NP_LOGIN_WITH_PASSWORD: Bad SMPSelectedProf number!!\n");
 			return;
 		}
-		g_print("net_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: Attempeting to login to SMP server as %s\n", SMPProfs[SelectedSMPProf].usr);
+		printf("net_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: Attempeting to login to SMP server as %s\n", SMPProfs[SelectedSMPProf].usr);
 		//Make login key (SHA512 of username+password+salt)
 		GChecksum *keygen;
 		gsize sp = NET_TX_BUFFER_SIZE - 1;
@@ -219,13 +220,13 @@ void net_server_send_cmd(server_command_t cmd) {
 		g_checksum_get_digest(keygen, &cmdbuf[1], &sp);
 		g_checksum_free(keygen);
 		if(sp >= NET_TX_BUFFER_SIZE - 1) {
-			g_print("np_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: SHA512 failed. Buffer overflow.\n");
+			printf("np_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: SHA512 failed. Buffer overflow.\n");
 			return;
 		}
 		ctxlen = sp;
 	break;
 	default:
-		g_print("net_server_send_command(): Bad command.\n");
+		printf("net_server_send_command(): Bad command.\n");
 		return;
 	}
 	if(send_tcp_socket(cmdbuf, ctxlen + 1) != 0) {

@@ -5,7 +5,7 @@ Please consider supporting me through ko-fi or pateron
 https://ko-fi.com/kumohakase
 https://www.patreon.com/kumohakasemk8
 
-Zundamon bakage powered by Gtk4
+Zundamon bakage powered by cairo, X11.
 
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
@@ -15,46 +15,56 @@ gamesys.c: game process and related functions
 
 #include "main.h"
 
-extern char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE];
-extern int32_t ChatTimeout;
-extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
-extern int32_t CameraX, CameraY;
-extern int32_t CursorX, CursorY;
-extern obj_type_t AddingTID;
-extern int32_t CommandCursor; //Command System Related
-extern char CommandBuffer[BUFFER_SIZE];
-gboolean CommandBufferMutex = FALSE;
-extern GdkClipboard* GClipBoard;
-extern gboolean DebugMode;
-extern gamestate_t GameState;
-extern int32_t StateChangeTimer;
-extern int32_t PlayingCharacterID;
-extern int32_t Money;
-extern int32_t EarthID;
-extern gboolean CharacterMove;
-extern int32_t SelectingItemID;
+cairo_surface_t *Gsfc = NULL; //GameScreen surface
+cairo_t* G = NULL; //Gamescreen cairo context
+extern cairo_surface_t *GSsfc; //GameScreen drawer surface
+extern cairo_t *GS; //GameScreen Drawer
+cairo_surface_t *Plimgs[IMAGE_COUNT]; //Preloaded images
+extern const char* IMGPATHES[]; //preload image pathes
+PangoLayout *Gpangolayout = NULL; //For drawing font
+SMPProfile_t* t_SMPProf = NULL;
+char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE];
+int32_t ChatTimeout = 0;
+GameObjs_t Gobjs[MAX_OBJECT_COUNT];
+int32_t CameraX = 0, CameraY = 0;
+int32_t CursorX, CursorY;
+obj_type_t AddingTID;
+int32_t CommandCursor = -1; //Command System Related
+char CommandBuffer[BUFFER_SIZE];
+int32_t DebugMode = 0;
+gamestate_t GameState;
+int32_t StateChangeTimer = 0;
+int32_t PlayingCharacterID = -1;
+int32_t Money;
+int32_t EarthID;
+int32_t CharacterMove;
+int32_t SelectingItemID;
 extern const int32_t ITEMPRICES[ITEM_COUNT];
 extern const int32_t FTIDS[ITEM_COUNT];
-extern langid_t LangID;
-extern int32_t ItemCooldownTimers[ITEM_COUNT];
+langid_t LangID;
+int32_t ItemCooldownTimers[ITEM_COUNT];
 extern int32_t ITEMCOOLDOWNS[ITEM_COUNT];
-extern int32_t SkillCooldownTimers[SKILL_COUNT];
-extern int32_t CurrentPlayableCharacterID;
-extern keyflags_t KeyFlags;
-extern gboolean ProgramExiting;
-extern int32_t MapTechnologyLevel;
+int32_t SkillCooldownTimers[SKILL_COUNT];
+int32_t CurrentPlayableCharacterID = 0;
+keyflags_t KeyFlags;
+int32_t ProgramExiting = 0;
+int32_t MapTechnologyLevel;
 extern int32_t SKILLCOOLDOWNS[SKILL_COUNT];
-extern int32_t MapEnergyLevel;
-extern int32_t SkillKeyState;
-extern int32_t SubthreadMessageReq;
+int32_t MapEnergyLevel;
+int32_t MapRequiredEnergyLevel = 0;
+int32_t SkillKeyState;
+int32_t SubthreadMessageReq = -1;
 char SubthreadMSGCTX[BUFFER_SIZE];
-extern smpstatus_t SMPStatus;
-extern int32_t Difficulty;
-extern int32_t SMPProfCount;
-extern SMPProfile_t *SMPProfs;
-extern int32_t SelectedSMPProf;
-extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
+smpstatus_t SMPStatus = NETWORK_DISCONNECTED;
+int32_t Difficulty = 1;
+int32_t SMPProfCount = 0;
+SMPProfile_t *SMPProfs = NULL;
+int32_t SelectedSMPProf = 0;
+SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
 extern int32_t SMPcid;
+int32_t StatusShowTimer;
+char StatusTextBuffer[BUFFER_SIZE];
+int32_t CommandBufferMutex = 0;
 
 //Request to show chat message from another thread (this can not be nested)
 void chat_request(char* ctx) {
@@ -153,7 +163,7 @@ int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
 			set_speed_for_following(newid);
 		} else {
 			Gobjs[newid].tid = TID_NULL;
-			g_print("add_character(): object destroyed, no target found.\n");
+			printf("add_character(): object destroyed, no target found.\n");
 		}
 	}
 	switch(tid) {
@@ -186,7 +196,7 @@ void chat(char* c) {
 		die("gamesys.c: chat() failed: message too long.\n");
 	}
 	strcpy(ChatMessages[0], c);
-	g_print("[chat] %s\n", c);
+	printf("[chat] %s\n", c);
 }
 
 void chatf(const char* p, ...) {
@@ -359,11 +369,11 @@ int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilte
 	}
 }
 
-gboolean gametick(gpointer data) {
+void gametick() {
 	//gametick, called for every 10mS
 	//Take care of chat timeout and timers
 	if(ChatTimeout != 0) { ChatTimeout--; }
-	//if(ErrorShowTimer != 0) { ErrorShowTimer--; }
+	if(StatusShowTimer != 0) { StatusShowTimer--; }
 	//Process subthread message request
 	if(SubthreadMessageReq != -1) {
 		chat(SubthreadMSGCTX);
@@ -401,16 +411,16 @@ gboolean gametick(gpointer data) {
 				}
 			}
 		}
-		return TRUE;
+		return;
 	case GAMESTATE_GAMECLEAR:
 	case GAMESTATE_GAMEOVER:
 		//Init game in 5 sec.
 		StateChangeTimer++;
 		//Pause playable character
-		CharacterMove = FALSE;
+		CharacterMove = 0;
 		if(StateChangeTimer > 500) {
 			reset_game();
-			return TRUE; //Not doing AI proc after init game, or bug.
+			return; //Not doing AI proc after init game, or bug.
 		}
 		break;
 	case GAMESTATE_DEAD:
@@ -433,7 +443,6 @@ gboolean gametick(gpointer data) {
 		if(SkillCooldownTimers[i] != 0) {SkillCooldownTimers[i]--;}
 	}
 	procai();
-	return !ProgramExiting;
 }
 
 void proc_playable_op() {
@@ -442,7 +451,7 @@ void proc_playable_op() {
 		return;
 	}
 	if(Gobjs[PlayingCharacterID].tid == -1) {
-		g_print("proc_playable_op(): Player TID is -1??\n");
+		printf("proc_playable_op(): Player TID is -1??\n");
 		return;
 	}
 	PlayableInfo_t plinf;
@@ -451,7 +460,7 @@ void proc_playable_op() {
 	double tx = 0, ty = 0;
 	static double prevtx = 0, prevty = 0;
 	if(CharacterMove && GameState == GAMESTATE_PLAYING) {
-		//If CharacterMove == TRUE, and PALYING state, playable character will follow mouse
+		//If CharacterMove == 1, and PALYING state, playable character will follow mouse
 		//Set player move speed
 		double cx, cy;
 		double playerspd = 1.0 + (MapTechnologyLevel * 0.5);
@@ -509,7 +518,7 @@ void proc_playable_op() {
 //Activate Skill
 void use_skill(int32_t cid, int32_t sid, PlayableInfo_t plinf) {
 	if(!is_range(cid, 0, MAX_OBJECT_COUNT - 1) || !is_range(sid, 0, SKILL_COUNT - 1) || is_playable_character(Gobjs[cid].tid) == 0) {
-		g_print("use_skill(): bad parameter!\n");
+		die("use_skill(): bad parameter!\n");
 		return;
 	}
 	Gobjs[cid].timers[sid + 1] = plinf.skillinittimers[sid];
@@ -538,7 +547,7 @@ void use_item() {
 		return;
 	}
 	//Buy facility
-	if( buy_facility((uint8_t)SelectingItemID) == FALSE) {
+	if( buy_facility((uint8_t)SelectingItemID) != 0) {
 		return; //Could not buy facility
 	}
 	//If succeed, decrease money and set up Cooldown timer
@@ -548,12 +557,12 @@ void use_item() {
 	}
 }
 
-gboolean buy_facility(int32_t fid) {
+int32_t buy_facility(int32_t fid) {
 	//Try to buy facility (Key handler)
 	obj_type_t tid = FTIDS[fid];
 	if(tid == TID_NULL) {
 		die("buy_facility(): This tid is not facility!.\n");
-		return FALSE;
+		return 1;
 	}
 	double mx, my;
 	local2map(CursorX, CursorY, &mx, &my);
@@ -565,7 +574,7 @@ gboolean buy_facility(int32_t fid) {
 			if(get_distance_raw(Gobjs[i].x, Gobjs[i].y, mx, my) < 500) {
 				//showerrorstr(0);
 				chat( (char*)getlocalizedstring(0));
-				return FALSE;
+				return 1;
 			}
 		}
 	}
@@ -574,7 +583,7 @@ gboolean buy_facility(int32_t fid) {
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		stack_packet(EV_PLACE_ITEM, tid, mx, my);
 	}
-	return TRUE;
+	return 0;
 }
 
 //Select next item candidate
@@ -604,7 +613,7 @@ void debug_add_character() {
 	}
 }
 
-void start_command_mode(gboolean c) {
+void start_command_mode(int32_t c) {
 	KeyFlags = 0;
 	SkillKeyState = -1;
 	if(c) {
@@ -620,9 +629,9 @@ void switch_character_move() {
 	//M key handler
 	if(GameState == GAMESTATE_PLAYING) {
 		if(CharacterMove) {
-			CharacterMove = FALSE;
+			CharacterMove = 0;
 		} else {
-			CharacterMove = TRUE;
+			CharacterMove = 1;
 		}
 	}
 }
@@ -637,10 +646,10 @@ void execcmd() {
 		chat(CREDIT_STRING);
 	} else if(strcmp(CommandBuffer, "/debugon") == 0) {
 		//Debug mode on
-		DebugMode = TRUE;
+		DebugMode = 1;
 	} else if(strcmp(CommandBuffer, "/debugoff") == 0) {
 		//Debug off
-		DebugMode = FALSE;
+		DebugMode = 0;
 	} else if(memcmp(CommandBuffer, "/addid ", 7) == 0) {
 		//Set appending object id (for debug)
 		int32_t i = (int32_t)strtol(&CommandBuffer[7], NULL, 10);
@@ -660,7 +669,7 @@ void execcmd() {
 	} else if(memcmp(CommandBuffer, "/smp ", 5) == 0) {
 		//Changing selecting smp prof id (Can't be changed in SMP)
 		if(SMPStatus != NETWORK_DISCONNECTED) {
-			g_print("execcmd(): /smp: in connection, you can not change SMP profile.\n");
+			printf("execcmd(): /smp: in connection, you can not change SMP profile.\n");
 			chat( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
 			return;
 		}
@@ -710,84 +719,6 @@ void execcmd() {
 			chatf("[local] %s", CommandBuffer);
 		}
 	}
-}
-
-void commandmode_keyhandler(guint keyval, GdkModifierType state) {
-	//command mode
-	if(keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
-		//Enter
-		CommandCursor = -1;
-		//g_print("Command: %s\n", CommandBuffer);
-		execcmd(CommandBuffer);
-	} else if(keyval == GDK_KEY_BackSpace) {
-		//BackSpace
-		if(CommandCursor > 0 && !CommandBufferMutex) {
-			CommandBufferMutex = TRUE;
-			char *s = g_utf8_offset_to_pointer(CommandBuffer, CommandCursor - 1); //String after Deletion
-			char *s2 = g_utf8_offset_to_pointer(CommandBuffer, CommandCursor); //String after current cursor
-			//Shift left string
-			for(uint16_t i = 0; i < strlen(s) + 1; i++) {
-				s[i] = s2[i];
-			}
-			CommandCursor--;
-			CommandBufferMutex = FALSE;
-		}
-	} else if(keyval == GDK_KEY_Left) {
-		//LeftArrow
-		if(CommandCursor > 0) {CommandCursor--;}
-	} else if(keyval == GDK_KEY_Right) {
-		//RightArrow
-		if(CommandCursor < g_utf8_strlen(CommandBuffer, 65535) ) {
-			CommandCursor++;
-		}
-	} else if(keyval == GDK_KEY_v && (state & GDK_CONTROL_MASK) != 0) {
-		//CtrlV
-		gdk_clipboard_read_text_async(GClipBoard, NULL, clipboard_read_handler, NULL);
-	} else if(keyval == GDK_KEY_Escape) {
-		//Escape
-		CommandCursor = -1;
-	} else {
-		//Others
-		uint32_t t = gdk_keyval_to_unicode(keyval);
-		//g_print("%d\n", keycode);
-		if(is_range((int32_t)t, 0x20, 0x7e) && !CommandBufferMutex) {
-			CommandBufferMutex = TRUE;
-			char s[] = {(char)t, 0};
-			if(strlen(CommandBuffer) + strlen(s) + 1 <= sizeof(CommandBuffer) ) {
-				utf8_insertstring(CommandBuffer, s, CommandCursor, sizeof(CommandBuffer) );
-				CommandCursor += 1;
-			} else {
-				g_print("main.c: commandmode_keyhandler(): Append letter failed: Buffer full.\n");
-			}
-			CommandBufferMutex = FALSE;
-		}
-	}
-}
-
-void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
-	//Data type check
-	const GdkContentFormats* f = gdk_clipboard_get_formats(GClipBoard);
-	gsize i;
-	const GType* t = gdk_content_formats_get_gtypes(f, &i);
-	if(t == NULL) {
-		g_print("main.c: clipboard_read_handler(): gdk_content_formats_get_gtypes() failed.\n");
-		return;
-	}
-	if(i != 1 || t[0] != G_TYPE_STRING) {
-		g_print("main.c: clipboard_read_handler(): Data type missmatch.\n");
-		return;
-	}
-	//Get text and insert into CommandBuffer
-	char *cb = gdk_clipboard_read_text_finish(GClipBoard, res, NULL);
-	//g_print("Clipboard string size: %d\nCommandBuffer length: %d\n", l, (uint32_t)strlen(CommandBuffer));
-	CommandBufferMutex = TRUE;
-	if(utf8_insertstring(CommandBuffer, cb, CommandCursor, sizeof(CommandBuffer) ) == TRUE) {
-		CommandCursor += (int32_t)g_utf8_strlen(cb, 65535);
-	} else {
-		g_print("main.c: clipboard_read_handler(): insert failed.\n");
-	}
-	CommandBufferMutex = FALSE;
-	free(cb);
 }
 
 void reset_game() {
@@ -840,7 +771,7 @@ void reset_game() {
 
 //Spawn playable character
 void spawn_playable_me() {
-	CharacterMove = FALSE;
+	CharacterMove = 0;
 	PlayingCharacterID = spawn_playable(CurrentPlayableCharacterID);
 	//For SMP, register own playable character object id to client list
 	if(SMPStatus == NETWORK_LOGGEDIN) {
@@ -848,7 +779,7 @@ void spawn_playable_me() {
 		if(is_range(i, 0, MAX_CLIENTS - 1) ) {
 			SMPPlayerInfo[i].playable_objid = PlayingCharacterID;
 		} else {
-			g_print("spawn_playable(): Could not register my playable character id to list.\n");
+			printf("spawn_playable(): Could not register my playable character id to list.\n");
 		}
 	}
 }
@@ -871,9 +802,363 @@ void aim_earth(int32_t i) {
 		}
 	set_speed_for_following(i);
 }
-/*
-void showerrorstr(int32_t errorid) {
-	RecentErrorId = errorid;
-	ErrorShowTimer = ERROR_SHOW_TIMEOUT;
+
+void showstatus(const char* ctx, ...) {
+	va_list varg;
+	va_start(varg, ctx);
+	vsnprintf(StatusTextBuffer, BUFFER_SIZE, ctx, varg);
+	va_end(varg);
+	StatusTextBuffer[BUFFER_SIZE - 1] = 0; //For Additional Security
+	StatusShowTimer = ERROR_SHOW_TIMEOUT;
 }
-*/
+
+int32_t gameinit() {
+	//Gameinit function, load assets and more.
+	read_creds(); //read smp profiles
+	
+	//Create game screen and its content
+	Gsfc = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, WINDOW_WIDTH, WINDOW_HEIGHT);
+	G = cairo_create(Gsfc);
+	if(cairo_status(G) != CAIRO_STATUS_SUCCESS) {
+		printf("gameinit(): Making game screen buffer failed.\n");
+		do_finalize();
+		return -1;
+	}
+
+	//Load images into memory.
+	printf("Loading image assets.\n");
+	for(guint i = 0; i < IMAGE_COUNT; i++) {
+		Plimgs[i] = NULL;
+	}
+	for(guint i = 0; i < IMAGE_COUNT; i++) {
+		Plimgs[i] = cairo_image_surface_create_from_png(IMGPATHES[i]);
+		if(cairo_surface_status(Plimgs[i]) != CAIRO_STATUS_SUCCESS) {
+			printf("gameinit(): Error loading %s\n", IMGPATHES[i]);
+			return -1;
+		}
+	}
+	
+	//Detect system locale
+	PangoLanguage* lang = pango_language_get_default();
+	const char* lang_c = pango_language_to_string(lang);
+	if(strcmp(lang_c, "ja-jp") == 0) {
+		printf("Japanese locale detected. Changing language.\n");
+		LangID = LANGID_JP;
+	} else {
+		printf("Changed to English mode because of your locale setting: %s\n", lang_c);
+		LangID = LANGID_EN;
+	}
+	
+	//Initialize Chat Message Slots
+	for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {
+		ChatMessages[i][0] = 0;
+	}
+	
+	check_data(); //Data Check
+
+	//Setup font
+	loadfont("Ubuntu Mono,monospace");
+	set_font_size(FONT_DEFAULT_SIZE);
+	
+	reset_game(); //reset game round
+	return 0;
+}
+
+void do_finalize() {
+	printf("do_finalize(): bye. thank you for playing.\n");
+	//Finalize
+	ProgramExiting = 1; //Notify that program is exiting
+	
+	//Clean SMP profiles
+	if(SMPProfs != NULL) {
+		free(SMPProfs);
+	}
+	
+	//Close Network Connection
+	if(SMPStatus != NETWORK_DISCONNECTED) {
+		close_tcp_socket();
+	}
+	
+	//Unload images
+	for(uint8_t i = 0; i < IMAGE_COUNT; i++) {
+		if(Plimgs[i] != NULL) {
+			cairo_surface_destroy(Plimgs[i]);
+		}
+	}
+	
+	//Unload other resources
+	if(Gpangolayout != NULL) {
+		g_object_unref(Gpangolayout);
+	}
+	if(G != NULL) {
+		cairo_destroy(G);
+	}
+	if(Gsfc != NULL) {
+		cairo_surface_destroy(Gsfc);
+	}
+	if(GS != NULL) {
+		cairo_destroy(GS);
+	}
+	if(GSsfc != NULL) {
+		cairo_surface_destroy(GSsfc);
+	}
+}
+
+//Read SMP Credentials from file
+void read_creds() {
+	FILE* f = fopen("credentials.txt", "r");
+	char buf[BUFFER_SIZE];
+	if(f == NULL) {
+		printf("Can not open credentials.txt: %s\n", strerror(errno) );
+		return;
+	}
+	int lineno = 0;
+	while(fgets(buf, BUFFER_SIZE, f) != NULL) {
+		buf[BUFFER_SIZE - 1] = 0; //For Additional security
+		lineno++;
+		char *t = buf;
+		int32_t err = 0;
+		SMPProfile_t t_rec;
+		for(int32_t i = 0; i < 4; i++) {
+			const size_t rec_size[] = {HOSTNAME_SIZE, PORTNAME_SIZE, UNAME_SIZE, PASSWD_SIZE};
+			char *rec_ptr[] = {t_rec.host, t_rec.port, t_rec.usr, t_rec.pwd};
+			//Find splitter letter
+			char *t2 = strchr(t, '\t');
+			//Last record will be finished by newline character
+			if(i == 3) {
+				t2 = strchr(t, '\n');
+			}
+			if(t2 == NULL) {
+				printf("read_creds(): credentials.txt:%d: No splitter letter, parsing skipped for the line.\n", lineno);
+				err = 1;
+				break;
+			}
+			//Measure distance to the letter
+			size_t reclen = (size_t)t2 - (size_t)t;
+			if(reclen >= rec_size[i]) {
+				printf("read_creds(): credentials.txt:%d: Record size overflow, persing skipped for the line.\n", lineno);
+				err = 1;
+				break;
+			}
+			if(reclen == 0) {
+				printf("read_creds(): credentials.txt:%d: Empty record detected, parsing skipped for this line.\n", lineno);
+				err = 1;
+				break;
+			}
+			//Copy string from t to the splitter letter into elem
+			memcpy(rec_ptr[i], t, reclen);
+			rec_ptr[i][reclen] = 0;
+			t = &t2[1]; //Set next record finding position right after the splitter letter
+		}
+		if(err) {
+			continue;
+		}
+		printf("SMP Credential %d: Host: %s, Port: %s, User: %s\n", SMPProfCount, t_rec.host, t_rec.port, t_rec.usr);
+		//If no error occurs, allocate memory for new record and copy.
+		if(SMPProfs == NULL) {
+			SMPProfs = malloc(sizeof(SMPProfile_t) );
+			if(SMPProfs == NULL) {
+				printf("read_creds(): insufficient memory, malloc failure.\n");
+				return;
+			}
+		} else {
+			t_SMPProf = realloc(SMPProfs, sizeof(SMPProfile_t) * (size_t)(SMPProfCount + 1) );
+			if(t_SMPProf == NULL) {
+				printf("read_creds(): insufficient memory, realloc failure.\n");
+				free(SMPProfs);
+				SMPProfs = NULL;
+				return;
+			}
+			SMPProfs = t_SMPProf;
+		}
+		memcpy(&SMPProfs[SMPProfCount], &t_rec, sizeof(SMPProfile_t) );
+		SMPProfCount++;
+	}
+	fclose(f);
+}
+
+void mousemotion_handler(int32_t x, int32_t y) {
+	//Called when mouse moved, save mouse location value
+	CursorX = (int32_t)x;
+	CursorY = (int32_t)y;
+}
+
+void keypress_handler(char kc, specialkey_t ks) {
+	if(CommandCursor == -1) {
+		//normal mode
+		switch(kc) {
+		case 't':
+		case 'T':
+			//T
+			start_command_mode(0);
+			break;
+		case '/':
+			// slash
+			start_command_mode(1);
+			break;
+		case ' ':
+			//space
+			switch_character_move();
+			break;
+		case 'a':
+		case 'A':
+			//A
+			select_prev_item();
+			break;
+		case 's':
+		case 'S':
+			//S
+			select_next_item();
+			break;
+		case 'd':
+		case 'D':
+			//D
+			use_item();
+			break;
+		case 'f':
+		case 'F':
+			//F (Debug Key)
+			debug_add_character();
+			break;
+		case 'q':
+		case 'Q':
+			//Q
+			if( (KeyFlags & KEY_F1) == 0) { KeyFlags += KEY_F1; }
+			break;
+		case 'w':
+		case 'W':
+			//W
+			if( (KeyFlags & KEY_F2) == 0) { KeyFlags += KEY_F2; }
+			break;
+		case 'e':
+		case 'E':
+			//E
+			if( (KeyFlags & KEY_F3) == 0) { KeyFlags += KEY_F3; }
+			break;
+		case 'j':
+		case 'J':
+			//J
+			if( (KeyFlags & KEY_LEFT) == 0) { KeyFlags += KEY_LEFT; }
+			break;
+		case 'k':
+		case 'K':
+			//K
+			if( (KeyFlags & KEY_DOWN) == 0) { KeyFlags += KEY_DOWN; }
+			break;
+		case 'l':
+		case 'L':
+			//L
+			if( (KeyFlags & KEY_RIGHT) == 0) { KeyFlags += KEY_RIGHT; }
+			break;
+		case 'i':
+		case 'I':
+			//I
+			if( (KeyFlags & KEY_UP) == 0) { KeyFlags += KEY_UP; }
+			break;
+		}
+	} else {
+		//command mode
+		//printf("%02d\n", kc);
+		if(ks == SPK_ENTER) {
+			//Enter
+			CommandCursor = -1;
+			execcmd(CommandBuffer);
+		} else if(ks == SPK_BS) {
+			//BackSpace
+			if(CommandCursor > 0 && !CommandBufferMutex) {
+				CommandBufferMutex = 1;
+				char *s = g_utf8_offset_to_pointer(CommandBuffer, CommandCursor - 1); //String after Deletion
+				char *s2 = g_utf8_offset_to_pointer(CommandBuffer, CommandCursor); //String after current cursor
+				//Shift left string
+				for(uint16_t i = 0; i < strlen(s) + 1; i++) {
+					s[i] = s2[i];
+				}
+				CommandCursor--;
+				CommandBufferMutex = 0;
+			}
+		} else if(ks == SPK_LEFT) {
+			//LeftArrow
+			if(CommandCursor > 0) {CommandCursor--;}
+		} else if(ks == SPK_RIGHT) {
+			//RightArrow
+			if(CommandCursor < g_utf8_strlen(CommandBuffer, 65535) ) {
+				CommandCursor++;
+			}
+		} else if(kc == 0x16) {
+			//CtrlV
+			//gdk_clipboard_read_text_async(GClipBoard, NULL, clipboard_read_handler, NULL);
+		} else if(ks == SPK_ESC) {
+			//Escape
+			CommandCursor = -1;
+		} else {
+			//Others
+			//printf("%d\n", keycode);
+			if(is_range(kc, 0x20, 0x7e) && !CommandBufferMutex) {
+				CommandBufferMutex = 1;
+				char s[] = {kc, 0};
+				if(strlen(CommandBuffer) + strlen(s) + 1 <= sizeof(CommandBuffer) ) {
+					utf8_insertstring(CommandBuffer, s, CommandCursor, sizeof(CommandBuffer) );
+					CommandCursor += 1;
+				} else {
+					printf("main.c: commandmode_keyhandler(): Append letter failed: Buffer full.\n");
+				}
+				CommandBufferMutex = 0;
+			}
+		}
+	}
+}
+
+void keyrelease_handler(char kc) {
+	if(CommandCursor == -1) {
+		//Operate keyflags on command mode
+		switch(kc) {
+		case 'q':
+		case 'Q':
+			//Q
+			if(KeyFlags & KEY_F1) { KeyFlags -= KEY_F1; }
+			break;
+		case 'w':
+		case 'W':
+			//W
+			if(KeyFlags & KEY_F2) { KeyFlags -= KEY_F2; }
+			break;
+		case 'e':
+		case 'E':
+			//E
+			if(KeyFlags & KEY_F3) { KeyFlags -= KEY_F3; }
+			break;
+		case 'j':
+		case 'J':
+			//J
+			if(KeyFlags & KEY_LEFT) { KeyFlags -= KEY_LEFT; }
+			break;
+		case 'k':
+		case 'K':
+			//K
+			if(KeyFlags & KEY_DOWN) { KeyFlags -= KEY_DOWN; }
+			break;
+		case 'l':
+		case 'L':
+			//L
+			if(KeyFlags & KEY_RIGHT) { KeyFlags -= KEY_RIGHT; }
+			break;
+		case 'i':
+		case 'I':
+			//I
+			if(KeyFlags & KEY_UP) { KeyFlags -= KEY_UP; }
+			break;
+		}
+	}
+}
+
+void mousepressed_handler(mousebutton_t keynum) {
+	if(keynum == MB_LEFT) { //Left
+		switch_character_move();
+	} else if(keynum == MB_RIGHT) { //Right
+		use_item();
+	} else if(keynum == MB_UP) { //WheelUp
+		select_next_item();
+	} else if(keynum == MB_DOWN) { //WheelDn
+		select_prev_item();
+	}
+}

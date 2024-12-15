@@ -5,24 +5,32 @@ Please consider supporting me through ko-fi or pateron
 https://ko-fi.com/kumohakase
 https://www.patreon.com/kumohakasemk8
 
-Zundamon bakage powered by Gtk4
+Zundamon bakage powered by cairo, X11.
 
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
 
-gutil.c: drawing functions
+graphics.c: drawing functions and ui drawing
 */
 
-#define _USE_MATH_DEFINES //Windows MSVC workaround
 #include "main.h"
 
 double Fgcolor[4] = {1.0, 1.0, 1.0, 1.0}; //Selected FGcolor
 extern cairo_t* G; //Gamescreen cairo context
 extern cairo_surface_t* Plimgs[];
-extern PangoLayout *Gpangolayout;
 
-//Change drawing color to colorcode, backup if savecolor is TRUE
-void chcolor(uint32_t colorcode, gboolean savecolor) {
+//Draw hp bar at x, y with width w and height h, chp is current hp, fhp is full hp,
+//colorbg is background color, colorfg is foreground color.
+void draw_hpbar(double x, double y, double w, double h, double chp, double fhp, uint32_t colorbg, uint32_t colorfg) {
+	chcolor(colorbg, 1);
+	fillrect(x, y, w, h);
+	double bw = scale_number(chp, fhp, w);
+	chcolor(colorfg, 1);
+	fillrect(x, y, bw, h);
+}
+
+//Change drawing color to colorcode, backup if savecolor is 1
+void chcolor(uint32_t colorcode, int32_t savecolor) {
 	double a = scale_number((colorcode >> 24) & 0xff, 255.0, 1.0);
 	double r = scale_number((colorcode >> 16) & 0xff, 255.0, 1.0);
 	double g = scale_number((colorcode >> 8) & 0xff, 255.0, 1.0);
@@ -57,10 +65,10 @@ void fillcircle(double x, double y, double diam) {
 
 //draw string ctx in pos x, y
 void drawstring(double x, double y, char* ctx) {
-	pango_layout_set_text(Gpangolayout, ctx, -1);
-	cairo_move_to(G, x, y); // + get_font_height());
-	//cairo_show_text(G, ctx);
-	pango_cairo_show_layout(G, Gpangolayout);
+	//pango_layout_set_text(Gpangolayout, ctx, -1);
+	cairo_move_to(G, x, y + get_font_height() - 2);
+	cairo_show_text(G, ctx);
+	//pango_cairo_show_layout(G, Gpangolayout);
 }
 
 //draw substring ctx (index sp to ed) in pos x, y
@@ -85,8 +93,8 @@ void drawstringf(double x, double y, const char *p, ...) {
 	drawstring(x, y, b);
 }
 
-//draw string and let it fit in width wid using newline. if bg is TRUE, string will have rectangular background
-double drawstring_inwidth(double x, double y, char* ctx, int32_t wid, gboolean bg) {
+//draw string and let it fit in width wid using newline. if bg is 1, string will have rectangular background
+double drawstring_inwidth(double x, double y, char* ctx, int32_t wid, int32_t bg) {
 	double ty = y;
 	int32_t cp = 0;
 	int32_t ch = get_font_height();
@@ -96,7 +104,7 @@ double drawstring_inwidth(double x, double y, char* ctx, int32_t wid, gboolean b
 		int32_t a;
 		int32_t t = shrink_substring(ctx, wid, cp, ml, &a);
 		if(bg) {
-			chcolor(COLOR_TEXTBG, FALSE);
+			chcolor(COLOR_TEXTBG, 0);
 			fillrect(x, ty, a, ch + 5);
 			restore_color();
 		}
@@ -164,7 +172,7 @@ int32_t drawstring_title(double y, char* ctx, int32_t s) {
 	int32_t w = get_string_width(ctx);
 	int32_t h = get_font_height();
 	double x = (WINDOW_WIDTH / 2) - (w / 2);
-	chcolor(COLOR_TEXTBG, FALSE);
+	chcolor(COLOR_TEXTBG, 0);
 	fillrect(x, y, w, h);
 	restore_color();
 	drawstring(x, y, ctx);
@@ -175,18 +183,12 @@ int32_t drawstring_title(double y, char* ctx, int32_t s) {
 
 //Set font size to s
 void set_font_size(int32_t s) {
-	const PangoFontDescription *pfd = pango_layout_get_font_description(Gpangolayout);
-	PangoFontDescription *pfdd = pango_font_description_copy(pfd);
-	pango_font_description_set_size(pfdd, s * PANGO_SCALE);
-	pango_layout_set_font_description(Gpangolayout, pfdd);
-	pango_font_description_free(pfdd);
+	cairo_set_font_size(G, (double)s);
 }
 
 //load fonts from fontlist and use it for text drawing
 void loadfont(const char* fontlist) {
-	PangoFontDescription *pfd = pango_font_description_from_string(fontlist);
-	pango_layout_set_font_description(Gpangolayout, pfd);
-	pango_font_description_free(pfd);
+	cairo_select_font_face(G, "Ubuntu Mono", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
 }
 
 //draw polygon that has start point x,y and vertexes represented by x: points[2n], y: points[2n+1]
@@ -200,3 +202,5 @@ void draw_polygon(double x, double y, int32_t num_points, double points[]) {
 	cairo_move_to(G, x, y);
 	cairo_fill(G);
 }
+
+

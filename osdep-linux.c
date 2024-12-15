@@ -5,7 +5,7 @@ Please consider supporting me through ko-fi or pateron
 https://ko-fi.com/kumohakase
 https://www.patreon.com/kumohakasemk8
 
-Zundamon bakage powered by Gtk4
+Zundamon bakage powered by cairo, X11.
 
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
@@ -33,7 +33,7 @@ int ConnectionSocket = -1;
 int32_t make_tcp_socket(char* hostname, char* port) {
 	//If already connected, this function will fail.
 	if(ConnectionSocket != -1) {
-		g_print("make_tcp_socket(): already connected.\n");
+		printf("make_tcp_socket(): already connected.\n");
 		return -1;
 	}
 	//Name Resolution
@@ -44,20 +44,20 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 	int32_t r = getaddrinfo(hostname, port, &hint, &addr);
 	if(r != 0) {
 		//getaddrinfo error
-		g_print("make_tcp_socket(): getaddrinfo failed. (%d)\n", r);
+		printf("make_tcp_socket(): getaddrinfo failed. (%d)\n", r);
 		return -1;
 	}
 	//Make socket
 	ConnectionSocket = socket(AF_INET, SOCK_STREAM, 0);
 	if(ConnectionSocket < 0) {
 		//Socket error
-		g_print("make_tcp_socket(): socket creation failed. (%d)\n", ConnectionSocket);
+		printf("make_tcp_socket(): socket creation failed. (%d)\n", ConnectionSocket);
 		freeaddrinfo(addr);
 		return -1;
 	}
 	//Connect to node
 	if(connect(ConnectionSocket, addr->ai_addr, addr->ai_addrlen) != 0) {
-		g_print("make_tcp_socket(): connect failed. %s.\n", strerror(errno) );
+		printf("make_tcp_socket(): connect failed. %s.\n", strerror(errno) );
 		close(ConnectionSocket);
 		ConnectionSocket = -1;
 	}
@@ -67,7 +67,7 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 	}
 	//Make socket async, set handler
 	if(fcntl(ConnectionSocket, F_SETFL, O_ASYNC) == -1 || fcntl(ConnectionSocket, F_SETOWN, getpid() ) == -1) {
-		g_print("make_tcp_socket(): setting socket option failed.\n");
+		printf("make_tcp_socket(): setting socket option failed.\n");
 		close(ConnectionSocket);
 		ConnectionSocket = -1;
 	}
@@ -77,7 +77,7 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 //Close current connection
 int32_t close_tcp_socket() {
 	if(ConnectionSocket == -1) {
-		g_print("close_tcp_socket(): socket is not open!\n");
+		printf("close_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	close(ConnectionSocket);
@@ -88,33 +88,34 @@ int32_t close_tcp_socket() {
 //Send bytes to connected server
 int32_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	if(ConnectionSocket == -1) {
-		g_print("send_tcp_socket(): socket is not open!\n");
+		printf("send_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	if(send(ConnectionSocket, ctx, ctxlen, MSG_NOSIGNAL) != ctxlen) {
-		g_print("send_tcp_socket(): send failed. Closing current connection.\n");
+		printf("send_tcp_socket(): send failed. Closing current connection.\n");
 		close_tcp_socket();
 		return -1;
 	}
 	return 0;
 }
 
-void netio_handler(int) {
-	net_recv_handler();
+void netio_handler(int) { //left for compatibility
+	//net_recv_handler();
 }
 
-//Install IO Handler, Returns 0 if succeed (linux uses network callback)
+//Install IO Handler, Returns 0 if succeed (linux uses network callback: left for comaptibility)
 int32_t install_io_handler() {
-	struct sigaction sig;
-	memset(&sig, 0, sizeof(struct sigaction) );
-	sig.sa_handler = netio_handler;
-	return sigaction(SIGIO, &sig, NULL);
+	//struct sigaction sig;
+	//memset(&sig, 0, sizeof(struct sigaction) );
+	//sig.sa_handler = netio_handler;
+	//return sigaction(SIGIO, &sig, NULL);
+	return -1;
 }
 
 //Receive bytes from connected server, returns read bytes
 ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	if(ConnectionSocket == -1) {
-		g_print("recv_tcp_socket(): socket is not open!\n");
+		printf("recv_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	return recv(ConnectionSocket, ctx, ctxlen, 0);

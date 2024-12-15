@@ -5,7 +5,7 @@ Please consider supporting me through ko-fi or pateron
 https://ko-fi.com/kumohakase
 https://www.patreon.com/kumohakasemk8
 
-Zundamon bakage powered by Gtk4
+Zundamon bakage powered by cairo, X11.
 
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr

@@ -5,7 +5,7 @@ Please consider supporting me through ko-fi or pateron
 https://ko-fi.com/kumohakase
 https://www.patreon.com/kumohakasemk8
 
-Zundamon bakage powered by Gtk4
+Zundamon bakage powered by cairo, X11.
 
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
@@ -25,7 +25,7 @@ extern int32_t MapEnergyLevel;
 extern int32_t MapRequiredEnergyLevel;
 extern langid_t LangID;
 extern const char *EN_TID_NAMES[MAX_TID];
-extern gboolean CharacterMove;
+extern int32_t CharacterMove;
 extern int32_t SMPStatus;
 extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
 
@@ -283,10 +283,10 @@ void procai() {
 			//normal hitdetection
 			if(d < ((Gobjs[i].hitdiameter + Gobjs[j].hitdiameter) / 2)) {
 				//g_print("gamesys.c: hitdetect: source %d target %d\n", i, j);
-				if(procobjhit(i, j, srcinfo, dstinfo) == FALSE) {
+				if(procobjhit(i, j, srcinfo, dstinfo) == 0) {
 					//g_print("gametick(): id %d (TID=%d) erased because of collision\n", i, Gobjs[i].tid);
 					Gobjs[i].tid = TID_NULL;
-					break; //if FALSE returned, erase source object and skip further hit detection
+					break; //if 0 returned, erase source object and skip further hit detection
 				}
 			}
 			//radar detection
@@ -413,17 +413,17 @@ void procai() {
 		//Init timer in both case
 		if(earthcount == 0 || enemybasecount == 0) {
 			StateChangeTimer = 0;
-			CharacterMove = FALSE;
+			CharacterMove = 0;
 		}
 	}
 }
 
 //Called when Gobjs[dst] object is close (within Gobjs[dst].hitdiameter) to Gobjs[src] object
-//Return FALSE if you want to delete source object
-gboolean procobjhit(int32_t src, int32_t dst, LookupResult_t srcinfo, LookupResult_t dstinfo) {
+//Return 0 if you want to delete source object
+int32_t procobjhit(int32_t src, int32_t dst, LookupResult_t srcinfo, LookupResult_t dstinfo) {
 	if(!is_range(src, 0, MAX_OBJECT_COUNT - 1) || !is_range(dst, 0, MAX_OBJECT_COUNT - 1)) {
 		die("damage_object(): Bad parameter!\n");
-		return FALSE;
+		return 0;
 	}
 	if(dstinfo.inithp != 0 && srcinfo.teamid != dstinfo.teamid) {
 		//Damage if different team id and target initial hp is not 0
@@ -442,7 +442,7 @@ gboolean procobjhit(int32_t src, int32_t dst, LookupResult_t srcinfo, LookupResu
 					//Kumo9 x24 missile will put lava and destroy self
 					add_character(TID_KUMO9_X24_MISSILE_RESIDUE, Gobjs[src].x, Gobjs[src].y, src);
 				}
-				return FALSE; //kill source object
+				return 0; //kill source object
 				//g_print("procobjhit(): Missile %d exploded: hit with %d\n", src, dst);
 			}
 		} else if(Gobjs[src].damage != 0) {
@@ -450,12 +450,12 @@ gboolean procobjhit(int32_t src, int32_t dst, LookupResult_t srcinfo, LookupResu
 			damage_object(dst, src);
 			//preserve explosion or laser
 			if(Gobjs[src].tid == TID_ENEMYZUNDALASER || Gobjs[src].tid == TID_ALLYEXPLOSION || Gobjs[src].tid == TID_ENEMYEXPLOSION || Gobjs[src].tid == TID_EXPLOSION || Gobjs[src].tid == TID_KUMO9_X24_MISSILE_RESIDUE || Gobjs[src].tid == TID_KUMO9_X24_LASER) {
-				return TRUE;
+				return 1;
 			}
-			return FALSE; //kill this source object if not laser nor explosion
+			return 0; //kill this source object if not laser nor explosion
 		}
 	}
-	return TRUE;
+	return 1;
 }
 
 //Damage object id dstid by object id srcid
