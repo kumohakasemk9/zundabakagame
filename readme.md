@@ -51,44 +51,21 @@ Each information is splitted by tab letters, ensure new line
 comes at last. (Do not eorry if you are in windows, in windows code, cr
 is recognized as newline instead.)   
    
-# Prepareation for Windows
-0. Get releases for Windows. I would pack all of required dlls inside releases.
-1. Download Microsoft Visual C++ Redistributable   
-   ( https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170 )   
-   and install.   
-2. Double click game executable and enjoy.
-    
-If dlls are missing, please download dlls from gvsbuild and cygwin   
-then copy all the dlls to the game directory (or specify dll path into PATH)   
-gvsbuild: https://github.com/wingtk/gvsbuild/releases (You need gtk4)
-cygwin: https://cygwin.com/   
-(install without no additional software, you can obtain `cygwin1.dll` from `C:\cygwin64\bin`)
-   
-# Prepareation for linux
-1. You only need gtk4. Maybe most linux already have it.
-   
-# Building in Windows (Cygwin + gcc)
-If you want to build in cygwin, install `gcc` and `make`    
-Then copy and edit `makefile_windows` for it (like include path and compiler name)     
-
-# Debugging in Windows (hints only)
-- This project is made in linux, and debugging in linux is recommended. You can use gdb.   
-- If you want to debug it in Windows, Microsoft Visual Studio + MSVC may be your choice.   
-- Append appropriate include directories. You can get needed directories by
-  typing `gvsbuild/bin/pkg-config gtk4 --cflags`. `makefile_windows` has big hint to pathname
-  of those additional files.   
-- Append appropriate external libraries too.   
-  You can get required external libraries by typing `gvsbuild/bin/pkg-config gtk4 --libs` . 
-- You will probably get some compile error due to MSVC restrictions or function   
-  definition difference between linux and win, please fix it yourself.  
+# Prepareation
+1. Library needed: `cairo` `x11` `pangocairo`
+2. `git clone https://github.com/kumohakasemk9/zundabakagame.git`
+3. `cd zundabakagame-master`
+4.	`make`
+5. `./zundagame`
    
 # Thanks
 - You
-- Gtk4 https://www.gtk.org/
+- cairo https://www.cairographics.org/
+- Xlib https://x.org/releases/current/doc/libX11/libX11/libX11.html
+- pangocairo https://docs.gtk.org/PangoCairo/
 - Zundamon (C) 2024 ＳＳＳ合同会社 https://zunko.jp/
 - Zundamon (Image) (C) 2024 https://twitter.com/sakamoto_ahr 坂本アヒル
 - Adwaita Icon Theme https://github.com/GNOME/adwaita-icon-theme
-- gvsbuild https://github.com/wingtk/gvsbuild
 
 only adwaita legacy and programs are licensed by CC,   
 for other resources, do not redistribute or use out of game without perm    
