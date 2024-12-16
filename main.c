@@ -34,11 +34,22 @@ change Character constant information structure to each function getters
 #include <unistd.h>
 #include <sys/time.h>
 #include <signal.h>
+#include <netinet/tcp.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <arpa/inet.h>
+#include <crypt.h>
 
 Display *Disp = NULL; //XDisplay
 Window Win; //XWindow
 cairo_surface_t *GSsfc; //GameScreen drawer surface
 cairo_t *GS; //GameScreen Drawer
+int ConnectionSocket = -1;
 
 void sigalrm_handler(int);
 void sigio_handler(int);
@@ -77,9 +88,9 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 			k = SPK_BS;
 		} else if(ks == XK_Left) {
 			k = SPK_LEFT;
-		} else if(k == XK_Right) {
+		} else if(ks == XK_Right) {
 			k = SPK_RIGHT;
-		} else if(k == XK_Escape) {
+		} else if(ks == XK_Escape) {
 			k = SPK_ESC;
 		}
 		
@@ -189,6 +200,44 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
+uint16_t host2network_fconv_16(int16_t d) {
+	return htons( (uint16_t)d);
+}
+
+int16_t network2host_fconv_16(uint16_t d) {
+	return (int16_t)ntohs(d);
+}
+
+int32_t network2host_fconv_32(uint32_t d) {
+	return (int32_t)htonl(d);
+}
+
+uint32_t host2network_fconv_32(int32_t d) {
+	return ntohl( (uint32_t)d);
+}
+
+//Calculate linux hash of uname + password + salt string. Max input size is UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH + 1
+char *compute_passhash(char* uname, char* password, char *salt) {
+	struct crypt_data t = {
+		.initialized = 0
+	};
+	
+	//date length check
+	char input_data[UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH + 1];
+	if(strlen(uname) + strlen(password) + SALT_LENGTH >= sizeof(input_data) ) {
+		printf("main.c: compute_passhash: overflow\n");
+		return NULL;
+	}
+
+	//make all data together
+	memcpy(input_data, salt, SALT_LENGTH); //salt
+	input_data[SALT_LENGTH] = 0;
+	strcat(input_data, uname); //username
+	strcat(input_data, password); //password
+	
+	return crypt_r(input_data, "$5$", &t); //Compute hash
+}
+
 /*
 void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 	//Data type check
@@ -217,3 +266,86 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 }
 
 */
+
+//Open and connect tcp socket to hostname and port
+int32_t make_tcp_socket(char* hostname, char* port) {
+	//If already connected, this function will fail.
+	if(ConnectionSocket != -1) {
+		printf("make_tcp_socket(): already connected.\n");
+		return -1;
+	}
+	//Name Resolution
+	struct addrinfo *addr, hint;
+	memset(&hint, 0, sizeof(hint) );
+	hint.ai_flags = AF_INET;
+	hint.ai_socktype = SOCK_STREAM;
+	int32_t r = getaddrinfo(hostname, port, &hint, &addr);
+	if(r != 0) {
+		//getaddrinfo error
+		printf("make_tcp_socket(): getaddrinfo failed. (%d)\n", r);
+		return -1;
+	}
+	//Make socket
+	ConnectionSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if(ConnectionSocket < 0) {
+		//Socket error
+		printf("make_tcp_socket(): socket creation failed. (%d)\n", ConnectionSocket);
+		freeaddrinfo(addr);
+		return -1;
+	}
+	//Connect to node
+	if(connect(ConnectionSocket, addr->ai_addr, addr->ai_addrlen) != 0) {
+		printf("make_tcp_socket(): connect failed. %s.\n", strerror(errno) );
+		close(ConnectionSocket);
+		ConnectionSocket = -1;
+	}
+	freeaddrinfo(addr);
+	if(ConnectionSocket == -1) {
+		return -1;
+	}
+	//Make socket async, set handler
+	if(fcntl(ConnectionSocket, F_SETFL, O_ASYNC) == -1 || fcntl(ConnectionSocket, F_SETOWN, getpid() ) == -1) {
+		printf("make_tcp_socket(): setting socket option failed.\n");
+		close(ConnectionSocket);
+		ConnectionSocket = -1;
+	}
+	return 0;
+}
+
+//Close current connection
+int32_t close_tcp_socket() {
+	if(ConnectionSocket == -1) {
+		printf("close_tcp_socket(): socket is not open!\n");
+		return -1;
+	}
+	close(ConnectionSocket);
+	ConnectionSocket = -1;
+	return 0;
+}
+
+//Send bytes to connected server
+int32_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
+	if(ConnectionSocket == -1) {
+		printf("send_tcp_socket(): socket is not open!\n");
+		return -1;
+	}
+	if(send(ConnectionSocket, ctx, ctxlen, MSG_NOSIGNAL) != ctxlen) {
+		printf("send_tcp_socket(): send failed. Closing current connection.\n");
+		close_tcp_socket();
+		return -1;
+	}
+	return 0;
+}
+
+//Receive bytes from connected server, returns read bytes
+ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
+	if(ConnectionSocket == -1) {
+		printf("recv_tcp_socket(): socket is not open!\n");
+		return -1;
+	}
+	return recv(ConnectionSocket, ctx, ctxlen, 0);
+}
+
+void poll_tcp_socket() {
+	//Do nothing in linux, linux code does not use poll strategy
+}

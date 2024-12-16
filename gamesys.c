@@ -638,6 +638,9 @@ void switch_character_move() {
 
 void execcmd() {
 	//Command Handler: called when command entered
+	if(strlen(CommandBuffer) == 0) {
+		return;
+	}
 	if(strcmp(CommandBuffer, "/version") == 0) {
 		//Show Version
 		chatf("Version: %s", VERSION_STRING);
@@ -684,7 +687,7 @@ void execcmd() {
 		chatf("getsmps: %d", SMPProfCount);
 	} else if(strcmp(CommandBuffer, "/getsmp") == 0) {
 		//Get current selected SMP profile
-		if(!is_range(SelectedSMPProf, 0, SMPProfCount) ) {
+		if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
 			chatf("getsmp: %d (ID overflow)", SelectedSMPProf + 1);
 		} else {
 			chatf("getsmp: %d (%s@%s:%s)", SelectedSMPProf + 1, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
@@ -838,17 +841,15 @@ int32_t gameinit() {
 		}
 	}
 	
-	//Detect system locale
-	PangoLanguage* lang = pango_language_get_default();
-	const char* lang_c = pango_language_to_string(lang);
-	if(strcmp(lang_c, "ja-jp") == 0) {
+	//Detect system language
+	const char* lang_c = getenv("LANG");
+	if(strstr(lang_c, "ja_JP") != NULL) {
 		printf("Japanese locale detected. Changing language.\n");
 		LangID = LANGID_JP;
 	} else {
 		printf("Changed to English mode because of your locale setting: %s\n", lang_c);
 		
 	}
-	LangID = LANGID_EN;
 	
 	//Initialize Chat Message Slots
 	for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {

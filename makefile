@@ -14,8 +14,8 @@
 CC=gcc
 CFLAGSEXTRA=`pkg-config --cflags cairo pangocairo x11`
 CFLAGS=-g3 -Wconversion $(CFLAGSEXTRA)
-LDFLAGS=`pkg-config --libs cairo pangocairo x11`
-OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o network.o osdep-linux.o smp.o ui.o
+LDFLAGS=-lcrypt `pkg-config --libs cairo pangocairo x11`
+OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o network.o ui.o
 OUTNAME=zundagame
 RELEASEOUT=game.tar.gz
 PKGCTX=readme.md img adwaitalegacy $(OUTNAME)

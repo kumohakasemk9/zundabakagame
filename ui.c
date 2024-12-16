@@ -277,7 +277,7 @@ void draw_ui() {
 		//Shrink string to fit in screen
 		uint16_t sp = 0;
 		int32_t w = WINDOW_WIDTH + 10;
-		uint16_t l = (uint16_t)g_utf8_strlen(CommandBuffer, 65535);
+		int32_t l = utf8_strlen(CommandBuffer);
 		while(w > WINDOW_WIDTH - 5) {
 			w = get_substring_width(CommandBuffer, sp, CommandCursor);
 			if(w <= WINDOW_WIDTH - 5 || sp >= l - 1) { break; }
@@ -302,7 +302,7 @@ void draw_info() {
 		chcolor(COLOR_TEXTCHAT, 1);
 		double ty = (double)fh + 2;
 		for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {
-			if(g_utf8_strlen(ChatMessages[i], 65535) != 0) {
+			if(strlen(ChatMessages[i]) != 0) {
 				//print(m)
 				ty = drawstring_inwidth(0, ty, ChatMessages[i], WINDOW_WIDTH - 5, 1);
 			}

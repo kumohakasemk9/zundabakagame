@@ -207,25 +207,57 @@ size_t utf8_get_letter_bytelen(char *l) {
 
 //UTF-8 compatible strlen
 int32_t utf8_strlen(char* ctx) {
-	int32_t r = 0;
-	size_t bp = 0;
-	while(r < BUFFER_SIZE) {
-		size_t e = utf8_get_letter_bytelen(&ctx[bp]);
-		bp += e;
-		r++;
+	setlocale(LC_ALL, "en_US.utf8"); //Needed for mbrlen
+	mbstate_t mb;
+	int32_t lcnt = 0;
+	ssize_t bl = 0; //byte offset
+	memset(&mb, 0, sizeof(mbstate_t) );
+	while(lcnt < BUFFER_SIZE) {
+		ssize_t r = (ssize_t)mbrlen(&ctx[bl], 4, &mb);
+		//if first byte is utf8 header, get next byte to examine entire letter byte size
+		if(r == -2) {
+			bl++;
+			r = (ssize_t)mbrlen(&ctx[bl], 4, &mb);
+			if(r == -1 || r == -2) {
+				printf("utf8_strlen_test(): Bad UTF8, decorder terminated.\n");
+				return 0;
+			}
+		} else if(r == 0) {
+			return lcnt; //null terminator detected
+		} else if(r == -1) {
+			printf("utf8_strlen_test(): Bad UTF8, decorder terminated.\n");
+		}
+		bl += r; //advance byte count to point next letter
+		lcnt++;
 	}
-	return r;
+	return lcnt;
 }
 
 //Get pointer that starts from letter index letterpos for utf8
 char *utf8_strlen_to_pointer(char *ctx, int32_t letterpos) {
-	int32_t r = 0;
-	size_t bp = 0;
+	setlocale(LC_ALL, "en_US.utf8"); //Needed for mbrlen
+	mbstate_t mb;
+	int32_t lcnt = 0;
 	int32_t t = constrain_i32(letterpos, 0, BUFFER_SIZE);
-	while(r < t) {
-		size_t e = utf8_get_letter_bytelen(&ctx[bp]);
-		bp += e;
-		r++;
+	ssize_t bl = 0; //byte offset
+	memset(&mb, 0, sizeof(mbstate_t) );
+	while(lcnt < t) {
+		ssize_t r = (ssize_t)mbrlen(&ctx[bl], 4, &mb);
+		//if first byte is utf8 header, get next byte to examine entire letter byte size
+		if(r == -2) {
+			bl++;
+			r = (ssize_t)mbrlen(&ctx[bl], 4, &mb);
+			if(r == -1 || r == -2) {
+				printf("utf8_strlen_test(): Bad UTF8, decorder terminated.\n");
+				return NULL;
+			}
+		} else if(r == 0) {
+			return NULL; //null terminator detected
+		} else if(r == -1) {
+			printf("utf8_strlen_test(): Bad UTF8, decorder terminated.\n");
+		}
+		bl += r; //advance byte count to point next letter
+		lcnt++;
 	}
-	return &ctx[bp];
+	return &ctx[bl];
 }

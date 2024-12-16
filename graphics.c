@@ -184,7 +184,11 @@ int32_t drawstring_title(double y, char* ctx, int32_t s) {
 
 //Set font size to s
 void set_font_size(int32_t s) {
-	
+	const PangoFontDescription *pfd = pango_layout_get_font_description(PangoL);
+	PangoFontDescription *pfdd = pango_font_description_copy(pfd);
+	pango_font_description_set_size(pfdd, s * PANGO_SCALE);
+	pango_layout_set_font_description(PangoL, pfdd);
+	pango_font_description_free(pfdd);
 	//cairo_set_font_size(G, (double)s);
 }
 
