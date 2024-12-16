@@ -13,21 +13,11 @@ Zundamon is from https://zunko.jp/
 main.h: integrated header file
 */
 
-#include "zunda-defs.h"
-
-#include <cairo/cairo.h>
-#include <pango/pangocairo.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <time.h>
-#include <errno.h>
 #include <stdint.h>
-#include <wchar.h>
-#include <locale.h>
 
+#include "zunda-defs.h"
 #include "zunda-server.h"
 #include "zunda-structs.h"
 

@@ -30,20 +30,24 @@ change Character constant information structure to each function getters
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+
 #include <cairo/cairo-xlib.h>
+
 #include <unistd.h>
 #include <sys/time.h>
+#include <fcntl.h>
 #include <signal.h>
+#include <crypt.h>
+
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <unistd.h>
 #include <netdb.h>
 #include <sys/types.h>
-#include <fcntl.h>
-#include <signal.h>
 #include <arpa/inet.h>
-#include <crypt.h>
+
+#include <errno.h>
+#include <string.h>
 
 Display *Disp = NULL; //XDisplay
 Window Win; //XWindow

@@ -15,6 +15,12 @@ graphics.c: drawing functions
 
 #include "main.h"
 
+#include <stdarg.h>
+#include <math.h>
+
+#include <pango/pangocairo.h>
+#include <cairo/cairo.h>
+
 double Fgcolor[4] = {1.0, 1.0, 1.0, 1.0}; //Selected FGcolor
 extern cairo_t* G; //Gamescreen cairo context
 extern cairo_surface_t* Plimgs[];

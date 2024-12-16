@@ -15,6 +15,14 @@ util.c: utility functions
 
 #include "main.h"
 
+#include <wchar.h>
+#include <string.h>
+#include <locale.h>
+#include <stdarg.h>
+
+#include <cairo/cairo.h>
+#include <pango/pangocairo.h>
+
 extern PangoLayout *PangoL;
 extern int32_t ProgramExiting;
 //extern cairo_t* G;

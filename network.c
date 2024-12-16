@@ -15,6 +15,10 @@ network.c: process network packets
 
 #include "main.h"
 
+#include <string.h>
+#include <stdarg.h>
+#include <errno.h>
+
 extern int32_t CurrentPlayableCharacterID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
 extern int32_t Difficulty;
@@ -263,7 +267,7 @@ void process_smp() {
 			}
 			hdr = (event_hdr_t*)&RXSMPEventBuffer[ptr];
 			int32_t cid = hdr->cid;
-			size_t evlen = g_ntohs(hdr->evlen);
+			size_t evlen = (size_t)network2host_fconv_16(hdr->evlen);
 			size_t reclen = evlen + sizeof(event_hdr_t);
 			uint8_t* evhead = &RXSMPEventBuffer[ptr + (int32_t)sizeof(event_hdr_t)];
 			if(rem < reclen) {

@@ -15,6 +15,14 @@ gamesys.c: game process and related functions
 
 #include "main.h"
 
+#include <string.h>
+#include <errno.h>
+#include <math.h>
+#include <stdarg.h>
+
+#include <pango/pangocairo.h>
+#include <cairo/cairo.h>
+
 cairo_surface_t *Gsfc = NULL; //GameScreen surface
 cairo_t* G = NULL; //Gamescreen cairo context
 extern cairo_surface_t *GSsfc; //GameScreen drawer surface

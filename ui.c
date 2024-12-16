@@ -14,6 +14,10 @@ ui.c: gamescreen drawing
 */
 
 #include "main.h"
+
+#include <string.h>
+#include <cairo/cairo.h>
+
 extern cairo_surface_t *Gsfc; //GameScreen surface
 extern cairo_t* G; //Gamescreen cairo context
 extern cairo_t *GS; //GameScreen Drawer

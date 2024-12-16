@@ -15,6 +15,8 @@ aiproc.c: Character AI
 
 #include "main.h"
 
+#include <string.h>
+
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
 extern gamestate_t GameState;
 extern int32_t Money;
