@@ -18,13 +18,13 @@ graphics.c: drawing functions
 #include <stdarg.h>
 #include <math.h>
 
-#include <pango/pangocairo.h>
+//#include <pango/pangocairo.h>
 #include <cairo/cairo.h>
 
 double Fgcolor[4] = {1.0, 1.0, 1.0, 1.0}; //Selected FGcolor
 extern cairo_t* G; //Gamescreen cairo context
 extern cairo_surface_t* Plimgs[];
-extern PangoLayout *PangoL;
+//extern PangoLayout *PangoL;
 
 //Draw hp bar at x, y with width w and height h, chp is current hp, fhp is full hp,
 //colorbg is background color, colorfg is foreground color.
@@ -72,10 +72,10 @@ void fillcircle(double x, double y, double diam) {
 
 //draw string ctx in pos x, y
 void drawstring(double x, double y, char* ctx) {
-	pango_layout_set_text(PangoL, ctx, -1);
-	cairo_move_to(G, x, y); // + get_font_height() - 2);
-	//cairo_show_text(G, ctx);
-	pango_cairo_show_layout(G, PangoL);
+	//pango_layout_set_text(PangoL, ctx, -1);
+	cairo_move_to(G, x, y + get_font_height() - 2);
+	cairo_show_text(G, ctx);
+	//pango_cairo_show_layout(G, PangoL);
 }
 
 //draw substring ctx (index sp to ed) in pos x, y
@@ -190,20 +190,20 @@ int32_t drawstring_title(double y, char* ctx, int32_t s) {
 
 //Set font size to s
 void set_font_size(int32_t s) {
-	const PangoFontDescription *pfd = pango_layout_get_font_description(PangoL);
-	PangoFontDescription *pfdd = pango_font_description_copy(pfd);
-	pango_font_description_set_size(pfdd, s * PANGO_SCALE);
-	pango_layout_set_font_description(PangoL, pfdd);
-	pango_font_description_free(pfdd);
-	//cairo_set_font_size(G, (double)s);
+	//const PangoFontDescription *pfd = pango_layout_get_font_description(PangoL);
+	//PangoFontDescription *pfdd = pango_font_description_copy(pfd);
+	//pango_font_description_set_size(pfdd, s * PANGO_SCALE);
+	//pango_layout_set_font_description(PangoL, pfdd);
+	//pango_font_description_free(pfdd);
+	cairo_set_font_size(G, (double)s);
 }
 
 //load fonts from fontlist and use it for text drawing
 void loadfont(const char* fontlist) {
-	PangoFontDescription *desc;
-	desc = pango_font_description_from_string (fontlist);
-	pango_layout_set_font_description (PangoL, desc);
-	pango_font_description_free (desc);
+	//PangoFontDescription *desc;
+	//desc = pango_font_description_from_string (fontlist);
+	//pango_layout_set_font_description (PangoL, desc);
+	//pango_font_description_free (desc);
 	//cairo_select_font_face(G, "Ubuntu Mono", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
 }
 

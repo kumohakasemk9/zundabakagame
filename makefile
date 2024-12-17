@@ -12,9 +12,9 @@
 #makefile: build script
 
 CC=gcc
-CFLAGSEXTRA=`pkg-config --cflags cairo pangocairo x11`
+CFLAGSEXTRA=`pkg-config --cflags cairo x11`
 CFLAGS=-g3 -Wconversion $(CFLAGSEXTRA)
-LDFLAGS=-lcrypt `pkg-config --libs cairo pangocairo x11`
+LDFLAGS=-lcrypt `pkg-config --libs cairo x11`
 OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o network.o ui.o
 OUTNAME=zundagame
 RELEASEOUT=game.tar.gz

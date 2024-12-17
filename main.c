@@ -53,6 +53,7 @@ Display *Disp = NULL; //XDisplay
 Window Win; //XWindow
 cairo_surface_t *GSsfc; //GameScreen drawer surface
 cairo_t *GS; //GameScreen Drawer
+extern cairo_surface_t *Gsfc; //game screen
 int ConnectionSocket = -1;
 
 void sigalrm_handler(int);
@@ -60,6 +61,7 @@ void sigio_handler(int);
 int install_handler(int, void (*)(int) );
 void xwindowevent_handler(XEvent, Atom);
 extern int32_t ProgramExiting;
+extern langid_t LangID;
 
 //Gametick timer, called every 10 mS
 void sigalrm_handler(int) {
@@ -77,6 +79,9 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 		ProgramExiting = 1;
 	} else if(ev.type == Expose) { //Redraw
 		game_paint();
+		//Apply game screen
+		cairo_set_source_surface(GS, Gsfc, 0, 0);
+		cairo_paint(GS);
 		XClearArea(Disp, Win, 0, 0, 1, 1, True); //request repaint
 	} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
 		//Get key char andd sym
@@ -133,11 +138,15 @@ int install_handler(int sign, void (*hwnd)(int) ) {
 }
 
 int main(int argc, char *argv[]) {
+	printf("Welcome to zundagame. Initializing: %s\n", VERSION_STRING);
+	printf("%s\n", CONSOLE_CREDIT_STRING);
+
 	//Install network IO handler
 	if(install_handler(SIGIO, sigio_handler) != 0) {
 		printf("main(): Could not prepare for network play!\n");
 		return 1;
 	}
+	printf("Network handler installed.\n");
 
 	//Install timer handler and timer
 	if(install_handler(SIGALRM, sigalrm_handler) != 0) {
@@ -154,13 +163,15 @@ int main(int argc, char *argv[]) {
 		printf("main(): Could not set interval of gametick timer!\n");
 		return 1;
 	}
+	printf("gametick timer installed.\n");
 
 	//Init game
 	if(gameinit() == -1) {
-		printf("main(): activate(): gameinit() failed\n");
+		printf("main(): gameinit() failed\n");
 		do_finalize();
 		return 1;
 	}
+	printf("gameinit(): OK\n");
 	
 	//Connect to X display
 	Disp = XOpenDisplay(NULL);
@@ -169,11 +180,13 @@ int main(int argc, char *argv[]) {
 		do_finalize();
 		return 1;
 	}
+	printf("X11 opened.\n");
 	
 	//Create and show window
 	Window r = DefaultRootWindow(Disp);
 	Win = XCreateSimpleWindow(Disp, r, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, 0);
 	XMapWindow(Disp, Win);
+	printf("Window opened.\n");
 
 	//Make game screen drawer and its graphic context
 	int s = DefaultScreen(Disp);
@@ -182,25 +195,41 @@ int main(int argc, char *argv[]) {
 	GS = cairo_create(GSsfc);
 	if(cairo_status(GS) != CAIRO_STATUS_SUCCESS) {
 		printf("main(): Failed to create game screen drawer.\n");
+		cairo_destroy(GS);
+		cairo_surface_destroy(GSsfc);
 		XDestroyWindow(Disp, Win);
 		XCloseDisplay(Disp);
 		do_finalize();
 	}
+	printf("Image buffer and Graphics context created.\n");
 	
+	//Fix window size
+	XSizeHints sh = {
+		.flags = PMinSize | PMaxSize,
+		.min_width = 800,
+		.min_height = 600,
+		.max_width = 800,
+		.max_height = 600
+	};
+	XSetWMNormalHints(Disp, Win, &sh);
+
 	//Select event and message loop
 	Atom WM_DELETE_WINDOW = XInternAtom(Disp, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(Disp, Win, &WM_DELETE_WINDOW, 1);
 	XSelectInput(Disp, Win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ExposureMask | PointerMotionMask);
+	printf("Starting message loop.\n");
 	while(ProgramExiting == 0) {
 		XEvent e;
 		XNextEvent(Disp, &e);
 		xwindowevent_handler(e, WM_DELETE_WINDOW);
 	}
 	
+	//Finalize
 	do_finalize();
 	XDestroyWindow(Disp, Win);
 	XCloseDisplay(Disp);
-	
+	cairo_destroy(GS);
+	cairo_surface_destroy(GSsfc);
 	return 0;
 }
 
@@ -352,4 +381,17 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 
 void poll_tcp_socket() {
 	//Do nothing in linux, linux code does not use poll strategy
+}
+
+void detect_syslang() {
+	const char *LOCALEENVS[] = {"LANG", "LANGUAGE", "LC_ALL"};
+	for(int i = 0; i < 3; i++) {
+		char *t = getenv(LOCALEENVS[i]);
+		if(t != NULL && memcmp(t, "ja", 2) == 0) {
+			printf("Japanese locale detected.\n");
+			LangID = LANGID_JP;
+			return;
+		}
+	}
+	printf("English locale detected\n");
 }

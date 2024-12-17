@@ -20,13 +20,11 @@ gamesys.c: game process and related functions
 #include <math.h>
 #include <stdarg.h>
 
-#include <pango/pangocairo.h>
+//#include <pango/pangocairo.h>
 #include <cairo/cairo.h>
 
 cairo_surface_t *Gsfc = NULL; //GameScreen surface
 cairo_t* G = NULL; //Gamescreen cairo context
-extern cairo_surface_t *GSsfc; //GameScreen drawer surface
-extern cairo_t *GS; //GameScreen Drawer
 cairo_surface_t *Plimgs[IMAGE_COUNT]; //Preloaded images
 extern const char* IMGPATHES[]; //preload image pathes
 SMPProfile_t* t_SMPProf = NULL;
@@ -56,7 +54,6 @@ int32_t CurrentPlayableCharacterID = 0;
 keyflags_t KeyFlags;
 int32_t ProgramExiting = 0;
 int32_t MapTechnologyLevel;
-extern int32_t SKILLCOOLDOWNS[SKILL_COUNT];
 int32_t MapEnergyLevel;
 int32_t MapRequiredEnergyLevel = 0;
 int32_t SkillKeyState;
@@ -72,7 +69,7 @@ extern int32_t SMPcid;
 int32_t StatusShowTimer;
 char StatusTextBuffer[BUFFER_SIZE];
 int32_t CommandBufferMutex = 0;
-PangoLayout *PangoL = NULL;
+//PangoLayout *PangoL = NULL;
 
 //Request to show chat message from another thread (this can not be nested)
 void chat_request(char* ctx) {
@@ -849,15 +846,7 @@ int32_t gameinit() {
 		}
 	}
 	
-	//Detect system language
-	const char* lang_c = getenv("LANG");
-	if(strstr(lang_c, "ja_JP") != NULL) {
-		printf("Japanese locale detected. Changing language.\n");
-		LangID = LANGID_JP;
-	} else {
-		printf("Changed to English mode because of your locale setting: %s\n", lang_c);
-		
-	}
+	detect_syslang();
 	
 	//Initialize Chat Message Slots
 	for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {
@@ -866,7 +855,7 @@ int32_t gameinit() {
 	
 	check_data(); //Data Check
 
-	PangoL = pango_cairo_create_layout(G);
+	//PangoL = pango_cairo_create_layout(G);
 	
 	//Setup font
 	loadfont("Ubuntu Mono,monospace");
@@ -899,20 +888,14 @@ void do_finalize() {
 	}
 	
 	//Unload other resources
-	if(PangoL != NULL) {
-		g_object_unref(PangoL);
-	}
+	//if(PangoL != NULL) {
+	//	g_object_unref(PangoL);
+	//}
 	if(G != NULL) {
 		cairo_destroy(G);
 	}
 	if(Gsfc != NULL) {
 		cairo_surface_destroy(Gsfc);
-	}
-	if(GS != NULL) {
-		cairo_destroy(GS);
-	}
-	if(GSsfc != NULL) {
-		cairo_surface_destroy(GSsfc);
 	}
 }
 

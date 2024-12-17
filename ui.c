@@ -18,9 +18,7 @@ ui.c: gamescreen drawing
 #include <string.h>
 #include <cairo/cairo.h>
 
-extern cairo_surface_t *Gsfc; //GameScreen surface
 extern cairo_t* G; //Gamescreen cairo context
-extern cairo_t *GS; //GameScreen Drawer
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game Objects
 extern int32_t CameraX, CameraY; //Camera Position
 extern int32_t CommandCursor; //Command System Related
@@ -60,9 +58,6 @@ void game_paint() {
 	draw_game_main();
 	draw_ui();
 	draw_info();
-	//Apply screen
-	cairo_set_source_surface(GS, Gsfc, 0, 0);
-	cairo_paint(GS);
 }
 
 void draw_game_main() {

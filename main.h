@@ -22,6 +22,7 @@ main.h: integrated header file
 #include "zunda-structs.h"
 
 //main.c
+void detect_syslang();
 int32_t make_tcp_socket(char*, char*);
 int32_t close_tcp_socket();
 int32_t send_tcp_socket(uint8_t*, size_t);

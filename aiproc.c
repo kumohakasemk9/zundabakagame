@@ -26,7 +26,6 @@ extern int32_t MapTechnologyLevel;
 extern int32_t MapEnergyLevel;
 extern int32_t MapRequiredEnergyLevel;
 extern langid_t LangID;
-extern const char *EN_TID_NAMES[MAX_TID];
 extern int32_t CharacterMove;
 extern int32_t SMPStatus;
 extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];

@@ -16,6 +16,12 @@ zunda-defs.h: definitions
 //Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function added (feature add), 3 will increase if function update (bugfix)
 #define VERSION_STRING "9.0.0-16dec2024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
+#define CONSOLE_CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0\n" \
+							  "Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社\n" \
+							  "(C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr\n" \
+							  "Please consider supporting me through ko-fi or pateron\n" \
+							  "https://ko-fi.com/kumohakase\n" \
+							  "https://www.patreon.com/kumohakasemk8\n"
 
 #define MAX_DIFFICULTY 5 //Max difficulty
 #define WINDOW_WIDTH 800 //Game width
