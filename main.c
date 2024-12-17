@@ -206,10 +206,10 @@ int main(int argc, char *argv[]) {
 	//Fix window size
 	XSizeHints sh = {
 		.flags = PMinSize | PMaxSize,
-		.min_width = 800,
-		.min_height = 600,
-		.max_width = 800,
-		.max_height = 600
+		.min_width = WINDOW_WIDTH,
+		.min_height = WINDOW_HEIGHT,
+		.max_width = WINDOW_WIDTH,
+		.max_height = WINDOW_HEIGHT
 	};
 	XSetWMNormalHints(Disp, Win, &sh);
 
