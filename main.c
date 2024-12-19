@@ -32,12 +32,12 @@ change Character constant information structure to each function getters
 #include <X11/Xutil.h>
 
 #include <cairo/cairo-xlib.h>
+#include <openssl/evp.h>
 
 #include <unistd.h>
 #include <sys/time.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <crypt.h>
 
 #include <netinet/tcp.h>
 #include <netinet/in.h>
@@ -55,13 +55,15 @@ cairo_surface_t *GSsfc; //GameScreen drawer surface
 cairo_t *GS; //GameScreen Drawer
 extern cairo_surface_t *Gsfc; //game screen
 int ConnectionSocket = -1;
+extern int32_t ProgramExiting;
+extern langid_t LangID;
 
 void sigalrm_handler(int);
 void sigio_handler(int);
 int install_handler(int, void (*)(int) );
 void xwindowevent_handler(XEvent, Atom);
-extern int32_t ProgramExiting;
-extern langid_t LangID;
+
+void poll_socket() {};
 
 //Gametick timer, called every 10 mS
 void sigalrm_handler(int) {
@@ -140,6 +142,19 @@ int install_handler(int sign, void (*hwnd)(int) ) {
 int main(int argc, char *argv[]) {
 	printf("Welcome to zundagame. Initializing: %s\n", VERSION_STRING);
 	printf("%s\n", CONSOLE_CREDIT_STRING);
+	
+	//Debug
+	printf("sizeof(event_hdr_t): %d\n", sizeof(event_hdr_t) );
+	printf("sizeof(np_greeter_t): %d\n", sizeof(np_greeter_t) );
+	printf("sizeof(userlist_hdr_t): %d\n", sizeof(userlist_hdr_t) );
+	printf("sizeof(ev_placeitem_t): %d\n", sizeof(ev_placeitem_t) );
+	printf("sizeof(ev_useskill_t): %d\n", sizeof(ev_useskill_t) );
+	printf("sizeof(ev_changeplayablespeed_t): %d\n", sizeof(ev_changeplayablespeed_t) );
+	printf("sizeof(ev_chat_t): %d\n", sizeof(ev_chat_t) );
+	printf("sizeof(ev_reset_t): %d\n", sizeof(ev_reset_t) );
+	printf("sizeof(ev_hello_t): %d\n", sizeof(ev_hello_t) );
+	printf("sizeof(ev_bye_t): %d\n", sizeof(ev_bye_t) );
+	printf("sizeof(ev_changeplayablespeed_t): %d\n", sizeof(ev_changeplayablespeed_t) );
 
 	//Install network IO handler
 	if(install_handler(SIGIO, sigio_handler) != 0) {
@@ -249,26 +264,30 @@ uint32_t host2network_fconv_32(int32_t d) {
 	return ntohl( (uint32_t)d);
 }
 
-//Calculate linux hash of uname + password + salt string. Max input size is UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH + 1
-char *compute_passhash(char* uname, char* password, char *salt) {
-	struct crypt_data t = {
-		.initialized = 0
-	};
-	
-	//date length check
-	char input_data[UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH + 1];
-	if(strlen(uname) + strlen(password) + SALT_LENGTH >= sizeof(input_data) ) {
-		printf("main.c: compute_passhash: overflow\n");
-		return NULL;
+//Calculate linux hash of uname + password + salt string. Max input size is UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH + 1 and store to output, output should pre-allocated 512 bit buffer. returns 0 when success, -1 when fail.
+int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *output) {
+	EVP_MD_CTX *evp = EVP_MD_CTX_new();
+	EVP_DigestInit_ex(evp, EVP_sha512(), NULL);
+	if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
+		EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
+		EVP_DigestUpdate(evp, salt, SALT_LENGTH) != 1) {
+		printf("compute_passhash: Feeding data to SHA512 generator failed.\n");
+		EVP_MD_CTX_free(evp);
+		return -1;	
 	}
-
-	//make all data together
-	memcpy(input_data, salt, SALT_LENGTH); //salt
-	input_data[SALT_LENGTH] = 0;
-	strcat(input_data, uname); //username
-	strcat(input_data, password); //password
-	
-	return crypt_r(input_data, "$5$", &t); //Compute hash
+	unsigned int l = 0;
+	if(EVP_DigestFinal_ex(evp, output, &l) != 1) {
+		printf("compute_passhash: SHA512 get digest failed.\n");
+		EVP_MD_CTX_free(evp);
+		return -1;
+	}
+	if(l != SHA512_LENGTH) {
+		printf("compute_passhash: Desired length != Actual wrote length.\n");
+		EVP_MD_CTX_free(evp);
+		return -1;
+	}
+	EVP_MD_CTX_free(evp);
+	return 0;
 }
 
 /*

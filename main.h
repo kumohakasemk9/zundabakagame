@@ -22,18 +22,18 @@ main.h: integrated header file
 #include "zunda-structs.h"
 
 //main.c
+void poll_socket();
 void detect_syslang();
 int32_t make_tcp_socket(char*, char*);
 int32_t close_tcp_socket();
 int32_t send_tcp_socket(uint8_t*, size_t);
 int32_t install_io_handler();
 ssize_t recv_tcp_socket(uint8_t*, size_t);
-void poll_tcp_socket();
 int16_t network2host_fconv_16(uint16_t);
 int32_t network2host_fconv_32(uint32_t);
 uint16_t host2network_fconv_16(int16_t);
 uint32_t host2network_fconv_32(int32_t);
-char *compute_passhash(char*, char*, char*);
+int32_t compute_passhash(char*, char*, uint8_t*, uint8_t*);
 
 //ui.c
 void game_paint();

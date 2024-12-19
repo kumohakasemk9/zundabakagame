@@ -18,6 +18,7 @@ zunda-server.h: server client common definitions (like commands)
 #define PASSWD_SIZE 16 //max password length (includes zero)
 #define SALT_LENGTH 16 //Server salt length
 #define NET_CHAT_LIMIT 512 //Network chat length limit (includes zero)
+#define SHA512_LENGTH 64 //SHA512 is 512 bits long (64 bytes)
 
 //Server command definitions
 typedef enum {

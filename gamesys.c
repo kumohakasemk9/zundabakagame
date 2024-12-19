@@ -375,6 +375,7 @@ int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilte
 }
 
 void gametick() {
+	poll_socket();
 	//gametick, called for every 10mS
 	//Take care of chat timeout and timers
 	if(ChatTimeout != 0) { ChatTimeout--; }
@@ -387,10 +388,6 @@ void gametick() {
 	//SMP Processing
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		process_smp();
-	}
-	//For windows
-	if(SMPStatus != NETWORK_DISCONNECTED) {
-		poll_tcp_socket();
 	}
 	//If game is not in playing state, do special process
 	switch(GameState) {

@@ -128,6 +128,7 @@ void net_recv_handler() {
 		}
 		memcpy(RXSMPEventBuffer, &recvdata[1], (size_t)r - 1);
 		RXSMPEventLen = (size_t)r - 1;
+		printf("net_recv_handler(): GetEvent: RXSMPEventlen: %d\n", RXSMPEventLen);
 	} else {
 		close_connection_silent();
 		chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
@@ -216,18 +217,13 @@ void net_server_send_cmd(server_command_t cmd) {
 		}
 		printf("net_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: Attempeting to login to SMP server as %s\n", SMPProfs[SelectedSMPProf].usr);
 		//Make login key (SHA512 of username+password+salt)
-		char *ph = compute_passhash(SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].pwd, SMPsalt);
-		if(ph == NULL)  {
+		uint8_t ph[SHA512_LENGTH];
+		if(compute_passhash(SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].pwd, SMPsalt, ph) != 0)  {
 			printf("np_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: calculating hash failed.\n");
 			return;
 		}
-		size_t sp = strlen(ph);
-		if(sp + 1 >= NET_TX_BUFFER_SIZE - 1) {
-			printf("np_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: Buffer overflow.\n");
-			return;
-		}
-		memcpy(&cmdbuf[1], ph, sp); //combine command and hash
-		ctxlen = sp;
+		memcpy(&cmdbuf[1], ph, SHA512_LENGTH); //combine command and hash
+		ctxlen = SHA512_LENGTH;
 	} else {
 		printf("net_server_send_command(): Bad command.\n");
 		return;
@@ -239,7 +235,6 @@ void net_server_send_cmd(server_command_t cmd) {
 
 //Process SMP packet
 void process_smp() {
-	poll_tcp_socket(); //For windows, poll network socket, linux uses callback.
 	//Process respawn timer
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		if(SMPPlayerInfo[i].cid != -1 && SMPPlayerInfo[i].respawn_timer > 0) {
@@ -260,9 +255,9 @@ void process_smp() {
 			size_t rem = RXSMPEventLen - ptr;
 			//Parse event record header
 			if(rem < sizeof(event_hdr_t) ) {
-				printf("process_smp(): Too short event record.\n");
-				chat( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-				close_connection_silent();
+				printf("process_smp(): Too short event record, rem:%d, ptr: %d\n", rem, ptr);
+				//chat( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+				//close_connection_silent();
 				return;
 			}
 			hdr = (event_hdr_t*)&RXSMPEventBuffer[ptr];

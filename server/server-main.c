@@ -15,20 +15,19 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 #define SERVER_EVENT -1
 #define LIMIT_ADD_EVENT 512
 #define SIZE_EVENT_BUFFER 8192
 #define SIZE_NET_BUFFER 512
-#define SHA512_DIGEST_LEN (512 / 8)
 
 #include <zunda-server.h>
 
 //User Information Struct
 typedef struct {
 	char usr[UNAME_SIZE];
-	uint8_t loginkey[SHA512_DIGEST_LEN];
+	char pwd[PASSWD_SIZE];
 } userinfo_t;
 
 //Client information struct
@@ -159,12 +158,9 @@ int main(int argc, char *argv[]) {
 		//Store username
 		memcpy(UserInformations[UserCount].usr, b, usernamelen);
 		UserInformations[UserCount].usr[usernamelen] = 0;
-		//Store loginkey in this session SHA512 of (username+password+salt)
-		uint8_t rawdat[UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH];
-		memcpy(rawdat, b, usernamelen);
-		memcpy(&rawdat[usernamelen], &pwdpos[1], passwdlen);
-		memcpy(&rawdat[usernamelen+passwdlen], ServerSalt, SALT_LENGTH);
-		SHA512(rawdat, usernamelen + passwdlen + SALT_LENGTH, UserInformations[UserCount].loginkey);
+		//Store password
+		memcpy(UserInformations[UserCount].pwd, &pwdpos[1], passwdlen);
+		UserInformations[UserCount].pwd[passwdlen] = 0;
 		UserCount++;
 	}
 	fclose(f_pwdfile);
@@ -574,14 +570,14 @@ void EventBufferGC() {
 
 void LoginWithPassword(uint8_t* dat, int dlen, int cid) {
 	char* pwdpos;
-	if(dlen != SHA512_DIGEST_LEN) {
+	if(dlen != SHA512_LENGTH) {
 		Log(cid, "LoginWithPassword: Wrong packet length.\n");
 		DisconnectWithReason(cid, "Bad command.");
 		return;
 	}
 	if(C[cid].uid != -1) {
 		Log(cid, "LoginWithPassword: Already logged in.\n");
-		send(C[cid].fd, "p+", 2, MSG_NOSIGNAL);
+		DisconnectWithReason(cid, "Bad command.");
 		return;
 	}
 /*
@@ -593,7 +589,24 @@ void LoginWithPassword(uint8_t* dat, int dlen, int cid) {
 */
 	//Find matching credentials
 	for(int i = 0; i < UserCount; i++) {
-		if(memcmp(UserInformations[i].loginkey, dat, SHA512_DIGEST_LEN ) == 0) {
+		//Make password hash
+		char *uname = UserInformations[i].usr;
+		char *password = UserInformations[i].pwd;
+		uint8_t loginkey[SHA512_LENGTH];
+		EVP_MD_CTX *evp = EVP_MD_CTX_new();
+		EVP_DigestInit_ex(evp, EVP_sha512(), NULL);
+		if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
+			EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
+			EVP_DigestUpdate(evp, ServerSalt, SALT_LENGTH) != 1) {
+			printf("LoginWithPassword: Feeding data to SHA512 generator failed.\n");
+		} else {
+			if(EVP_DigestFinal_ex(evp, loginkey, NULL) != 1) {
+				printf("LoginWithPassword: SHA512 get digest failed.\n");
+			}
+		}
+		EVP_MD_CTX_free(evp);
+		
+		if(memcmp(loginkey, dat, SHA512_LENGTH ) == 0) {
 			Log(cid, "LoginWithPassword: Logged in as user %s(ID=%d)\n", UserInformations[i].usr, i);
 			//Duplicate login check, BUG: can't re login as same user
 			for(int j = 0; j < MAX_CLIENTS; j++) {
