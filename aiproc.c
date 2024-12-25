@@ -29,6 +29,7 @@ extern langid_t LangID;
 extern int32_t CharacterMove;
 extern int32_t SMPStatus;
 extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
+extern double DifATKGain;
 
 void procai() {
 	//AI proc
@@ -461,6 +462,7 @@ int32_t procobjhit(int32_t src, int32_t dst, LookupResult_t srcinfo, LookupResul
 
 //Damage object id dstid by object id srcid
 void damage_object(int32_t dstid, int32_t srcid) {
+	//Check parameter
 	if(!is_range(dstid, 0, MAX_OBJECT_COUNT - 1) || !is_range(srcid, 0, MAX_OBJECT_COUNT - 1) ) {
 		die("damage_object(): Bad parameter!\n");
 		return;
@@ -468,13 +470,24 @@ void damage_object(int32_t dstid, int32_t srcid) {
 	if(Gobjs[dstid].hp == 0) {
 		return; //If already died, return
 	}
+
+	//Lookup for info
 	LookupResult_t srcinfo, dstinfo;
 	lookup(Gobjs[srcid].tid, &srcinfo);
 	lookup(Gobjs[dstid].tid, &dstinfo);
-	Gobjs[dstid].hp = constrain_number(Gobjs[dstid].hp - Gobjs[srcid].damage , 0, dstinfo.inithp);
+
+	//Decrease target HP
+	double m = 1.00;
+	//Apply DifATKGain if attacker is playable character
+	if(is_playable_character(Gobjs[srcid]) ) {
+		m = DifATKGain;
+	}
+	Gobjs[dstid].hp = constrain_number(Gobjs[dstid].hp - (Gobjs[srcid].damage * m) , 0, dstinfo.inithp);
+	
 	if(Gobjs[dstid].hp == 0) {
 		//Object Dead
 		//g_print("damage_object(): Object %d is dead.\n", i);
+
 		//If enemy unit is dead, give money to ally team
 		switch(Gobjs[dstid].tid) {
 		case TID_ZUNDAMON1:
@@ -496,6 +509,7 @@ void damage_object(int32_t dstid, int32_t srcid) {
 			Money += 1;
 			break;
 		}
+
 		//Write deathlog if facilities or unit dead
 		if(dstinfo.objecttype == UNITTYPE_FACILITY || is_playable_character(Gobjs[dstid].tid) ) {
 			int32_t killerid = Gobjs[srcid].srcid;

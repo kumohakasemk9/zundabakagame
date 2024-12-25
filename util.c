@@ -21,9 +21,9 @@ util.c: utility functions
 #include <stdarg.h>
 
 #include <cairo/cairo.h>
-//#include <pango/pangocairo.h>
+#include <pango/pangocairo.h>
 
-//extern PangoLayout *PangoL;
+extern PangoLayout *PangoL;
 extern int32_t ProgramExiting;
 extern cairo_t* G;
 extern cairo_surface_t* Plimgs[IMAGE_COUNT];
@@ -121,11 +121,11 @@ void die(const char *p, ...) {
 //Get how string ctx occupy width if drawn in current font
 int32_t get_string_width(char* ctx) {
 	int32_t w;
-	//pango_layout_set_text(PangoL, ctx, -1);
-	//pango_layout_get_pixel_size(PangoL, &w, NULL);
-	cairo_text_extents_t t;
-	cairo_text_extents(G, ctx, &t);
-	w = (int32_t)t.x_advance;
+	pango_layout_set_text(PangoL, ctx, -1);
+	pango_layout_get_pixel_size(PangoL, &w, NULL);
+	//cairo_text_extents_t t;
+	//cairo_text_extents(G, ctx, &t);
+	//w = (int32_t)t.x_advance;
 	return w;
 }
 
@@ -138,12 +138,12 @@ int32_t get_substring_width(char* ctx, int32_t st, int32_t ed) {
 
 //Get maximum letter height of current selected font.
 int32_t get_font_height() {
-	cairo_font_extents_t t;
+	//cairo_font_extents_t t;
 	int32_t h;
-	//pango_layout_set_text(PangoL, "abcdefghijklmnopqrstuvwxyz", -1);
-	//pango_layout_get_pixel_size(PangoL, NULL, &h);
-	cairo_font_extents(G, &t);
-	h = (int32_t)t.height;
+	pango_layout_set_text(PangoL, "abcdefghijklmnopqrstuvwxyz", -1);
+	pango_layout_get_pixel_size(PangoL, NULL, &h);
+	//cairo_font_extents(G, &t);
+	//h = (int32_t)t.height;
 	return h;
 }
 

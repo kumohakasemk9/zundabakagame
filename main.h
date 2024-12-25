@@ -122,6 +122,13 @@ void keypress_handler(char, specialkey_t);
 void mousemotion_handler(int, int);
 void keyrelease_handler(char);
 void mousepressed_handler(mousebutton_t);
+void get_smp_cmd();
+void reset_game_cmd();
+void smp_cmd();
+void addid_cmd();
+void ebcount_cmd();
+void ebdist_cmd();
+void atkgain_cmd();
 
 //info.c
 void lookup(obj_type_t, LookupResult_t*);

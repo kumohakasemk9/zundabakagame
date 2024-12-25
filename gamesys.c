@@ -20,7 +20,7 @@ gamesys.c: game process and related functions
 #include <math.h>
 #include <stdarg.h>
 
-//#include <pango/pangocairo.h>
+#include <pango/pangocairo.h>
 #include <cairo/cairo.h>
 
 cairo_surface_t *Gsfc = NULL; //GameScreen surface
@@ -69,7 +69,10 @@ extern int32_t SMPcid;
 int32_t StatusShowTimer;
 char StatusTextBuffer[BUFFER_SIZE];
 int32_t CommandBufferMutex = 0;
-//PangoLayout *PangoL = NULL;
+PangoLayout *PangoL = NULL;
+int32_t DifEnemyBaseCount[3] = {1, 0, 0}; //Default topright, bottomright, topleft enemy boss count
+int32_t DifEnemyBaseDist = 500; //Default enemy boss distance from each other
+double DifATKGain = 1.00; //Attack damage gain
 
 //Request to show chat message from another thread (this can not be nested)
 void chat_request(char* ctx) {
@@ -638,84 +641,86 @@ void switch_character_move() {
 	}
 }
 
+
+//Command Handler: called when command entered
 void execcmd() {
-	//Command Handler: called when command entered
+	//Return if command is empty string
 	if(strlen(CommandBuffer) == 0) {
 		return;
 	}
+
 	if(strcmp(CommandBuffer, "/version") == 0) {
 		//Show Version
 		chatf("Version: %s", VERSION_STRING);
+
 	} else if(strcmp(CommandBuffer, "/credit") == 0) {
 		//Show Credit
 		chat(CREDIT_STRING);
+
 	} else if(strcmp(CommandBuffer, "/debugon") == 0) {
 		//Debug mode on
 		DebugMode = 1;
+
 	} else if(strcmp(CommandBuffer, "/debugoff") == 0) {
 		//Debug off
 		DebugMode = 0;
+
 	} else if(memcmp(CommandBuffer, "/addid ", 7) == 0) {
-		//Set appending object id (for debug)
-		int32_t i = (int32_t)strtol(&CommandBuffer[7], NULL, 10);
-		if(is_range(i, 0, MAX_TID - 1) ) {
-			AddingTID = i;
-		} else {
-			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-		}
-	} else if(memcmp(CommandBuffer, "/difficulty ", 12) == 0) {
-		//Changing difficulty
-		int32_t i = (int32_t)strtol(&CommandBuffer[12], NULL, 10);
-		if(is_range(i, 1, MAX_DIFFICULTY) ) {
-			Difficulty = i;
-		} else {
-			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-		}
+		//Change addid for debug mode
+		addid_cmd();
+
 	} else if(memcmp(CommandBuffer, "/smp ", 5) == 0) {
-		//Changing selecting smp prof id (Can't be changed in SMP)
-		if(SMPStatus != NETWORK_DISCONNECTED) {
-			printf("execcmd(): /smp: in connection, you can not change SMP profile.\n");
-			chat( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
-			return;
-		}
-		int32_t i = (int32_t)strtol(&CommandBuffer[5], NULL, 10);
-		if(is_range(i, 1, SMPProfCount) ) {
-			SelectedSMPProf = i - 1;
-		} else {
-			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-		}
+		//Change SMP profile id
+		smp_cmd();
+
 	} else if(strcmp(CommandBuffer, "/getsmps") == 0) {
 		//Get current loaded SMP profile count
 		chatf("getsmps: %d", SMPProfCount);
+
 	} else if(strcmp(CommandBuffer, "/getsmp") == 0) {
-		//Get current selected SMP profile
-		if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
-			chatf("getsmp: %d (ID overflow)", SelectedSMPProf + 1);
-		} else {
-			chatf("getsmp: %d (%s@%s:%s)", SelectedSMPProf + 1, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
-		}
+		//get selected smp profile info
+		get_smp_cmd();
+
 	} else if(strcmp(CommandBuffer, "/reset") == 0) {
-		//Reset game round
-		if(SMPStatus != NETWORK_LOGGEDIN) {
-			reset_game();
-		} else {
-			stack_packet(EV_RESET);
-		}
+		//reset game
+		reset_game_cmd();
+
 	} else if(strcmp(CommandBuffer, "/jp") == 0) {
 		//Change language to Japanese
 		LangID = LANGID_JP;
+
 	} else if(strcmp(CommandBuffer, "/en") == 0) {
 		//Change language to English
 		LangID = LANGID_EN;
+
 	} else if(memcmp(CommandBuffer, "/chfont ", 8) == 0) {
 		//Load font list
 		loadfont(&CommandBuffer[8]);
+
 	} else if(strcmp(CommandBuffer, "/connect") == 0) {
 		//Connect to SMP server
 		connect_server();
+
 	} else if(strcmp(CommandBuffer, "/disconnect") == 0) {
 		//Disconnect from SMP server
 		close_connection(0);
+	
+	} else if(memcmp(CommandBuffer, "/ebcount ", 9) == 0) {
+		//Set difficulty parameter: enemy base count
+		ebcount_cmd();
+
+	} else if(memcmp(CommandBuffer, "/ebdist ", 8) == 0) {
+		//Set difficulty parameter: enemy base distance
+		ebdist_cmd();
+
+	} else if(memcmp(CommandBuffer, "/atkgain ", 9) == 0) {
+		//Set difficulty parameter: attack gain
+		atkgain_cmd();
+	
+	} else if(strcmp(CommandBuffer, "/difficulty") == 0 ) {
+		//Difficulty query command
+		chatf("difficulty: ATKGain: %.2f EBDist: %d EBCount: %d %d %d\n", DifATKGain, DifEnemyBaseDist, DifEnemyBaseCount[0], DifEnemyBaseCount[1], DifEnemyBaseCount[2]);
+
 	} else {
 		//If not command, treat them as a chat
 		if(SMPStatus == NETWORK_LOGGEDIN) {
@@ -726,8 +731,104 @@ void execcmd() {
 	}
 }
 
+void ebcount_cmd() {
+	//DifEnemyBaseCount set command ( topright [bottomright] [topleft] )
+	char *p = &CommandBuffer[9];
+	int32_t t[3] = {0, 0, 0};
+	int32_t check = 0;
+	for(int32_t i = 0; i < 3; i++) {
+		//convert and check
+		t[i] = (int32_t)strtol(p, NULL, 10);
+		if(!is_range(t[i], 0, 4) ) {
+			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+			return;
+		}
+		check += t[i];
+
+		//find next space and advance pointer, if not found finish converting task.
+		char *n = strchr(p, ' ');
+		if(n == NULL) { break; }
+		p = n + 1;
+	}
+	
+	//at least enemy base count total should be 1
+	if(check < 1) {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		return;
+	}
+
+	//Apply
+	for(int32_t i = 0; i < 3; i++) {
+		DifEnemyBaseCount[i] = t[i];
+	}
+}
+
+void ebdist_cmd() {
+	//DifEnemyBaseDist set command (distance)
+	int32_t i = (int32_t)strtol(&CommandBuffer[8], NULL, 10);
+	if(!is_range(i, 100, 300) ) {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		return;
+	}
+	DifEnemyBaseDist = i;
+}
+
+void atkgain_cmd() {
+	//DifATKGain set command (atkgain)
+	double i = (double)atof(&CommandBuffer[9]);
+	if(!is_range_number(i, 0.5, 5.0) ) {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		return;
+	}
+	DifATKGain = i;
+}
+
+void addid_cmd() {
+	//Set appending object id (for debug) (id)
+	int32_t i = (int32_t)strtol(&CommandBuffer[7], NULL, 10);
+	if(is_range(i, 0, MAX_TID - 1) ) {
+		AddingTID = i;
+	} else {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+	}
+}
+
+void smp_cmd() {
+	//Changing selecting smp prof id (Can't be changed in SMP) (id)
+	if(SMPStatus != NETWORK_DISCONNECTED) {
+		printf("smp_cmd(): /smp: in connection, you can not change SMP profile.\n");
+		chat( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
+		return;
+	}
+	int32_t i = (int32_t)strtol(&CommandBuffer[5], NULL, 10);
+	if(is_range(i, 1, SMPProfCount) ) {
+		SelectedSMPProf = i - 1;
+	} else {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+	}
+}
+
+void get_smp_cmd() {
+	//Get current selected SMP profile
+	if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
+		chatf("getsmp: %d (ID overflow)", SelectedSMPProf + 1);
+	} else {
+		chatf("getsmp: %d (%s@%s:%s)", SelectedSMPProf + 1, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
+	}
+}
+
+void reset_game_cmd() {
+	//Reset game round, if in SMP, send reset packet instead.
+	if(SMPStatus != NETWORK_LOGGEDIN) {
+		reset_game();
+	} else {
+		stack_packet(EV_RESET);
+	}
+}
+
+//Restarts game
 void reset_game() {
-	const double START_POS = 200;
+	//Initialize game related variables
 	GameState = GAMESTATE_INITROUND;
 	MapTechnologyLevel = 0;
 	MapEnergyLevel = 0;
@@ -744,22 +845,31 @@ void reset_game() {
 	for(uint8_t i = 0; i < ITEM_COUNT; i++) {
 		ItemCooldownTimers[i] = 0;
 	}
-	//Initialize GameObj Slots
+	//Initialize GameObj Slots (Clears map)
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		Gobjs[i].tid = TID_NULL;
 	}
+
+	//Add Earth (Ally base, if you lose it game is over.)
+	const double START_POS = 200;
 	EarthID = add_character(TID_EARTH, START_POS, START_POS, OBJID_INVALID);
-	//Place enemy zundamon basee according to difficulty,
-	//Everytime difficulty increases, the base is placed in top left, bottom left, topright corner
-	//If difficulty is over or equal 4, placing starts on top left corner again, but they must
-	//have enough distance from existing enemy base.
-	for(int32_t i = 1; i <= Difficulty; i++) {
-		const double EDGE_X = MAP_WIDTH - 200;
-		const double EDGE_Y = MAP_HEIGHT - 200;
-		double X[MAX_DIFFICULTY] = {EDGE_X, EDGE_X, START_POS, EDGE_X - 500, EDGE_X - 500};
-		double Y[MAX_DIFFICULTY] = {EDGE_Y, START_POS, EDGE_Y, EDGE_Y, START_POS};
-		add_character(TID_ENEMYBASE, X[i - 1], Y[i - 1], OBJID_INVALID);
+	
+	//Place enemy zundamon base according to DifEnemyBaseCount (defines how many enemybase spawns by each edges) and DifEnemyBaseDist(defines how far between enemy bases)
+	//Top right, bottom right, top left
+	const double BASEPOS_X[] = {MAP_WIDTH - START_POS, MAP_WIDTH - START_POS, START_POS}; //Exact spawn coordinate for each enemy spawn points
+	const double BASEPOS_Y[] = {MAP_HEIGHT - START_POS, START_POS, MAP_HEIGHT - START_POS};
+	const double MPY_X[] = {-1, -1, 1}; //Which position should we add enemybase for each enemy spawn points
+	const double MPY_Y[] = {-1, 1, -1};
+	for(int32_t i = 0; i < 3; i++) {
+		for(int32_t j = 0; j < DifEnemyBaseCount[i]; j++) {
+			//basespawnlocation + (adddirection * enemydistance * count ), will modified to be 2 rows
+			double x = BASEPOS_X[i] + (MPY_X[i] * DifEnemyBaseDist * (j % 2) );
+			double y = BASEPOS_Y[i] + (MPY_Y[i] * DifEnemyBaseDist * floor(j / 2) );
+			add_character(TID_ENEMYBASE, x, y, OBJID_INVALID);
+		}
 	}
+
+	//Spawn Playables
 	spawn_playable_me(); //Spawn local character
 	//Spawn SMP remote playable character
 	if(SMPStatus == NETWORK_LOGGEDIN) {
@@ -852,7 +962,7 @@ int32_t gameinit() {
 	
 	check_data(); //Data Check
 
-	//PangoL = pango_cairo_create_layout(G);
+	PangoL = pango_cairo_create_layout(G);
 	
 	//Setup font
 	loadfont("Ubuntu Mono,monospace");
@@ -885,9 +995,9 @@ void do_finalize() {
 	}
 	
 	//Unload other resources
-	//if(PangoL != NULL) {
-	//	g_object_unref(PangoL);
-	//}
+	if(PangoL != NULL) {
+		g_object_unref(PangoL);
+	}
 	if(G != NULL) {
 		cairo_destroy(G);
 	}

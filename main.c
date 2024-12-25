@@ -200,6 +200,7 @@ int main(int argc, char *argv[]) {
 	//Create and show window
 	Window r = DefaultRootWindow(Disp);
 	Win = XCreateSimpleWindow(Disp, r, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, 0);
+	XStoreName(Disp, Win, "Zundamon game");
 	XMapWindow(Disp, Win);
 	printf("Window opened.\n");
 
