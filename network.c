@@ -21,7 +21,6 @@ network.c: process network packets
 
 extern int32_t CurrentPlayableCharacterID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
-extern int32_t Difficulty;
 extern smpstatus_t SMPStatus;
 size_t RXSMPEventLen; //Remote event len
 size_t TXSMPEventLen; //Client Event len
@@ -348,7 +347,7 @@ void stack_packet(event_type_t etype, ...) {
 		ev_reset_t ev = {
 			.evtype = etype,
 			.level_seed = host2network_fconv_32(rand() ),
-			.level_difficulty = host2network_fconv_32(Difficulty)
+			.level_difficulty = 0
 		};
 		pktlen = sizeof(ev_reset_t);
 		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
@@ -501,16 +500,10 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				return;
 			}
 			ev_reset_t *ev = (ev_reset_t*)&evbuf[evp];
-			int32_t _difficulty = network2host_fconv_32(ev->level_difficulty);
 			uint32_t _seed = (uint32_t)network2host_fconv_32(ev->level_seed);
 			srand(_seed);
-			if(is_range(_difficulty, 1, MAX_DIFFICULTY) ) {
-				Difficulty = _difficulty;
-				printf("process_smp_events(): Round reset request from cid%d (Difficulty=%d, Seed=%d)\n", cid, Difficulty, _seed);
-				reset_game();
-			} else {
-				printf("process_smp_events(): EV_RESET: packet check failure.\n");
-			}
+			printf("process_smp_events(): Round reset request from cid%d (Seed=%d)\n", cid, _seed);
+			reset_game();
 			evp += (int32_t)sizeof(ev_reset_t);
 		} else if(evbuf[evp] == EV_HELLO) {
 			//Another client connect event

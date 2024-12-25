@@ -60,7 +60,6 @@ int32_t SkillKeyState;
 int32_t SubthreadMessageReq = -1;
 char SubthreadMSGCTX[BUFFER_SIZE];
 smpstatus_t SMPStatus = NETWORK_DISCONNECTED;
-int32_t Difficulty = 1;
 int32_t SMPProfCount = 0;
 SMPProfile_t *SMPProfs = NULL;
 int32_t SelectedSMPProf = 0;
@@ -747,7 +746,6 @@ void ebcount_cmd() {
 			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 			return;
 		}
-		check += t[i];
 
 		//find next space and advance pointer, if not found finish converting task.
 		char *n = strchr(p, ' ');
