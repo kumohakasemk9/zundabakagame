@@ -12,7 +12,6 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 - `a/s`     : cycle items
 - `d`       : use item
 - `space`   : switch movement
-- `j/k/l/i` : move (unimplemented)
 - `q/w/e`   : skill
    
 (1) You can cycle items also by mouse wheel.   
@@ -31,6 +30,25 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 - `/getsmp`          : Show current selected SMP connection profile.  
 - `/connect`         : Connect to SMP server using selected profile.   
 - `/disconnect`      : Disconnect from SMP server.  
+- `/difficulty`      : Get current difficulty parameters.
+- `/ebcount`         : Set difficulty parameter `ebcount`, this command takes 1 to 4 parameters. need at least 1 and omitted ones considered to `0`.
+- `/ebdist`          : Set difficulty parameter `ebdist`.
+- `/atkgain`         : Set difficulty parameter `atkgain`.
+    
+# About difficulty parameters
+They can be changed by commands for adjusting game difficulty, some    
+parameter won't apply until next round.   
+ - `ebcount`
+   Defines how many enemy base spawns in each edges. This can be up to 4.    
+   This parameters are 4 numbers, separated by spaces. Represents enemy base count of TopRight, BottomRight, TopLeft, and BottomLeft.    
+   for example, `1 2 3 0` means 1 enemy base on TopRight, 2 on BottomRight, 3 on TopLeft and nothing on BottomLeft.    
+   You may really want to set BottomLeft count at 0, if you don't want to see hell.    
+   Default is `1 0 0 0`. This won't apply until next round.    
+ - `ebdist`
+   Defines how far will enemybase placed to next. Default value is `500` and this can be `100` to `500`.    
+   This won't apply until next round.     
+ - `atkgain`
+   Defines damage rate when playable character attacks. Default is `1.000` and can be `0.500` to `5.000`.
 
 # About SMP   
 SMP support is still in development      

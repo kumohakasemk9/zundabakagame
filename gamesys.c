@@ -70,7 +70,7 @@ int32_t StatusShowTimer;
 char StatusTextBuffer[BUFFER_SIZE];
 int32_t CommandBufferMutex = 0;
 PangoLayout *PangoL = NULL;
-int32_t DifEnemyBaseCount[3] = {1, 0, 0}; //Default topright, bottomright, topleft enemy boss count
+int32_t DifEnemyBaseCount[4] = {1, 0, 0, 0}; //Default topright, bottomright, topleft and bottomleft enemy boss count
 int32_t DifEnemyBaseDist = 500; //Default enemy boss distance from each other
 double DifATKGain = 1.00; //Attack damage gain
 
@@ -734,12 +734,16 @@ void execcmd() {
 void ebcount_cmd() {
 	//DifEnemyBaseCount set command ( topright [bottomright] [topleft] )
 	char *p = &CommandBuffer[9];
-	int32_t t[3] = {0, 0, 0};
-	int32_t check = 0;
-	for(int32_t i = 0; i < 3; i++) {
+	int32_t t[4] = {0, 0, 0, 0};
+	for(int32_t i = 0; i < 4; i++) {
 		//convert and check
 		t[i] = (int32_t)strtol(p, NULL, 10);
-		if(!is_range(t[i], 0, 4) ) {
+		//First param should be greater than or equal 1
+		int32_t minim = 0;
+		if(i == 0) {
+			minim = 1;
+		}
+		if(!is_range(t[i], minim, 4) ) {
 			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 			return;
 		}
@@ -751,14 +755,8 @@ void ebcount_cmd() {
 		p = n + 1;
 	}
 	
-	//at least enemy base count total should be 1
-	if(check < 1) {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-		return;
-	}
-
 	//Apply
-	for(int32_t i = 0; i < 3; i++) {
+	for(int32_t i = 0; i < 4; i++) {
 		DifEnemyBaseCount[i] = t[i];
 	}
 }
@@ -766,7 +764,7 @@ void ebcount_cmd() {
 void ebdist_cmd() {
 	//DifEnemyBaseDist set command (distance)
 	int32_t i = (int32_t)strtol(&CommandBuffer[8], NULL, 10);
-	if(!is_range(i, 100, 300) ) {
+	if(!is_range(i, 100, 500) ) {
 		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		return;
 	}
@@ -855,12 +853,12 @@ void reset_game() {
 	EarthID = add_character(TID_EARTH, START_POS, START_POS, OBJID_INVALID);
 	
 	//Place enemy zundamon base according to DifEnemyBaseCount (defines how many enemybase spawns by each edges) and DifEnemyBaseDist(defines how far between enemy bases)
-	//Top right, bottom right, top left
-	const double BASEPOS_X[] = {MAP_WIDTH - START_POS, MAP_WIDTH - START_POS, START_POS}; //Exact spawn coordinate for each enemy spawn points
-	const double BASEPOS_Y[] = {MAP_HEIGHT - START_POS, START_POS, MAP_HEIGHT - START_POS};
-	const double MPY_X[] = {-1, -1, 1}; //Which position should we add enemybase for each enemy spawn points
-	const double MPY_Y[] = {-1, 1, -1};
-	for(int32_t i = 0; i < 3; i++) {
+	//Top right, bottom right, top left, bottomleft
+	const double BASEPOS_X[] = {MAP_WIDTH - START_POS, MAP_WIDTH - START_POS, START_POS, START_POS}; //Exact spawn coordinate for each enemy spawn points
+	const double BASEPOS_Y[] = {MAP_HEIGHT - START_POS, START_POS, MAP_HEIGHT - START_POS, START_POS};
+	const double MPY_X[] = {-1, -1, 1, 1}; //Which position should we add enemybase for each enemy spawn points
+	const double MPY_Y[] = {-1, 1, -1, 1};
+	for(int32_t i = 0; i < 4; i++) {
 		for(int32_t j = 0; j < DifEnemyBaseCount[i]; j++) {
 			//basespawnlocation + (adddirection * enemydistance * count ), will modified to be 2 rows
 			double x = BASEPOS_X[i] + (MPY_X[i] * DifEnemyBaseDist * (j % 2) );
