@@ -19,6 +19,7 @@ util.c: utility functions
 #include <string.h>
 #include <locale.h>
 #include <stdarg.h>
+#include <sys/time.h>
 
 #include <cairo/cairo.h>
 #include <pango/pangocairo.h>
@@ -268,4 +269,11 @@ char *utf8_strlen_to_pointer(char *ctx, int32_t letterpos) {
 		lcnt++;
 	}
 	return &ctx[bl];
+}
+
+//get current time (unix epoch) in mS
+double get_current_time_ms() {
+	struct timeval t;
+	gettimeofday(&t, NULL);
+	return ( (double)t.tv_sec * 1000.0) + ( (double)t.tv_usec / 1000.0);
 }

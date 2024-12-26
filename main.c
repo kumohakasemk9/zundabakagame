@@ -13,16 +13,13 @@ Zundamon is from https://zunko.jp/
 main.c: linux entry point, X11 funcs.
 
 TODO List
-support windows
 avoid blocking main thread by connect()
 nickname feature in SMP
 chat mute feature in SMP
-change difficulty algorithm (from increasing enemy to increase hp)
 add lol style death/kill anouncement
 add getCurrentPlayableCharacterId()
 Make me ahri
 Make it multiplay - Integrate with kumo auth system
-Port it to allegro
 change Character constant information structure to each function getters
 */
 
@@ -62,8 +59,6 @@ void sigalrm_handler(int);
 void sigio_handler(int);
 int install_handler(int, void (*)(int) );
 void xwindowevent_handler(XEvent, Atom);
-
-void poll_socket() {};
 
 //Gametick timer, called every 10 mS
 void sigalrm_handler(int) {
@@ -140,22 +135,6 @@ int install_handler(int sign, void (*hwnd)(int) ) {
 }
 
 int main(int argc, char *argv[]) {
-	printf("Welcome to zundagame. Initializing: %s\n", VERSION_STRING);
-	printf("%s\n", CONSOLE_CREDIT_STRING);
-	
-	//Debug
-	printf("sizeof(event_hdr_t): %d\n", sizeof(event_hdr_t) );
-	printf("sizeof(np_greeter_t): %d\n", sizeof(np_greeter_t) );
-	printf("sizeof(userlist_hdr_t): %d\n", sizeof(userlist_hdr_t) );
-	printf("sizeof(ev_placeitem_t): %d\n", sizeof(ev_placeitem_t) );
-	printf("sizeof(ev_useskill_t): %d\n", sizeof(ev_useskill_t) );
-	printf("sizeof(ev_changeplayablespeed_t): %d\n", sizeof(ev_changeplayablespeed_t) );
-	printf("sizeof(ev_chat_t): %d\n", sizeof(ev_chat_t) );
-	printf("sizeof(ev_reset_t): %d\n", sizeof(ev_reset_t) );
-	printf("sizeof(ev_hello_t): %d\n", sizeof(ev_hello_t) );
-	printf("sizeof(ev_bye_t): %d\n", sizeof(ev_bye_t) );
-	printf("sizeof(ev_changeplayablespeed_t): %d\n", sizeof(ev_changeplayablespeed_t) );
-
 	//Install network IO handler
 	if(install_handler(SIGIO, sigio_handler) != 0) {
 		printf("main(): Could not prepare for network play!\n");
@@ -397,10 +376,6 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 		return -1;
 	}
 	return recv(ConnectionSocket, ctx, ctxlen, 0);
-}
-
-void poll_tcp_socket() {
-	//Do nothing in linux, linux code does not use poll strategy
 }
 
 void detect_syslang() {

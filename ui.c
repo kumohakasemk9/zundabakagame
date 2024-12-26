@@ -48,16 +48,37 @@ extern int32_t MapEnergyLevel; //Current map energy level (Increases when powerp
 extern int32_t MapRequiredEnergyLevel; //Current map required energy level (Increases when facilities placed except power plants)
 extern smpstatus_t SMPStatus; //Server Connection Status
 extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //SMP Remote player information
+double DrawTime; //DrawTime (in milliseconds)
+extern double GameTickTime;
+extern int32_t AddingTID; //Debug mode appending object id
 
 //Paint event of window client, called for every 30mS
 void game_paint() {
+	//Prepare to measure
+	static int32_t dtmc = 0;
+	static double sdt = 0;
+	double beforetime = get_current_time_ms();
+
 	//Clear screen
 	cairo_set_source_rgb(G, 0, 0, 0);
 	cairo_paint(G);
+
 	//Draw game
-	draw_game_main();
-	draw_ui();
-	draw_info();
+	draw_game_main(); //draw characters
+	draw_cui(); //draw minecraft like cui
+	draw_mchotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
+	draw_lolhotbar(LHOTBAR_XOFF, LHOTBAR_YOFF); //draw lol like hotbar
+	draw_info(); //draw game information
+
+	//Calculate draw time (AVG)
+	sdt += get_current_time_ms() - beforetime;
+	dtmc++;
+	//measure 10 times, calculate avg amd reset
+	if(dtmc >= 10) {
+		DrawTime = sdt / 10;
+		sdt = 0;
+		dtmc = 0;
+	} 
 }
 
 void draw_game_main() {
@@ -268,9 +289,15 @@ void draw_shapes(int32_t idx, LookupResult_t t, double x, double y) {
 	}
 }
 
-void draw_ui() {
-	//draw ingame ui
+void draw_cui() {
+	//draw minecraft like cui
 	int32_t fh = get_font_height();
+	double yoff = IHOTBAR_YOFF - fh - 12; //text area pos
+
+	//Show system statics
+	chcolor(COLOR_TEXTCMD, 1);
+	drawstringf(0, 0, "Draw %.2fmS, Load %.2f%% (%.2fmS)", DrawTime, GameTickTime / 10.0, GameTickTime);
+
 	//Show command input window if command mode
 	if(CommandCursor != -1) {
 		//Shrink string to fit in screen
@@ -282,24 +309,19 @@ void draw_ui() {
 			if(w <= WINDOW_WIDTH - 5 || sp >= l - 1) { break; }
 			sp++;
 		}
+
 		//Show command buffer
 		chcolor(COLOR_TEXTBG, 1); //White (70% transparent)
-		fillrect(0, 0, WINDOW_WIDTH, fh + 2);
+		fillrect(0, yoff, WINDOW_WIDTH, fh + 2);
 		chcolor(COLOR_TEXTCMD, 1); //Green
-		drawsubstring(0, 0, CommandBuffer, sp, 65535);
-		drawline(w, 0, w ,fh + 2, 1);
+		drawsubstring(0, yoff, CommandBuffer, sp, 65535);
+		drawline(w, yoff, w , yoff + fh + 2, 1);
 	}
-	draw_mchotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
-	draw_lolhotbar(LHOTBAR_XOFF, LHOTBAR_YOFF); //draw lol like hotbar
-}
 
-void draw_info() {
-	//Draw additional information
-	int32_t fh = get_font_height();
 	//Show message window if there are message
 	if(CommandCursor != -1 || ChatTimeout != 0) {
 		chcolor(COLOR_TEXTCHAT, 1);
-		double ty = (double)fh + 2;
+		double ty = (double) fh * 2;
 		for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {
 			if(strlen(ChatMessages[i]) != 0) {
 				//print(m)
@@ -307,6 +329,12 @@ void draw_info() {
 			}
 		}
 	}
+}
+
+void draw_info() {
+	//Draw additional information
+	int32_t fh = get_font_height();
+
 	//Draw Error Message if there are error
 	if(StatusShowTimer != 0) {
 		/*if(!is_range(RecentErrorId, 0, MAX_STRINGS - 1) ) {
@@ -316,7 +344,8 @@ void draw_info() {
 		chcolor(COLOR_TEXTERROR, 1);
 		drawstring_title(WINDOW_WIDTH / 2, StatusTextBuffer, FONT_DEFAULT_SIZE);
 	}
-	//Draw Message when GAMESTATE != PLAYING
+
+	//Draw title Message when GAMESTATE != PLAYING
 	if(GameState != GAMESTATE_PLAYING) {
 		chcolor(COLOR_TEXTCMD, 1);
 		int32_t r;
@@ -339,23 +368,16 @@ void draw_info() {
 			break;
 		}
 	}
-	//If debug mode, show camera and cursor pos
-	if(DebugMode) {
-		chcolor(COLOR_TEXTCMD, 1);
-		drawstringf(0, WINDOW_HEIGHT - 120 - fh, "(Cheat Mode) Camera=(%d,%d) Cursor=(%d,%d) KeyFlags=0x%x", CameraX, CameraY, CursorX, CursorY, KeyFlags);
-	}
-	//const double ddd = 10 + (ITEM_COUNT * 50);
-	//Show Money value
-	//Show Money Icon
-	drawimage(STATUS_XOFF, IHOTBAR_YOFF, IMG_STAT_MONEY_ICO);
-	//Show current Money
+
+
+	//Show game status
+	//Show icons
+	drawimage(STATUS_XOFF, IHOTBAR_YOFF, IMG_STAT_MONEY_ICO); //Money ico
+	drawimage(STATUS_XOFF, IHOTBAR_YOFF + 16, IMG_STAT_TECH_ICO); //Tech icon
+	//Show Money val
 	chcolor(COLOR_TEXTCMD, 1);
 	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF, "%d", Money);
 	//Show MapTechnologyLevel
-	//Show Technology Icon
-	drawimage(STATUS_XOFF, IHOTBAR_YOFF + 16, IMG_STAT_TECH_ICO);
-	//Show current Technology level
-	chcolor(COLOR_TEXTCMD, 1);
 	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 16, "%d", MapTechnologyLevel);
 	//Show Energy Level
 	//Show Energy Icon
@@ -369,13 +391,6 @@ void draw_info() {
 	//Show current Energy level
 	chcolor(ttxtclr, 1);
 	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 32, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
-	//Show Current SMP Status
-	chcolor(COLOR_TEXTCMD, 1);
-	if(SMPStatus == NETWORK_DISCONNECTED) {
-		drawstring(STATUS_XOFF + 70, IHOTBAR_YOFF, "local");
-	} else {
-		drawstring(STATUS_XOFF + 70, IHOTBAR_YOFF, "SMP");
-	}
 }
 
 void draw_lolhotbar(double offsx, double offsy) {

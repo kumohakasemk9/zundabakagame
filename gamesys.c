@@ -72,6 +72,7 @@ PangoLayout *PangoL = NULL;
 int32_t DifEnemyBaseCount[4] = {1, 0, 0, 0}; //Default topright, bottomright, topleft and bottomleft enemy boss count
 int32_t DifEnemyBaseDist = 500; //Default enemy boss distance from each other
 double DifATKGain = 1.00; //Attack damage gain
+double GameTickTime; //Game tick running time (avg)
 
 //Request to show chat message from another thread (this can not be nested)
 void chat_request(char* ctx) {
@@ -377,20 +378,24 @@ int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilte
 }
 
 void gametick() {
-	poll_socket();
 	//gametick, called for every 10mS
+	double beforetime = get_current_time_ms(); //prepare for measure running time
+
 	//Take care of chat timeout and timers
 	if(ChatTimeout != 0) { ChatTimeout--; }
 	if(StatusShowTimer != 0) { StatusShowTimer--; }
+
 	//Process subthread message request
 	if(SubthreadMessageReq != -1) {
 		chat(SubthreadMSGCTX);
 		SubthreadMessageReq = -1;
 	}
+
 	//SMP Processing
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		process_smp();
 	}
+
 	//If game is not in playing state, do special process
 	switch(GameState) {
 	case GAMESTATE_INITROUND:
@@ -446,7 +451,21 @@ void gametick() {
 	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
 		if(SkillCooldownTimers[i] != 0) {SkillCooldownTimers[i]--;}
 	}
-	procai();
+
+	procai(); //process all game objects and hitdetects
+
+	//Measure running time
+	double rt = get_current_time_ms() - beforetime;
+	static double avgt = 0;
+	static int32_t avgc = 0;
+	avgt += rt;
+	avgc++;
+	//Calculate avg of 10 times, then reset
+	if(avgc >= 10) {
+		GameTickTime = avgt / 10;
+		avgc = 0;
+		avgt = 0;
+	}
 }
 
 void proc_playable_op() {
@@ -667,6 +686,10 @@ void execcmd() {
 	} else if(memcmp(CommandBuffer, "/addid ", 7) == 0) {
 		//Change addid for debug mode
 		addid_cmd();
+
+	} else if(memcmp(CommandBuffer,"/getaddid", 9) == 0) {
+		//Show addid
+		chatf("getaddid: %d", AddingTID);
 
 	} else if(memcmp(CommandBuffer, "/smp ", 5) == 0) {
 		//Change SMP profile id
@@ -924,7 +947,23 @@ void showstatus(const char* ctx, ...) {
 }
 
 int32_t gameinit() {
-	//Gameinit function, load assets and more.
+	//Gameinit function, load assets and more. Called when program starts.
+	printf("Welcome to zundagame. Initializing: %s\n", VERSION_STRING);
+	printf("%s\n", CONSOLE_CREDIT_STRING);
+	
+	//Debug
+	printf("sizeof(event_hdr_t): %d\n", sizeof(event_hdr_t) );
+	printf("sizeof(np_greeter_t): %d\n", sizeof(np_greeter_t) );
+	printf("sizeof(userlist_hdr_t): %d\n", sizeof(userlist_hdr_t) );
+	printf("sizeof(ev_placeitem_t): %d\n", sizeof(ev_placeitem_t) );
+	printf("sizeof(ev_useskill_t): %d\n", sizeof(ev_useskill_t) );
+	printf("sizeof(ev_changeplayablespeed_t): %d\n", sizeof(ev_changeplayablespeed_t) );
+	printf("sizeof(ev_chat_t): %d\n", sizeof(ev_chat_t) );
+	printf("sizeof(ev_reset_t): %d\n", sizeof(ev_reset_t) );
+	printf("sizeof(ev_hello_t): %d\n", sizeof(ev_hello_t) );
+	printf("sizeof(ev_bye_t): %d\n", sizeof(ev_bye_t) );
+	printf("sizeof(ev_changeplayablespeed_t): %d\n", sizeof(ev_changeplayablespeed_t) );
+
 	read_creds(); //read smp profiles
 	
 	//Create game screen and its content

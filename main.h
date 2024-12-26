@@ -22,7 +22,6 @@ main.h: integrated header file
 #include "zunda-structs.h"
 
 //main.c
-void poll_socket();
 void detect_syslang();
 int32_t make_tcp_socket(char*, char*);
 int32_t close_tcp_socket();
@@ -38,7 +37,7 @@ int32_t compute_passhash(char*, char*, uint8_t*, uint8_t*);
 //ui.c
 void game_paint();
 void draw_game_main();
-void draw_ui();
+void draw_cui();
 void draw_info();
 void draw_mchotbar(double, double);
 void draw_lolhotbar(double, double);
@@ -84,6 +83,7 @@ void get_image_size(int32_t, double*, double*);
 size_t utf8_get_letter_bytelen(char*);
 int32_t utf8_strlen(char*);
 char *utf8_strlen_to_pointer(char*, int32_t);
+double get_current_time_ms();
 
 //gamesys.c
 void read_creds();
