@@ -23,74 +23,80 @@ gamesys.c: game process and related functions
 #include <pango/pangocairo.h>
 #include <cairo/cairo.h>
 
+//gamesys.c
+void read_creds();
+void local2map(double, double, double*, double*);
+void chat(char*);
+void set_speed_for_going_location(int32_t, double, double, double);
+void start_command_mode(int32_t);
+void switch_character_move();
+void execcmd();
+void use_item();
+void proc_playable_op();
+int32_t buy_facility(int32_t fid);
+void debug_add_character();
+void aim_earth(int32_t);
+double get_distance_raw(double, double, double, double);
+void select_next_item();
+void select_prev_item();
+void spawn_playable_me();
+void get_smp_cmd();
+void reset_game_cmd();
+void smp_cmd();
+void addid_cmd();
+void ebcount_cmd();
+void ebdist_cmd();
+void atkgain_cmd();
+
 cairo_surface_t *Gsfc = NULL; //GameScreen surface
 cairo_t* G = NULL; //Gamescreen cairo context
 cairo_surface_t *Plimgs[IMAGE_COUNT]; //Preloaded images
 extern const char* IMGPATHES[]; //preload image pathes
 SMPProfile_t* t_SMPProf = NULL;
-char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE];
-int32_t ChatTimeout = 0;
-GameObjs_t Gobjs[MAX_OBJECT_COUNT];
-int32_t CameraX = 0, CameraY = 0;
-int32_t CursorX, CursorY;
-obj_type_t AddingTID;
+char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
+int32_t ChatTimeout = 0; //Douncounting timer, chat will shown it this is not 0
+GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game object memory
+int32_t CameraX = 0, CameraY = 0; //Camera position storage
+int32_t CursorX, CursorY; //Cursor position storage
+obj_type_t AddingTID; //Debug mode adding tid
 int32_t CommandCursor = -1; //Command System Related
-char CommandBuffer[BUFFER_SIZE];
-int32_t DebugMode = 0;
-gamestate_t GameState;
-int32_t StateChangeTimer = 0;
-int32_t PlayingCharacterID = -1;
-int32_t Money;
-int32_t EarthID;
-int32_t CharacterMove;
-int32_t SelectingItemID;
-extern const int32_t ITEMPRICES[ITEM_COUNT];
-extern const int32_t FTIDS[ITEM_COUNT];
-langid_t LangID;
-int32_t ItemCooldownTimers[ITEM_COUNT];
-extern int32_t ITEMCOOLDOWNS[ITEM_COUNT];
-int32_t SkillCooldownTimers[SKILL_COUNT];
-int32_t CurrentPlayableCharacterID = 0;
+char CommandBuffer[BUFFER_SIZE]; //Command string buffer
+int32_t DebugMode = 0; //If it is 1, you can see hitbox, object ids and more, it can be changed through gdb.
+gamestate_t GameState; //Current game status
+int32_t StateChangeTimer = 0; //Not it is almost like respawn timer
+int32_t PlayingCharacterID = -1; //Playable character's ID for Gobjs[]
+int32_t Money; //Money value, increaes when enemy killed, decreases when item purchased
+int32_t EarthID; //Earth object ID
+int32_t CharacterMove; //If it is 1, playable character will follow mouse
+int32_t SelectingItemID; //Changed by mousewheel, holds which item is selected now
+extern const int32_t ITEMPRICES[ITEM_COUNT]; //Item price LUT
+extern const int32_t FTIDS[ITEM_COUNT]; //Item <-> TID LUT
+langid_t LangID; //Language ID for internationalization
+int32_t ItemCooldownTimers[ITEM_COUNT]; //Set to nonzero value when item purchased, countdowns, if it got 0 you can buy item again.
+extern int32_t ITEMCOOLDOWNS[ITEM_COUNT]; //Default ITEMcooldown LUT
+int32_t SkillCooldownTimers[SKILL_COUNT]; //Set to nonzero balue when skill used, countdowns and if it gets 0 you can use skill again
+int32_t CurrentPlayableCharacterID = 0; //Current selected playable character id (Not Gobjs id!) for more playables
 keyflags_t KeyFlags;
-int32_t ProgramExiting = 0;
-int32_t MapTechnologyLevel;
-int32_t MapEnergyLevel;
-int32_t MapRequiredEnergyLevel = 0;
+int32_t ProgramExiting = 0; //Program should exit when 1
+int32_t MapTechnologyLevel; //Increases when google item placed, buffs playable
+int32_t MapEnergyLevel; //Increases when generator item placed, if it is lower than MapRequiredEnergyLevel, then all facilities stop.
+int32_t MapRequiredEnergyLevel = 0; //Increases when item placed except generator item.
 int32_t SkillKeyState;
-int32_t SubthreadMessageReq = -1;
-char SubthreadMSGCTX[BUFFER_SIZE];
-smpstatus_t SMPStatus = NETWORK_DISCONNECTED;
-int32_t SMPProfCount = 0;
-SMPProfile_t *SMPProfs = NULL;
-int32_t SelectedSMPProf = 0;
-SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
-extern int32_t SMPcid;
-int32_t StatusShowTimer;
-char StatusTextBuffer[BUFFER_SIZE];
-int32_t CommandBufferMutex = 0;
+smpstatus_t SMPStatus = NETWORK_DISCONNECTED; //Network status.
+int32_t SMPProfCount = 0; //Loaded smp profiles count from credentials.txt
+SMPProfile_t *SMPProfs = NULL; //SMP profiles form credentials.txt
+int32_t SelectedSMPProf = 0; //Current selected SMP profile
+SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //Server's player informations
+extern int32_t SMPcid; //ID of our client (told from SMP server)
+int32_t StatusShowTimer; //For showstatus(), it countdowns and if it gots 0 status message disappears
+char StatusTextBuffer[BUFFER_SIZE]; //For showstatus(), status text storage
+int32_t CommandBufferMutex = 0; //If 1, we should not modify CommandBuffer
 PangoLayout *PangoL = NULL;
 int32_t DifEnemyBaseCount[4] = {1, 0, 0, 0}; //Default topright, bottomright, topleft and bottomleft enemy boss count
 int32_t DifEnemyBaseDist = 500; //Default enemy boss distance from each other
 double DifATKGain = 1.00; //Attack damage gain
 double GameTickTime; //Game tick running time (avg)
-
-//Request to show chat message from another thread (this can not be nested)
-void chat_request(char* ctx) {
-	strncpy(SubthreadMSGCTX, ctx, BUFFER_SIZE);
-	SubthreadMSGCTX[BUFFER_SIZE - 1] = 0; //for additional security
-	SubthreadMessageReq = 1;
-}
-
-//Request to show chat message from another thread, but formatstr (this can not be nested)
-void chatf_request(const char* ctx, ...) {
-	va_list varg;
-	char t[BUFFER_SIZE];
-	va_start(varg, ctx);
-	vsnprintf(t, BUFFER_SIZE, ctx, varg);
-	va_end(varg);
-	t[BUFFER_SIZE - 1] = 0; //for additional security
-	chat_request(t);
-}
+int32_t DebugStatType = 0; //Shows information if nonzero 0: No debug, 1: System profiler, 2: Input test
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -381,15 +387,11 @@ void gametick() {
 	//gametick, called for every 10mS
 	double beforetime = get_current_time_ms(); //prepare for measure running time
 
+	network_recv_task();
+
 	//Take care of chat timeout and timers
 	if(ChatTimeout != 0) { ChatTimeout--; }
 	if(StatusShowTimer != 0) { StatusShowTimer--; }
-
-	//Process subthread message request
-	if(SubthreadMessageReq != -1) {
-		chat(SubthreadMSGCTX);
-		SubthreadMessageReq = -1;
-	}
 
 	//SMP Processing
 	if(SMPStatus == NETWORK_LOGGEDIN) {
@@ -596,7 +598,7 @@ int32_t buy_facility(int32_t fid) {
 		if(t.objecttype == UNITTYPE_FACILITY) {
 			if(get_distance_raw(Gobjs[i].x, Gobjs[i].y, mx, my) < 500) {
 				//showerrorstr(0);
-				chat( (char*)getlocalizedstring(0));
+				showstatus( (char*)getlocalizedstring(0));
 				return 1;
 			}
 		}
@@ -675,22 +677,6 @@ void execcmd() {
 		//Show Credit
 		chat(CREDIT_STRING);
 
-	} else if(strcmp(CommandBuffer, "/debugon") == 0) {
-		//Debug mode on
-		DebugMode = 1;
-
-	} else if(strcmp(CommandBuffer, "/debugoff") == 0) {
-		//Debug off
-		DebugMode = 0;
-
-	} else if(memcmp(CommandBuffer, "/addid ", 7) == 0) {
-		//Change addid for debug mode
-		addid_cmd();
-
-	} else if(memcmp(CommandBuffer,"/getaddid", 9) == 0) {
-		//Show addid
-		chatf("getaddid: %d", AddingTID);
-
 	} else if(memcmp(CommandBuffer, "/smp ", 5) == 0) {
 		//Change SMP profile id
 		smp_cmd();
@@ -725,7 +711,7 @@ void execcmd() {
 
 	} else if(strcmp(CommandBuffer, "/disconnect") == 0) {
 		//Disconnect from SMP server
-		close_connection(0);
+		close_connection_cmd();
 	
 	} else if(memcmp(CommandBuffer, "/ebcount ", 9) == 0) {
 		//Set difficulty parameter: enemy base count
@@ -752,6 +738,8 @@ void execcmd() {
 		}
 	}
 }
+
+
 
 void ebcount_cmd() {
 	//DifEnemyBaseCount set command ( topright [bottomright] [topleft] )
@@ -800,16 +788,6 @@ void atkgain_cmd() {
 		return;
 	}
 	DifATKGain = i;
-}
-
-void addid_cmd() {
-	//Set appending object id (for debug) (id)
-	int32_t i = (int32_t)strtol(&CommandBuffer[7], NULL, 10);
-	if(is_range(i, 0, MAX_TID - 1) ) {
-		AddingTID = i;
-	} else {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-	}
 }
 
 void smp_cmd() {
@@ -1019,7 +997,7 @@ void do_finalize() {
 	
 	//Close Network Connection
 	if(SMPStatus != NETWORK_DISCONNECTED) {
-		close_tcp_socket();
+		close_connection_silent();
 	}
 	
 	//Unload images
@@ -1191,6 +1169,13 @@ void keypress_handler(char kc, specialkey_t ks) {
 		case 'I':
 			//I
 			if( (KeyFlags & KEY_UP) == 0) { KeyFlags += KEY_UP; }
+			break;
+		default:
+			if(ks == SPK_F3) {
+				//F3 Key
+				DebugStatType++;
+				if(DebugStatType > 2) {DebugStatType = 0;} //0 to 2
+			}
 			break;
 		}
 	} else {

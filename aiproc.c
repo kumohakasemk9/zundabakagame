@@ -17,6 +17,9 @@ aiproc.c: Character AI
 
 #include <string.h>
 
+int32_t procobjhit(int32_t, int32_t, LookupResult_t, LookupResult_t);
+void damage_object(int32_t, int32_t);
+
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
 extern gamestate_t GameState;
 extern int32_t Money;

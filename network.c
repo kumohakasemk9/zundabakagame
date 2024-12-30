@@ -19,65 +19,148 @@ network.c: process network packets
 #include <stdarg.h>
 #include <errno.h>
 
+#include <arpa/inet.h>
+
+void process_smp_events(uint8_t*, size_t, int32_t);
+void net_server_send_cmd(server_command_t);
+void pkt_recv_handler(uint8_t*, size_t);
+
 extern int32_t CurrentPlayableCharacterID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
 extern smpstatus_t SMPStatus;
 size_t RXSMPEventLen; //Remote event len
 size_t TXSMPEventLen; //Client Event len
-uint8_t RXSMPEventBuffer[SMP_EVENT_BUFFER_SIZE], TXSMPEventBuffer[SMP_EVENT_BUFFER_SIZE]; //SMP Event Buffer
+uint8_t RXSMPEventBuffer[NET_BUFFER_SIZE], TXSMPEventBuffer[NET_BUFFER_SIZE]; //SMP Event Buffer
 uint8_t SMPsalt[SALT_LENGTH]; //Filled when connected
 int32_t SMPcid; //My client id
 extern int32_t SMPProfCount;
 extern SMPProfile_t *SMPProfs;
 extern int32_t SelectedSMPProf;
 extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
+uint8_t TempRXBuffer[NET_BUFFER_SIZE];
+size_t TRXBLength;
+
+void close_connection_cmd() {
+	close_connection_silent();
+	showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
+}
+
+//Called every 10 ms, do network task.
+void network_recv_task() {
+	//If not connected, return
+	if(SMPStatus == NETWORK_DISCONNECTED) {
+		return;
+	}
+
+	//Receive into buffer
+	uint8_t b[NET_BUFFER_SIZE];
+	ssize_t r = recv_tcp_socket(b, NET_BUFFER_SIZE);
+	if(r == 0) { //If recv returns 0, disconnected
+		printf("network_recv_task(): disconnected from server.\n");
+		showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
+		close_connection_silent();
+		return;
+	} else if(r == -1) { //no data
+		return; //EWOULDBLOCK or EAGAIN ... no data
+	} else if(r == -2) { //recv error
+		printf("network_recv_task(): recv failed\n");
+		showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
+		close_connection_silent();
+		return;
+	}
+
+	//Dumped received data
+	//printf("RX: ");
+	//for(size_t i = 0; i < r; i++) {
+	//	printf("%02x ", b[i]);
+	//}
+	//printf("\n");
+
+	//Process data
+	//Length 0-FD    XX
+	//Length FE-FFFF FE XX XX
+	//concat TempRXBuffer and b into tmpbuf
+	uint8_t tmpbuf[NET_BUFFER_SIZE * 2];
+	memcpy(tmpbuf, TempRXBuffer, TRXBLength);
+	memcpy(&tmpbuf[TRXBLength], b, (size_t)r);
+	size_t totallen = TRXBLength + (size_t)r;
+	//Process for each packet
+	size_t p = 0;
+	while(p < totallen) {
+		size_t remain = totallen - p;
+		size_t reqsize;
+		//Get packet data length
+		if(is_range(tmpbuf[p], 0, 0xfd) ) {
+			//first packet byte 0x0 - 0xfd means the byte represents length as uint_8t
+			reqsize = tmpbuf[p] + 1;
+		} else if(tmpbuf[p] == 0xfe) {
+			//first packet byte 0xfe means next two bytes represents length as uint16_t
+			if(remain >= 3) {
+				uint16_t *_v = (uint16_t*)&tmpbuf[1];
+				reqsize = ntohs(*_v) + 3;
+			} else {
+				break; //Not enough packet received
+			}
+		}
+		//Check buffer overflow
+		if(reqsize > NET_BUFFER_SIZE) {
+			printf("network_recv_task(): data length exceeds buffer size. closing connection.\n");
+			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			close_connection_silent();
+			return;
+		}
+		if(remain < reqsize) {
+			break; //Not enough packet received
+		} else {
+			//show received packet
+			//printf("PACKET (%d): ", reqsize);
+			//for(size_t i = 0; i < reqsize; i++) {
+			//	printf("%02x ", tmpbuf[p + i]);
+			//}
+			//printf("\n");
+			pkt_recv_handler(&tmpbuf[p], reqsize);
+		}
+		p += reqsize;
+	}
+	
+	//Push unprocessed data into TempRXBuffer
+	size_t remain = totallen - p;
+	memcpy(TempRXBuffer, &tmpbuf[p], remain);
+	TRXBLength = remain;
+}
 
 //Packet receiver handler
-void net_recv_handler() {
-	//BUG: 2 send sonetimes integrated to one recv event
-	//This will break packet interchange mechanism.
-	uint8_t recvdata[NET_RX_BUFFER_SIZE];
-	ssize_t r;
-	r = recv_tcp_socket(recvdata, NET_RX_BUFFER_SIZE);
-	if(r == 0) {
-		printf("net_recv_handler(): Disconnect detected.\n");
-		chat_request( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
-		close_connection_silent();
-		return;
-	}
-	if(r < 0) {
-		printf("net_recv_handler(): Socket recv() error detected.\n");
-		chatf_request("%s %s", getlocalizedstring(TEXT_SMP_ERROR), strerror(errno) );
-		close_connection_silent();
-		return;
-	}
+void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 	//Handle packet
-	if(recvdata[0] == NP_RESP_DISCONNECT) {
+	if(plen == 0) {
+		return;
+	}
+	if(pkt[0] == NP_RESP_DISCONNECT) {
 		//Disconnect packet
-		char reason[NET_RX_BUFFER_SIZE];
-		memcpy(reason, &recvdata[1], (size_t)r - 1);
-		reason[r - 1] = 0;
+		char reason[NET_BUFFER_SIZE];
+		memcpy(reason, &pkt[1], plen - 1);
+		reason[plen - 1] = 0;
 		printf("net_recv_handler(): Disconnect request: %s\n", reason);
 		//Request to show chat message 
-		chatf_request("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
+		chatf("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
 		close_connection_silent();
-	} else if(recvdata[0] == NP_GREETINGS) {
+	} else if(pkt[0] == NP_GREETINGS) {
 		//greetings response
 		//Security update: avoid sending credentials for multiple times
 		if(SMPcid != -1) {
 			printf("net_recv_handler(): Duplicate greetings packet.\n");
-			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
 		//Data length check
-		if(r != sizeof(np_greeter_t) ) {
+		if(plen != sizeof(np_greeter_t) ) {
 			printf("net_recv_handler(): Too short greetings packet.\n");
-			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
-		np_greeter_t *p = (np_greeter_t*)recvdata;
+		np_greeter_t *p = (np_greeter_t*)pkt;
 		SMPcid = (int32_t)p->cid;
 		memcpy(SMPsalt, p->salt, SALT_LENGTH);
 		printf("net_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
@@ -87,18 +170,18 @@ void net_recv_handler() {
 		//}
 		printf("\n");
 		net_server_send_cmd(NP_LOGIN_WITH_PASSWORD); //Send credentials
-	} else if(recvdata[0] == NP_LOGIN_WITH_PASSWORD) {
+	} else if(pkt[0] == NP_LOGIN_WITH_PASSWORD) {
 		//Login response: returns current userlist
 		int32_t p = 1;
 		int32_t c = 0;
-		while(p < r && c < MAX_CLIENTS) {
+		while(p < plen && c < MAX_CLIENTS) {
 			//Convert header
-			userlist_hdr_t *uhdr = (userlist_hdr_t*)&recvdata[p];
+			userlist_hdr_t *uhdr = (userlist_hdr_t*)&pkt[p];
 			int32_t csiz = sizeof(userlist_hdr_t) + uhdr->uname_len;
 			//Length check
-			if(p + csiz > r) {
+			if(p + csiz > plen) {
 				printf("net_recv_handler(): Bad login response\n");
-				chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 				close_connection_silent();
 				return;
 			}
@@ -106,34 +189,34 @@ void net_recv_handler() {
 			SMPPlayerInfo[c].cid = uhdr->cid;
 			SMPPlayerInfo[c].pid = 0;
 			SMPPlayerInfo[c].respawn_timer = -1;
-			memcpy(SMPPlayerInfo[c].usr, &recvdata[p + (int32_t)sizeof(userlist_hdr_t)], uhdr->uname_len);
+			memcpy(SMPPlayerInfo[c].usr, &pkt[p + (int32_t)sizeof(userlist_hdr_t)], uhdr->uname_len);
 			c++;
 			p += csiz;
 		}
 		if(c >= MAX_CLIENTS) {
 			printf("net_recv_handler(): Bad login response\n");
-			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
 		SMPStatus = NETWORK_LOGGEDIN;
 		printf("net_recv_handler(): Login successful response.\n");
-	} else if(recvdata[0] == NP_EXCHANGE_EVENTS) {
+	} else if(pkt[0] == NP_EXCHANGE_EVENTS) {
 		//Exchange event response
-		if(r >= SMP_EVENT_BUFFER_SIZE) {
+		if(plen >= NET_BUFFER_SIZE) {
 			printf("net_recv_handler(): GetEvent: Buffer overflow.\n");
 			close_connection_silent();
-			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 		}
-		memcpy(RXSMPEventBuffer, &recvdata[1], (size_t)r - 1);
-		RXSMPEventLen = (size_t)r - 1;
+		memcpy(RXSMPEventBuffer, &pkt[1], plen - 1);
+		RXSMPEventLen = plen - 1;
 		printf("net_recv_handler(): GetEvent: RXSMPEventlen: %d\n", RXSMPEventLen);
 	} else {
 		close_connection_silent();
-		chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-		printf("net_recv_handler(): Unknown Packet (%d): ", r);
-		for(int32_t i = 0; i < r; i++) {
-			printf("%02x ", recvdata[i]);
+		showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+		printf("net_recv_handler(): Unknown Packet (%d): ", plen);
+		for(size_t i = 0; i < plen; i++) {
+			printf("%02x ", pkt[i]);
 		}
 		printf("\n");
 	}
@@ -141,48 +224,39 @@ void net_recv_handler() {
 
 //Connect to specified address
 void connect_server() {
+	//Check for parameter
 	if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
 		printf("connect_server(): Bad profile number.\n", SMPProfCount);
 		return;
 	}
+
 	//If already connected, return
 	if(SMPStatus != NETWORK_DISCONNECTED) {
-		chat( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
+		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
 		printf("connect_server(): Already connected.\n");
 		return;
 	}
-	//chatf(); //Attempting to connect
+
+	//Announce and reset variables
 	showstatus("%s %s", getlocalizedstring(17), SMPProfs[SelectedSMPProf].host);
 	printf("connect_server(): Attempting to connect to %s:%s\n", SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
 	RXSMPEventLen = 0;
 	TXSMPEventLen = 0;
+	TRXBLength = 0;
 	SMPcid = -1;
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		SMPPlayerInfo[i].cid = -1;
 	}
 	SMPStatus = NETWORK_CONNECTING;
-	//Connect (TODO: this will block main thread, use another thread instead.)
+
+	//Connect
 	if(make_tcp_socket(SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port) != 0) {
-		chat( (char*)getlocalizedstring(18) ); //can not connect
+		showstatus( (char*)getlocalizedstring(18) ); //can not connect
 		SMPStatus = NETWORK_DISCONNECTED;
 		return;
 	}
-	chat( (char*)getlocalizedstring(20) ); //connected
+	showstatus( (char*)getlocalizedstring(20) ); //connected
 	SMPStatus = NETWORK_CONNECTED;
-}
-
-//Close connection with reason (Is it working as expected?)
-void close_connection(int32_t reason) {
-	if(SMPStatus != NETWORK_DISCONNECTED) {
-		if(reason == 1) {
-			chatf("%s %s", getlocalizedstring(TEXT_SMP_ERROR), strerror(errno) );
-		} else {
-			chat( (char*)getlocalizedstring(19) );
-		}
-		close_connection_silent();
-	} else {
-		chat( (char*)getlocalizedstring(10) );
-	}
 }
 
 //Close connection but do not announce.
@@ -195,15 +269,15 @@ void close_connection_silent() {
 
 //Send Command to server
 void net_server_send_cmd(server_command_t cmd) {
-	uint8_t cmdbuf[NET_TX_BUFFER_SIZE];
+	uint8_t cmdbuf[NET_BUFFER_SIZE];
 	size_t ctxlen = 0;
 	//Combine with command
 	cmdbuf[0] = (uint8_t)cmd;
 	if(cmd == NP_EXCHANGE_EVENTS) {
-		if(TXSMPEventLen + 1 >= NET_TX_BUFFER_SIZE) {
+		if(TXSMPEventLen + 1 >= NET_BUFFER_SIZE) {
 			printf("net_server_send_cmd(): ADD_EVENT: Packet buffer overflow.\n");
 			close_connection_silent();
-			chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			return;
 		}
 		memcpy(&cmdbuf[1], TXSMPEventBuffer, TXSMPEventLen);
@@ -227,8 +301,33 @@ void net_server_send_cmd(server_command_t cmd) {
 		printf("net_server_send_command(): Bad command.\n");
 		return;
 	}
-	if(send_tcp_socket(cmdbuf, ctxlen + 1) != 0) {
-		close_connection(1);
+
+	//Check for size and make size header, assemble packet.
+	size_t hdrlen;
+	uint8_t buf[NET_BUFFER_SIZE];
+	if(is_range( (int32_t)ctxlen, 0, 0xfd) ) {
+		buf[0] = (uint8_t)ctxlen;
+		hdrlen = 1;
+	} else if(is_range( (int32_t)ctxlen, 0xfe, 0xffff) ) {
+		uint16_t *p = (uint16_t*)&cmdbuf[1];
+		buf[0] = 0xfe;
+		*p = ntohs( (uint16_t)ctxlen);
+		hdrlen = 3;
+	} else {
+		printf("net_server_send_cmd(): incompatible packet size, not sending packet.\n");
+		return;
+	}
+	size_t totallen = ctxlen + hdrlen;
+	if(totallen > NET_BUFFER_SIZE) {
+		printf("net_server_send_command(): buffer overflow, not sending packet.\n");
+		return;
+	}
+	memcpy(&buf[hdrlen], cmdbuf, ctxlen);
+
+	//Send
+	if(send_tcp_socket(buf, totallen) != totallen) {
+		showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+		close_connection_silent();
 	}
 }
 
@@ -266,7 +365,7 @@ void process_smp() {
 			uint8_t* evhead = &RXSMPEventBuffer[ptr + (int32_t)sizeof(event_hdr_t)];
 			if(rem < reclen) {
 				printf("process_smp(): Too short event record.\n");
-				chat( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 				close_connection_silent();
 				return;
 			}
@@ -295,7 +394,7 @@ void stack_packet(event_type_t etype, ...) {
 			.sy = ty
 		};
 		pktlen = sizeof(ev_changeplayablespeed_t);
-		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
 			memcpy(poff, &ev, pktlen);
 		}
 	} else if(etype == EV_PLACE_ITEM) {
@@ -310,7 +409,7 @@ void stack_packet(event_type_t etype, ...) {
 			.y = host2network_fconv_16(y)
 		};
 		pktlen = sizeof(ev_placeitem_t);
-		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
 			memcpy(poff, &ev, pktlen);
 		}
 	} else if(etype == EV_USE_SKILL) {
@@ -321,7 +420,7 @@ void stack_packet(event_type_t etype, ...) {
 			.skillid = skillid
 		};
 		pktlen = sizeof(ev_useskill_t);
-		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
 			memcpy(poff, &ev, pktlen);
 		}
 	} else if(etype == EV_CHAT) {
@@ -338,7 +437,7 @@ void stack_packet(event_type_t etype, ...) {
 			printf("net_stack_packet(): CHAT: too long message\n");
 			pktlen = 0;
 		}
-		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
 			memcpy(poff, &ev, sizeof(ev_chat_t) );
 			memcpy(&poff[sizeof(ev_chat_t)], ctx, chatplen);
 		}
@@ -350,7 +449,7 @@ void stack_packet(event_type_t etype, ...) {
 			.level_difficulty = 0
 		};
 		pktlen = sizeof(ev_reset_t);
-		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
 			memcpy(poff, &ev, sizeof(ev_reset_t) );
 		}
 	} else if(etype == EV_CHANGE_PLAYABLE_ID) {
@@ -360,7 +459,7 @@ void stack_packet(event_type_t etype, ...) {
 			.pid = (uint8_t)CurrentPlayableCharacterID
 		};
 		pktlen = sizeof(ev_changeplayableid_t);
-		if(TXSMPEventLen + pktlen < SMP_EVENT_BUFFER_SIZE) {
+		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
 			memcpy(poff, &ev, sizeof(ev_changeplayableid_t) );
 		}
 	} else {
@@ -368,10 +467,10 @@ void stack_packet(event_type_t etype, ...) {
 		pktlen = 0;
 	}
 	va_end(varg);
-	if(TXSMPEventLen + pktlen >= SMP_EVENT_BUFFER_SIZE) {
+	if(TXSMPEventLen + pktlen >= NET_BUFFER_SIZE) {
 		printf("net_stack_packet(): TX SMP buffer overflow.\n");
 		close_connection_silent();
-		chat_request( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+		showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 	} else {
 		TXSMPEventLen += pktlen;
 	}

@@ -24,6 +24,8 @@ util.c: utility functions
 #include <cairo/cairo.h>
 #include <pango/pangocairo.h>
 
+size_t utf8_get_letter_bytelen(char*);
+
 extern PangoLayout *PangoL;
 extern int32_t ProgramExiting;
 extern cairo_t* G;
@@ -36,15 +38,6 @@ double scale_number(double v, double ma, double mp) {
 
 //Constrains number v between mi - mx
 double constrain_number(double v, double mi, double mx) {
-	if(v < mi) {
-		return mi;
-	} else if(v > mx) {
-		return mx;
-	}
-	return v;
-}
-
-uint32_t constrain_ui32(uint32_t v, uint32_t mi, uint32_t mx) {
 	if(v < mi) {
 		return mi;
 	} else if(v > mx) {
@@ -146,12 +139,6 @@ int32_t get_font_height() {
 	//cairo_font_extents(G, &t);
 	//h = (int32_t)t.height;
 	return h;
-}
-
-//shorten string to fit in width wid, returns shorten string length, stores actual width to widr if not NULL
-int32_t shrink_string(char *ctx, int32_t wid, int32_t* widr) {
-	int32_t l = utf8_strlen(ctx);
-	return shrink_substring(ctx, wid, 0, l, widr);
 }
 
 //substring version of shrink_string()

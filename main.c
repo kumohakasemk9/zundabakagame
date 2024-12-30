@@ -56,18 +56,12 @@ extern int32_t ProgramExiting;
 extern langid_t LangID;
 
 void sigalrm_handler(int);
-void sigio_handler(int);
 int install_handler(int, void (*)(int) );
 void xwindowevent_handler(XEvent, Atom);
 
 //Gametick timer, called every 10 mS
 void sigalrm_handler(int) {
 	gametick();
-}
-
-//SIGIO handler
-void sigio_handler(int) {
-	net_recv_handler();
 }
 
 //X11 window event catcher
@@ -98,6 +92,8 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 			k = SPK_RIGHT;
 		} else if(ks == XK_Escape) {
 			k = SPK_ESC;
+		} else if(ks == XK_F3) {
+			k = SPK_F3;
 		}
 		
 		//Pass it to wrapper
@@ -135,13 +131,6 @@ int install_handler(int sign, void (*hwnd)(int) ) {
 }
 
 int main(int argc, char *argv[]) {
-	//Install network IO handler
-	if(install_handler(SIGIO, sigio_handler) != 0) {
-		printf("main(): Could not prepare for network play!\n");
-		return 1;
-	}
-	printf("Network handler installed.\n");
-
 	//Install timer handler and timer
 	if(install_handler(SIGALRM, sigalrm_handler) != 0) {
 		printf("main(): Could not prepare gametick timer!\n");
@@ -306,6 +295,7 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 		printf("make_tcp_socket(): already connected.\n");
 		return -1;
 	}
+	
 	//Name Resolution
 	struct addrinfo *addr, hint;
 	memset(&hint, 0, sizeof(hint) );
@@ -317,14 +307,16 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 		printf("make_tcp_socket(): getaddrinfo failed. (%d)\n", r);
 		return -1;
 	}
+	
 	//Make socket
 	ConnectionSocket = socket(AF_INET, SOCK_STREAM, 0);
 	if(ConnectionSocket < 0) {
 		//Socket error
-		printf("make_tcp_socket(): socket creation failed. (%d)\n", ConnectionSocket);
+		printf("make_tcp_socket(): socket creation failed.\n");
 		freeaddrinfo(addr);
 		return -1;
 	}
+	
 	//Connect to node
 	if(connect(ConnectionSocket, addr->ai_addr, addr->ai_addrlen) != 0) {
 		printf("make_tcp_socket(): connect failed. %s.\n", strerror(errno) );
@@ -335,12 +327,15 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 	if(ConnectionSocket == -1) {
 		return -1;
 	}
-	//Make socket async, set handler
-	if(fcntl(ConnectionSocket, F_SETFL, O_ASYNC) == -1 || fcntl(ConnectionSocket, F_SETOWN, getpid() ) == -1) {
+	
+	//Make socket nonblock, set handler
+	if(fcntl(ConnectionSocket, F_SETFL, O_NONBLOCK) == -1) {
 		printf("make_tcp_socket(): setting socket option failed.\n");
 		close(ConnectionSocket);
 		ConnectionSocket = -1;
+		return -1;
 	}
+	
 	return 0;
 }
 
@@ -356,17 +351,20 @@ int32_t close_tcp_socket() {
 }
 
 //Send bytes to connected server
-int32_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
+ssize_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	if(ConnectionSocket == -1) {
 		printf("send_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
-	if(send(ConnectionSocket, ctx, ctxlen, MSG_NOSIGNAL) != ctxlen) {
-		printf("send_tcp_socket(): send failed. Closing current connection.\n");
-		close_tcp_socket();
+	ssize_t r = send(ConnectionSocket, ctx, ctxlen, MSG_NOSIGNAL);
+	if(r < 0) {
+		printf("send_tcp_socket(): send failed: %s\n", strerror(errno) );
+		return -1;
+	} else if(r != ctxlen) {
+		printf("send_tcp_socket(): send failed. incomplete data send.\n");
 		return -1;
 	}
-	return 0;
+	return r;
 }
 
 //Receive bytes from connected server, returns read bytes
@@ -375,7 +373,17 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 		printf("recv_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
-	return recv(ConnectionSocket, ctx, ctxlen, 0);
+	ssize_t r = recv(ConnectionSocket, ctx, ctxlen, 0);
+	if(r == 0) {
+		return 0;
+	} else if(r < 0) {
+		if(errno == EAGAIN || errno == EWOULDBLOCK) {
+			return -1;
+		} else {
+			printf("recv_tcp_socket(): recv() failed: %s\n", strerror(errno) );
+			return -2;
+		}
+	}
 }
 
 void detect_syslang() {

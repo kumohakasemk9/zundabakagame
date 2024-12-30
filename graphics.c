@@ -21,6 +21,8 @@ graphics.c: drawing functions
 #include <pango/pangocairo.h>
 #include <cairo/cairo.h>
 
+void restore_color();
+
 double Fgcolor[4] = {1.0, 1.0, 1.0, 1.0}; //Selected FGcolor
 extern cairo_t* G; //Gamescreen cairo context
 extern cairo_surface_t* Plimgs[];

@@ -14,7 +14,7 @@ zunda-defs.h: definitions
 */
 
 //Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function added (feature add), 3 will increase if function update (bugfix)
-#define VERSION_STRING "10.0.0-18dec2024"
+#define VERSION_STRING "10.2.0-30dec2024"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 #define CONSOLE_CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0\n" \
 							  "Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社\n" \
@@ -41,9 +41,7 @@ zunda-defs.h: definitions
 #define COLOR_KUMO9_X24_PCANNON 0xc0ffffff //kumo9 x24 pcannon color
 #define MAX_CHAT_COUNT 5 //Maximum chat show count
 #define BUFFER_SIZE 1024 //Command, message buffer size
-#define NET_RX_BUFFER_SIZE 8192 //Network buffer size for receiving
-#define NET_TX_BUFFER_SIZE 8192 //Network buffer size for transmitting
-#define SMP_EVENT_BUFFER_SIZE 8192 //SMP Event buffer size
+#define NET_BUFFER_SIZE 8192 //Network buffer size for receiving
 #define CHAT_TIMEOUT 1000 //Chat message timeout
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
@@ -141,7 +139,8 @@ typedef enum {
 	SPK_ESC = 2,
 	SPK_BS = 3,
 	SPK_LEFT = 4,
-	SPK_RIGHT = 5
+	SPK_RIGHT = 5,
+	SPK_F3 = 6
 } specialkey_t;
 
 //enum for passing mouse event

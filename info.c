@@ -441,13 +441,3 @@ int32_t is_playable_character(obj_type_t tid) {
 	}
 	return 0;
 }
-
-//Find playable that associated with tid, returns -1 if not found.
-int32_t find_playable_id_from_tid(obj_type_t tid) {
-	for(int32_t i = 0; i < PLAYABLE_CHARACTERS_COUNT; i++) {
-		if(tid == (obj_type_t)PLAYABLE_INFORMATION[i][0]) {
-			return i;
-		}
-	}
-	return -1;
-}

@@ -18,6 +18,15 @@ ui.c: gamescreen drawing
 #include <string.h>
 #include <cairo/cairo.h>
 
+//ui.c
+void draw_game_main();
+void draw_cui();
+void draw_info();
+void draw_mchotbar(double, double);
+void draw_lolhotbar(double, double);
+void draw_game_object(int32_t, LookupResult_t, double, double);
+void draw_shapes(int32_t, LookupResult_t, double, double);
+
 extern cairo_t* G; //Gamescreen cairo context
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game Objects
 extern int32_t CameraX, CameraY; //Camera Position
@@ -51,7 +60,7 @@ extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //SMP Remote player information
 double DrawTime; //DrawTime (in milliseconds)
 extern double GameTickTime;
 extern int32_t AddingTID; //Debug mode appending object id
-
+extern int32_t DebugStatType;
 //Paint event of window client, called for every 30mS
 void game_paint() {
 	//Prepare to measure
@@ -294,9 +303,20 @@ void draw_cui() {
 	int32_t fh = get_font_height();
 	double yoff = IHOTBAR_YOFF - fh - 12; //text area pos
 
-	//Show system statics
+	//Show F3
 	chcolor(COLOR_TEXTCMD, 1);
-	drawstringf(0, 0, "Draw %.2fmS, Load %.2f%% (%.2fmS)", DrawTime, GameTickTime / 10.0, GameTickTime);
+	if(DebugStatType == 1) {
+		//Calculate obj count
+		int32_t objc = 0;
+		for(int32_t i = 0; i < MAX_OBJECT_COUNT; i++) {
+			if(Gobjs[i].tid != TID_NULL) {
+				objc++;
+			}
+		}
+		drawstringf(0, 0, "System: %.2f %.2f%% %.2f%%", DrawTime, GameTickTime / 10.0, (double)objc / (double)MAX_OBJECT_COUNT); //System Statics
+	} else if(DebugStatType == 2) {
+		drawstringf(0, 0, "Input: (%d, %d) (%d, %d) 0x%02x", CameraX, CameraY, CursorX, CursorY, KeyFlags); //Input Statics
+	}
 
 	//Show command input window if command mode
 	if(CommandCursor != -1) {
