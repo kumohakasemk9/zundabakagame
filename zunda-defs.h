@@ -89,6 +89,12 @@ zunda-defs.h: definitions
 #define TEXT_UNAVAILABLE 10 //Command or item unavailable
 #define TEXT_SMP_ERROR 21 //Disconnected because error in SMP routine
 
+//Network debug flags
+typedef enum {
+	NET_DEBUG_PACKET = 1,
+	NET_DEBUG_RAW = 2
+} netdbgflags_t;
+
 //Language ID
 typedef enum {
 	LANGID_EN = 0,

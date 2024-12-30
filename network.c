@@ -39,6 +39,9 @@ extern int32_t SelectedSMPProf;
 extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
 uint8_t TempRXBuffer[NET_BUFFER_SIZE];
 size_t TRXBLength;
+extern int32_t NetworkTimeout;
+extern netdbgflags_t NetworkDebugFlag;
+int32_t TimeoutTimer;
 
 void close_connection_cmd() {
 	close_connection_silent();
@@ -61,20 +64,31 @@ void network_recv_task() {
 		close_connection_silent();
 		return;
 	} else if(r == -1) { //no data
-		return; //EWOULDBLOCK or EAGAIN ... no data
+		//EWOULDBLOCK or EAGAIN ... no data
+		//Check for timeout
+		TimeoutTimer++;
+		if(NetworkTimeout == 0 && TimeoutTimer >= NetworkTimeout) {
+			printf("network_recv_task(): Timed out, no packet longer than timeout.\n");
+			showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
+			close_connection_silent();
+		}
+		return;
 	} else if(r == -2) { //recv error
 		printf("network_recv_task(): recv failed\n");
 		showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
 		close_connection_silent();
 		return;
 	}
+	TimeoutTimer = 0;
 
 	//Dumped received data
-	//printf("RX: ");
-	//for(size_t i = 0; i < r; i++) {
-	//	printf("%02x ", b[i]);
-	//}
-	//printf("\n");
+	if( (NetworkDebugFlag & NET_DEBUG_RAW) != 0) {
+		printf("RX: ");
+		for(size_t i = 0; i < r; i++) {
+			printf("%02x ", b[i]);
+		}
+		printf("\n");
+	}
 
 	//Process data
 	//Length 0-FD    XX
@@ -88,14 +102,16 @@ void network_recv_task() {
 	size_t p = 0;
 	while(p < totallen) {
 		size_t remain = totallen - p;
-		size_t reqsize;
+		size_t reqsize, lenhdrsize;
 		//Get packet data length
 		if(is_range(tmpbuf[p], 0, 0xfd) ) {
-			//first packet byte 0x0 - 0xfd means the byte represents length as uint_8t
-			reqsize = tmpbuf[p] + 1;
+			//first packet byte 0x0 - 0xfd means the byte represents length as uint8_t
+			lenhdrsize = 1;
+			reqsize = tmpbuf[p] + lenhdrsize;
 		} else if(tmpbuf[p] == 0xfe) {
 			//first packet byte 0xfe means next two bytes represents length as uint16_t
-			if(remain >= 3) {
+			lenhdrsize = 3;
+			if(remain >= lenhdrsize) {
 				uint16_t *_v = (uint16_t*)&tmpbuf[1];
 				reqsize = ntohs(*_v) + 3;
 			} else {
@@ -113,12 +129,14 @@ void network_recv_task() {
 			break; //Not enough packet received
 		} else {
 			//show received packet
-			//printf("PACKET (%d): ", reqsize);
-			//for(size_t i = 0; i < reqsize; i++) {
-			//	printf("%02x ", tmpbuf[p + i]);
-			//}
-			//printf("\n");
-			pkt_recv_handler(&tmpbuf[p], reqsize);
+			if( (NetworkDebugFlag & NET_DEBUG_PACKET) != 0) {
+				printf("PACKET (%d): ", reqsize);
+				for(size_t i = 0; i < reqsize; i++) {
+					printf("%02x ", tmpbuf[p + i]);
+				}
+				printf("\n");
+			}
+			pkt_recv_handler(&tmpbuf[p + lenhdrsize], reqsize - lenhdrsize);
 		}
 		p += reqsize;
 	}
@@ -132,9 +150,6 @@ void network_recv_task() {
 //Packet receiver handler
 void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 	//Handle packet
-	if(plen == 0) {
-		return;
-	}
 	if(pkt[0] == NP_RESP_DISCONNECT) {
 		//Disconnect packet
 		char reason[NET_BUFFER_SIZE];
@@ -244,6 +259,7 @@ void connect_server() {
 	TXSMPEventLen = 0;
 	TRXBLength = 0;
 	SMPcid = -1;
+	TimeoutTimer = 0;
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		SMPPlayerInfo[i].cid = -1;
 	}

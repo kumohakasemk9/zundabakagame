@@ -47,6 +47,7 @@ void addid_cmd();
 void ebcount_cmd();
 void ebdist_cmd();
 void atkgain_cmd();
+void changetimeout_cmd();
 
 cairo_surface_t *Gsfc = NULL; //GameScreen surface
 cairo_t* G = NULL; //Gamescreen cairo context
@@ -97,6 +98,8 @@ int32_t DifEnemyBaseDist = 500; //Default enemy boss distance from each other
 double DifATKGain = 1.00; //Attack damage gain
 double GameTickTime; //Game tick running time (avg)
 int32_t DebugStatType = 0; //Shows information if nonzero 0: No debug, 1: System profiler, 2: Input test
+int32_t NetworkTimeout = 10; //If there's period that has no packet longer than this value, assumed as disconnected. 0: disable timeout
+netdbgflags_t NetworkDebugFlag = 0; //0x1: Show packet hexdump, 0x2: Show received data hexdump
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -725,9 +728,17 @@ void execcmd() {
 		//Set difficulty parameter: attack gain
 		atkgain_cmd();
 	
-	} else if(strcmp(CommandBuffer, "/difficulty") == 0 ) {
+	} else if(strcmp(CommandBuffer, "/difficulty") == 0) {
 		//Difficulty query command
 		chatf("difficulty: ATKGain: %.2f EBDist: %d EBCount: %d %d %d\n", DifATKGain, DifEnemyBaseDist, DifEnemyBaseCount[0], DifEnemyBaseCount[1], DifEnemyBaseCount[2]);
+	
+	} else if(memcmp(CommandBuffer, "/chtimeout ", 11) == 0) {
+		//Setting timeout command
+		changetimeout_cmd();
+
+	} else if(strcmp(CommandBuffer, "/timeout") == 0) {
+		//Get timeout
+		chatf("timeout: %d", NetworkTimeout);
 
 	} else {
 		//If not command, treat them as a chat
@@ -739,7 +750,16 @@ void execcmd() {
 	}
 }
 
-
+void changetimeout_cmd() {
+	//change network timeout
+	int32_t i = (int32_t)strtol(&CommandBuffer[11], NULL, 10);
+	if(!is_range(i, 0, 1000) ) {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		printf("changetimeout_cmd(): paraneter must be 0 to 1000.\n");
+		return;
+	}
+	NetworkTimeout = i;
+}
 
 void ebcount_cmd() {
 	//DifEnemyBaseCount set command ( topright [bottomright] [topleft] )
