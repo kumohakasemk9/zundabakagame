@@ -14,8 +14,7 @@ jobs:
    - name: install dependics
      run: sudo apt-get install -y libcairo2-dev libx11-dev libpango1.0-dev
 
-   - name: code checkout
-     uses: actions/checkout@v2
+   - uses: actions/checkout@v2
 
    - name: build program
      run: make
@@ -23,10 +22,27 @@ jobs:
    - name: make program package
      run: tar cvf zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
 
-   - name: Upload artifact
-     uses: xresloader/upload-to-github-release@v1
+   - uses: xresloader/upload-to-github-release@v1
      env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
      with:
       file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
       draft: false
+
+ build-windows:
+  runs-on: windows-latest
+
+  steps:
+
+   - uses: actions/checkout@v2
+
+   - uses: msys2/setup-msys2@v2
+
+   - name: msys2 build steps
+     run : |
+      curl -o GTK3_Gvsbuild_2024.12.0_x64.zip https://github.com/wingtk/gvsbuild/releases/download/2024.12.0/GTK3_Gvsbuild_2024.12.0_x64.zip
+      mkdir gvsbuild
+      unzip -d gvsbuild GTK3_Gvsbuild_2024.12.0_x64.zip
+      ls gvsbuild/include
+      
+
