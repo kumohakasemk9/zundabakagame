@@ -6,30 +6,30 @@ on:
    - main
 
 jobs:
- build-linux:
-  runs-on: ubuntu-latest
-
-  steps:
-
-   - name: install dependics
-     run: sudo apt-get install -y libcairo2-dev libx11-dev libpango1.0-dev
-
-   - uses: actions/checkout@v2
-
-   - name: build program
-     run: make
-
-   - name: make program package
-     run: tar cvf zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
-
-   - uses: xresloader/upload-to-github-release@v1
-     name: upload artifacts
-     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-     with:
-      file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
-      draft: false
-
+# build-linux:
+#  runs-on: ubuntu-latest
+#
+#  steps:
+#
+#   - name: install dependics
+#     run: sudo apt-get install -y libcairo2-dev libx11-dev libpango1.0-dev
+#
+#   - uses: actions/checkout@v2
+#
+#   - name: build program
+#     run: make
+#
+#   - name: make program package
+#     run: tar cvf zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
+#
+#   - uses: xresloader/upload-to-github-release@v1
+#     name: upload artifacts
+#     env:
+#      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#     with:
+#      file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
+#      draft: false
+#
  build-windows:
   runs-on: windows-latest
 
@@ -50,6 +50,6 @@ jobs:
 
    - name: msys2 build steps
      run : |
-      gtk3/bin/pkg-config --libs --cflags cairo
+      make -f makefile-win
       
 

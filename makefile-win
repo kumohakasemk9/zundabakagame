@@ -1,0 +1,25 @@
+#Zundamon bakage (C) 2024 Kumohakase
+#https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0
+#Please consider supporting me through ko-fi or pateron
+#https://ko-fi.com/kumohakase
+#https://www.patreon.com/kumohakasemk8
+#
+#Zundamon bakage powered by cairo, X11.
+#
+#Zundamon is from https://zunko.jp/
+#(C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
+#
+#makefile-win: build script for windows with msys2 and gvsbuild
+
+CC=gcc
+PKGCONFIG_CMD=gtk3/bin/pkg-config cairo x11 pangocairo
+CFLAGS=-Wall `$(PKGCONFIG_CMD) --cflags`
+LDFLAGS=`$(PKGCONFIG_CMD) --libs` -lbcrypt -lws2_32
+OBJS=graphics.o util.o info.o gamesys.o aiproc.o network.o ui.o windows-zunda-main.o
+OUT=zundagame
+
+all: $(OBJS)
+	$(CC) $^ $(LDFLAGS) -o $(OUT)
+
+clean:
+	rm -f $(OBJS) $(OUT).exe
