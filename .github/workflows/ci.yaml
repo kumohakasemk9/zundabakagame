@@ -30,20 +30,3 @@ jobs:
      with:
       file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
       draft: false
-
- build-macos:
-  runs-on: macos-latest
-
-  steps:
-
-   - name: install dependics
-     uses: ConorMacBride/install-package@v1
-     with:
-      brew: pango
-
-   - name: code checkout
-     uses: actions/checkout@v2
-
-   - name: build program
-     run: make
-  
