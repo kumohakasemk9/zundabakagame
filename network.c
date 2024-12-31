@@ -67,7 +67,7 @@ void network_recv_task() {
 		//EWOULDBLOCK or EAGAIN ... no data
 		//Check for timeout
 		TimeoutTimer++;
-		if(NetworkTimeout == 0 && TimeoutTimer >= NetworkTimeout) {
+		if(NetworkTimeout != 0 && TimeoutTimer >= NetworkTimeout) {
 			printf("network_recv_task(): Timed out, no packet longer than timeout.\n");
 			showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
 			close_connection_silent();
@@ -112,7 +112,7 @@ void network_recv_task() {
 			//first packet byte 0xfe means next two bytes represents length as uint16_t
 			lenhdrsize = 3;
 			if(remain >= lenhdrsize) {
-				uint16_t *_v = (uint16_t*)&tmpbuf[1];
+				uint16_t *_v = (uint16_t*)&tmpbuf[p + 1];
 				reqsize = ntohs(*_v) + 3;
 			} else {
 				break; //Not enough packet received
@@ -155,7 +155,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		char reason[NET_BUFFER_SIZE];
 		memcpy(reason, &pkt[1], plen - 1);
 		reason[plen - 1] = 0;
-		printf("net_recv_handler(): Disconnect request: %s\n", reason);
+		printf("pkt_recv_handler(): Disconnect request: %s\n", reason);
 		//Request to show chat message 
 		chatf("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
 		close_connection_silent();
@@ -163,14 +163,14 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		//greetings response
 		//Security update: avoid sending credentials for multiple times
 		if(SMPcid != -1) {
-			printf("net_recv_handler(): Duplicate greetings packet.\n");
+			printf("pkt_recv_handler(): Duplicate greetings packet.\n");
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
 		//Data length check
 		if(plen != sizeof(np_greeter_t) ) {
-			printf("net_recv_handler(): Too short greetings packet.\n");
+			printf("pkt_recv_handler(): Too short greetings packet.\n");
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
@@ -178,12 +178,12 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		np_greeter_t *p = (np_greeter_t*)pkt;
 		SMPcid = (int32_t)p->cid;
 		memcpy(SMPsalt, p->salt, SALT_LENGTH);
-		printf("net_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
+		printf("pkt_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
 		//printf("net_recv_handler(): Salt: ");
 		//for(int32_t i = 0; i < SALT_LENGTH; i++) {
 		//	printf("%02x", p->salt[i]);
 		//}
-		printf("\n");
+		//printf("\n");
 		net_server_send_cmd(NP_LOGIN_WITH_PASSWORD); //Send credentials
 	} else if(pkt[0] == NP_LOGIN_WITH_PASSWORD) {
 		//Login response: returns current userlist
@@ -195,7 +195,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 			int32_t csiz = sizeof(userlist_hdr_t) + uhdr->uname_len;
 			//Length check
 			if(p + csiz > plen) {
-				printf("net_recv_handler(): Bad login response\n");
+				printf("pkt_recv_handler(): Bad login response\n");
 				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 				close_connection_silent();
 				return;
@@ -209,27 +209,27 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 			p += csiz;
 		}
 		if(c >= MAX_CLIENTS) {
-			printf("net_recv_handler(): Bad login response\n");
+			printf("pkt_recv_handler(): Bad login response\n");
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
 		SMPStatus = NETWORK_LOGGEDIN;
-		printf("net_recv_handler(): Login successful response.\n");
+		printf("pkt_recv_handler(): Login successful response.\n");
 	} else if(pkt[0] == NP_EXCHANGE_EVENTS) {
 		//Exchange event response
 		if(plen >= NET_BUFFER_SIZE) {
-			printf("net_recv_handler(): GetEvent: Buffer overflow.\n");
+			printf("pkt_recv_handler(): GetEvent: Buffer overflow.\n");
 			close_connection_silent();
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 		}
 		memcpy(RXSMPEventBuffer, &pkt[1], plen - 1);
 		RXSMPEventLen = plen - 1;
-		printf("net_recv_handler(): GetEvent: RXSMPEventlen: %d\n", RXSMPEventLen);
+		//printf("pkt_recv_handler(): GetEvent: RXSMPEventlen: %d\n", RXSMPEventLen);
 	} else {
 		close_connection_silent();
 		showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-		printf("net_recv_handler(): Unknown Packet (%d): ", plen);
+		printf("pkt_recv_handler(): Unknown Packet (%d): ", plen);
 		for(size_t i = 0; i < plen; i++) {
 			printf("%02x ", pkt[i]);
 		}
@@ -297,7 +297,7 @@ void net_server_send_cmd(server_command_t cmd) {
 			return;
 		}
 		memcpy(&cmdbuf[1], TXSMPEventBuffer, TXSMPEventLen);
-		ctxlen = TXSMPEventLen;
+		ctxlen = TXSMPEventLen + 1;
 		TXSMPEventLen = 0;
 	} else if(cmd == NP_LOGIN_WITH_PASSWORD) {
 		if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
@@ -312,7 +312,7 @@ void net_server_send_cmd(server_command_t cmd) {
 			return;
 		}
 		memcpy(&cmdbuf[1], ph, SHA512_LENGTH); //combine command and hash
-		ctxlen = SHA512_LENGTH;
+		ctxlen = SHA512_LENGTH + 1;
 	} else {
 		printf("net_server_send_command(): Bad command.\n");
 		return;
@@ -369,9 +369,9 @@ void process_smp() {
 			size_t rem = RXSMPEventLen - ptr;
 			//Parse event record header
 			if(rem < sizeof(event_hdr_t) ) {
-				printf("process_smp(): Too short event record, rem:%d, ptr: %d\n", rem, ptr);
-				//chat( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-				//close_connection_silent();
+				printf("process_smp(): header read failed, rem:%d, ptr: %d\n", rem, ptr);
+				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+				close_connection_silent();
 				return;
 			}
 			hdr = (event_hdr_t*)&RXSMPEventBuffer[ptr];
@@ -380,7 +380,7 @@ void process_smp() {
 			size_t reclen = evlen + sizeof(event_hdr_t);
 			uint8_t* evhead = &RXSMPEventBuffer[ptr + (int32_t)sizeof(event_hdr_t)];
 			if(rem < reclen) {
-				printf("process_smp(): Too short event record.\n");
+				printf("process_smp(): Too short event record. rem: %d, ptr: %d\n", rem, ptr);
 				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 				close_connection_silent();
 				return;
@@ -515,7 +515,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 						Gobjs[p_objid].sx = sx;
 						Gobjs[p_objid].sy = sy;
 					} else {
-						//g_print("process_smp_events(): CHANGE_PALYABLE_SPEED: Character of CID%d is not generated yet.\n");
+						printf("process_smp_events(): CHANGE_PALYABLE_SPEED: Character of CID%d is not generated yet.\n");
 					}
 				} else {
 					//Not registed in client list.
@@ -533,8 +533,8 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 			//ItemPlace
 			ev_placeitem_t *ev = (ev_placeitem_t*)&evbuf[evp];
 			obj_type_t tid = (obj_type_t)ev->tid;
-			double x = (double)network2host_fconv_32(ev->x);
-			double y = (double)network2host_fconv_32(ev->y);
+			double x = (double)ntohs(ev->x);
+			double y = (double)ntohs(ev->y);
 			//Security check
 			if(is_range_number(x, 0, MAP_WIDTH) && is_range_number(y, 0, MAP_HEIGHT) && is_range(tid, 0, MAX_TID - 1) ) {
 				//Place object and set client id
@@ -545,7 +545,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 						printf("process_smp_events(): PLACE_ITEM: cid=%d, tid=%d, x=%f, y=%f\n", cid, tid, x, y);
 						int32_t objid = add_character(tid, x, y, i);
 					} else {
-						//g_print("process_smp_events(): PLACE_ITEM ignored, CID%d does not have playable character.\n", cid);
+						printf("process_smp_events(): PLACE_ITEM ignored, CID%d does not have playable character.\n", cid);
 					}
 				} else {
 					printf("process_smp_events(): CID%d is not in client list yet!\n", cid);
@@ -589,7 +589,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 			//Chat on other client
 			ev_chat_t *ev = (ev_chat_t*)&evbuf[evp];
 			char ctx[BUFFER_SIZE];
-			ssize_t cpktlen = (ssize_t)network2host_fconv_16(ev->clen);
+			ssize_t cpktlen = (ssize_t)ntohs(ev->clen);
 			char* netchat = (char*)&evbuf[evp + (int32_t)sizeof(ev_chat_t)];
 			if((ssize_t)remaining < (ssize_t)sizeof(ev_chat_t) + cpktlen) {
 				printf("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
@@ -615,7 +615,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				return;
 			}
 			ev_reset_t *ev = (ev_reset_t*)&evbuf[evp];
-			uint32_t _seed = (uint32_t)network2host_fconv_32(ev->level_seed);
+			uint32_t _seed = (uint32_t)ntohl(ev->level_seed);
 			srand(_seed);
 			printf("process_smp_events(): Round reset request from cid%d (Seed=%d)\n", cid, _seed);
 			reset_game();

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -39,6 +40,9 @@ typedef struct  {
 	int inread; //MUTEX
 	int bufcur; //current event buffer cursor
 	int uid; //logged in user id, -1 if not logged in
+	int rdlength;
+	int timeouttimer;
+	uint8_t rdbuf[SIZE_NET_BUFFER];
 } cliinfo_t;
 
 int ServerSocket;
@@ -49,6 +53,8 @@ int EBptr = 0;
 userinfo_t *UserInformations = NULL;
 int UserCount = 0;
 uint8_t ServerSalt[SALT_LENGTH];
+uint8_t RemainingDataBuffer[SIZE_NET_BUFFER];
+int RDBLength = 0;
 
 void SendJoinPacket(int);
 void SendLeavePacket(int);
@@ -69,6 +75,8 @@ void EventBufferGC();
 void Log(int, const char*, ...);
 int GetEventPacketSize(uint8_t*, int);
 void SendUserLists(int);
+void recv_packet_handler(uint8_t*, size_t, int);
+ssize_t send_packet(void*, size_t, int);
 
 int main(int argc, char *argv[]) {
 	//TODO: Timeout mechanism
@@ -181,6 +189,12 @@ int main(int argc, char *argv[]) {
 				//Process close request
 				if(C[i].closereq == 1) {
 					Log(i, "Closing connection.\n");
+					close(C[i].fd);
+					C[i].fd = -1;
+				}
+				//Process timeout
+				if(C[i].timeouttimer + 120 < time(NULL) ) {
+					Log(i, "Timeout.\n");
 					close(C[i].fd);
 					C[i].fd = -1;
 				}
@@ -307,6 +321,8 @@ void NewClient() {
 			C[i].uid = -1;
 			C[i].closereq = 0;
 			C[i].inread = 0;
+			C[i].rdlength = 0;
+			C[i].timeouttimer = time(NULL);
 			C[i].fd = client;
 			Log(i, "New connection from %s:%d.\n", inet_ntoa(ip), prt);
 			if(MakeAsync(client) == -1) {
@@ -345,27 +361,76 @@ void ClientReceive(int cid) {
 		C[cid].inread = 0;
 		return;
 	}
+	//Grantee packet size
+	uint8_t tmpbuf[SIZE_NET_BUFFER * 2];
+	memcpy(tmpbuf, C[cid].rdbuf, C[cid].rdlength);
+	memcpy(&tmpbuf[C[cid].rdlength], b, r);
+	size_t p = 0;
+	size_t totallen = C[cid].rdlength + r;
+	while(p < totallen) {
+		size_t lensiz;
+		size_t reqsiz;
+		size_t rem = totallen - p;
+		//get packet size
+		if(tmpbuf[p] <= 0xfd) {
+			lensiz = 1;
+			reqsiz = tmpbuf[p];
+		} else if(tmpbuf[p] == 0xfe) {
+			lensiz = 3;
+			if(rem < lensiz) {
+				break; //more data required
+			}
+			uint16_t *t = (uint16_t*)&tmpbuf[p + 1];
+			reqsiz = (size_t)ntohs(*t);
+		} else if(tmpbuf[p] == 0xff) {
+			Log(cid, "packet decoding: Bad size identifier 0xff on first byte of packet. Closing connection.\n");
+			C[cid].closereq = 1;
+			SendLeavePacket(cid);
+			C[cid].inread = 0;
+			return;
+		}
+		if(rem < lensiz + reqsiz) {
+			break; //more data required
+		}
+		//Process packet
+		/*
+		Log(cid, "Incoming Packet (%d): ", reqsiz);
+		for(int i = 0; i < reqsiz; i++) {
+			printf("%02x ", tmpbuf[p + i + lensiz]);
+		}
+		printf("\n");
+		*/
+		recv_packet_handler(&tmpbuf[p + lensiz], reqsiz, cid);
+		p += lensiz + reqsiz;
+	}
+	//Write back remaining
+	size_t rem = totallen - p;
+	memcpy(C[cid].rdbuf, &tmpbuf[p], rem);
+	C[cid].rdlength = rem;
+	C[cid].inread = 0; //MUTEX
+}
+
+void recv_packet_handler(uint8_t *b, size_t blen, int cid) {
 	//Execute command handler according to command type
 	switch(b[0]) {
 		case NP_EXCHANGE_EVENTS:
-			if(r - 1 > 0) {
-				AddEventCmd(&b[1], r - 1, (int8_t)cid);
+			if(blen - 1 > 0) {
+				AddEventCmd(&b[1], blen - 1, (int8_t)cid);
 			}
 			GetEvent(cid);
 		break;
 		case NP_LOGIN_WITH_PASSWORD:
-			LoginWithPassword(&b[1], r - 1, cid);
+			LoginWithPassword(&b[1], blen - 1, cid);
 		break;
 		default:
-			Log(cid, "Unknown command (%d): ", r);
-			for(int i = 0; i < r; i++) {
+			Log(cid, "Unknown command (%d): ", blen);
+			for(int i = 0; i < blen; i++) {
 				printf("%02x ", b[i]);
 			}
 			printf("\n");
 			DisconnectWithReason(cid, "Bad command.");
 		break;
 	}
-	C[cid].inread = 0; //MUTEX
 }
 
 void SendGreetingsPacket(int cid) {
@@ -374,7 +439,7 @@ void SendGreetingsPacket(int cid) {
 		.cid = cid
 	};
 	memcpy(&p.salt, ServerSalt, SALT_LENGTH);
-	send(C[cid].fd, &p, sizeof(np_greeter_t), MSG_NOSIGNAL);
+	send_packet(&p, sizeof(np_greeter_t), cid);
 }
 
 void AddEventCmd(uint8_t* d, int dlen, int cid) {
@@ -493,9 +558,31 @@ void GetEvent(int cid) {
 	}
 	C[cid].bufcur += elen;
 	//Send out data
-	send(C[cid].fd, tb, w_ptr, MSG_NOSIGNAL);
+	send_packet(tb, w_ptr, cid);
 	EventBufferGC();
 	//Log(cid, "GetEvent()\n");
+}
+
+ssize_t send_packet(void *pkt, size_t plen, int cid) {
+	uint8_t b[SIZE_NET_BUFFER];
+	size_t sizlen;
+	if(plen <= 0xfd) {
+		sizlen = 1;
+		b[0] = (uint8_t)plen;
+	} else if(0xfe <= plen && plen <= 0xffff) {
+		sizlen = 3;
+		uint16_t *t = (uint16_t*)&b[1];
+		*t = htons(plen);
+	} else {
+		Log(cid, "send_packet(): too long packet.\n");
+		return -1;
+	}
+	if(plen + sizlen > SIZE_NET_BUFFER) {
+		Log(cid, "send_packet(): buffer overflow.\n");
+		return -1;
+	}
+	memcpy(&b[sizlen], pkt, plen);
+	return send(C[cid].fd, b, plen + sizlen, MSG_NOSIGNAL);
 }
 
 int GetEventPacketSize(uint8_t *d, int l) {
@@ -648,7 +735,7 @@ void SendUserLists(int cid) {
 		memcpy(&sendbuf[w_ptr + sizeof(userlist_hdr_t)], un, t.uname_len);
 		w_ptr += psize;
 	}
-	send(C[cid].fd, sendbuf, w_ptr, MSG_NOSIGNAL);
+	send_packet(sendbuf, w_ptr, cid);
 }
 
 void DisconnectWithReason(int cid, char* reason) {

@@ -545,8 +545,12 @@ void proc_playable_op() {
 
 //Activate Skill
 void use_skill(int32_t cid, int32_t sid, PlayableInfo_t plinf) {
-	if(!is_range(cid, 0, MAX_OBJECT_COUNT - 1) || !is_range(sid, 0, SKILL_COUNT - 1) || is_playable_character(Gobjs[cid].tid) == 0) {
+	if(!is_range(cid, 0, MAX_OBJECT_COUNT - 1) || !is_range(sid, 0, SKILL_COUNT - 1) ) {
 		die("use_skill(): bad parameter!\n");
+		return;
+	}
+	if(!is_playable_character(Gobjs[cid].tid) ) {
+		printf("use_skill(): target object is not playable!\n");
 		return;
 	}
 	Gobjs[cid].timers[sid + 1] = plinf.skillinittimers[sid];
