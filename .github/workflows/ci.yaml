@@ -6,30 +6,31 @@ on:
    - main
 
 jobs:
-# build-linux:
-#  runs-on: ubuntu-latest
-#
-#  steps:
-#
-#   - name: install dependics
-#     run: sudo apt-get install -y libcairo2-dev libx11-dev libpango1.0-dev
-#
-#   - uses: actions/checkout@v2
-#
-#   - name: build program
-#     run: make
-#
-#   - name: make program package
-#     run: tar cvf zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
-#
-#   - uses: xresloader/upload-to-github-release@v1
-#     name: upload artifacts
-#     env:
-#      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#     with:
-#      file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
-#      draft: false
-#
+ build-linux:
+  runs-on: ubuntu-latest
+
+  steps:
+
+   - name: install dependics
+     run: sudo apt-get install -y libcairo2-dev libx11-dev libpango1.0-dev
+
+   - uses: actions/checkout@v2
+
+   - name: build program
+     run: make
+
+   - name: make program package
+     run: tar cvf zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
+
+   - uses: xresloader/upload-to-github-release@v1
+     name: upload artifacts
+     env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     with:
+      file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
+      draft: false
+      
+
  build-windows:
   runs-on: windows-latest
 
@@ -55,4 +56,13 @@ jobs:
      run : |
       make -f makefile-win
       cp ${{ steps.msys2.outputs.msys2-location }}/usr/bin/msys-2.0.dll .
-      7z a zundagame-bin-windows-msys2-gvsbuild-${{ github.RUN_NUMBER }} adwaitalegacy img zundagame.exe readme.md msys-2.0.dll
+      7z a zundagame-bin-windows-msys2-gvsbuild-${{ github.RUN_NUMBER }}.zip adwaitalegacy img zundagame.exe readme.md msys-2.0.dll
+
+   - uses: xresloader/upload-to-github-release@v1
+     name: upload artifacts
+     env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     with:
+      file: zundagame-bin-windows-msys2-gvsbuild-${{ github.RUN_NUMBER }}.zip
+      draft: false
+ 
