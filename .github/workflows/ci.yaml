@@ -10,7 +10,12 @@ jobs:
   runs-on: ubuntu-latest
 
   steps:
+
    - name: install dependics
      run: sudo apt-get install -y libcairo2-dev libx11-dev libpango1.0-dev
+
+   - name: code checkout
+     uses: actions/checkout@v2
+
    - name: build program
      run: make
