@@ -12,7 +12,7 @@
 #makefile-win: build script for windows with msys2 and gvsbuild
 
 CC=gcc
-PKGCONFIG_CMD=gtk3/bin/pkg-config cairo x11 pangocairo
+PKGCONFIG_CMD=gtk3/bin/pkg-config cairo pangocairo pango
 CFLAGS=-Wall `$(PKGCONFIG_CMD) --cflags`
 LDFLAGS=`$(PKGCONFIG_CMD) --libs` -lbcrypt -lws2_32
 OBJS=graphics.o util.o info.o gamesys.o aiproc.o network.o ui.o windows-zunda-main.o
