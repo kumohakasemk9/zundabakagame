@@ -76,7 +76,7 @@ jobs:
    - name: install build dependencies
      run: |
       brew install --cask xquartz
-      brew install openssl
+      brew install pango
 
    - name: build
      run: make -f makefile-macos
