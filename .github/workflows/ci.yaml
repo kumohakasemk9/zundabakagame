@@ -29,5 +29,4 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
      with:
       file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
-     permissions:
-      attestations: write
+     permissions: ['attestations', 'write']
