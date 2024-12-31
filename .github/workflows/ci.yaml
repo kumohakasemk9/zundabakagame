@@ -50,6 +50,6 @@ jobs:
 
    - name: msys2 build steps
      run : |
-      ls
+      gtk3/bin/pkg-config --libs --cflags cairo
       
 
