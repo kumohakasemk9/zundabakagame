@@ -19,8 +19,6 @@ network.c: process network packets
 #include <stdarg.h>
 #include <errno.h>
 
-#include <arpa/inet.h>
-
 void process_smp_events(uint8_t*, size_t, int32_t);
 void net_server_send_cmd(server_command_t);
 void pkt_recv_handler(uint8_t*, size_t);
@@ -113,7 +111,7 @@ void network_recv_task() {
 			lenhdrsize = 3;
 			if(remain >= lenhdrsize) {
 				uint16_t *_v = (uint16_t*)&tmpbuf[p + 1];
-				reqsize = ntohs(*_v) + 3;
+				reqsize = network2host_fconv_16(*_v) + 3;
 			} else {
 				break; //Not enough packet received
 			}
@@ -327,7 +325,7 @@ void net_server_send_cmd(server_command_t cmd) {
 	} else if(is_range( (int32_t)ctxlen, 0xfe, 0xffff) ) {
 		uint16_t *p = (uint16_t*)&cmdbuf[1];
 		buf[0] = 0xfe;
-		*p = ntohs( (uint16_t)ctxlen);
+		*p = network2host_fconv_16( (uint16_t)ctxlen);
 		hdrlen = 3;
 	} else {
 		printf("net_server_send_cmd(): incompatible packet size, not sending packet.\n");
@@ -533,8 +531,8 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 			//ItemPlace
 			ev_placeitem_t *ev = (ev_placeitem_t*)&evbuf[evp];
 			obj_type_t tid = (obj_type_t)ev->tid;
-			double x = (double)ntohs(ev->x);
-			double y = (double)ntohs(ev->y);
+			double x = (double)network2host_fconv_16(ev->x);
+			double y = (double)network2host_fconv_16(ev->y);
 			//Security check
 			if(is_range_number(x, 0, MAP_WIDTH) && is_range_number(y, 0, MAP_HEIGHT) && is_range(tid, 0, MAX_TID - 1) ) {
 				//Place object and set client id
@@ -589,7 +587,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 			//Chat on other client
 			ev_chat_t *ev = (ev_chat_t*)&evbuf[evp];
 			char ctx[BUFFER_SIZE];
-			ssize_t cpktlen = (ssize_t)ntohs(ev->clen);
+			ssize_t cpktlen = (ssize_t)network2host_fconv_16(ev->clen);
 			char* netchat = (char*)&evbuf[evp + (int32_t)sizeof(ev_chat_t)];
 			if((ssize_t)remaining < (ssize_t)sizeof(ev_chat_t) + cpktlen) {
 				printf("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
@@ -615,7 +613,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				return;
 			}
 			ev_reset_t *ev = (ev_reset_t*)&evbuf[evp];
-			uint32_t _seed = (uint32_t)ntohl(ev->level_seed);
+			uint32_t _seed = (uint32_t)network2host_fconv_32(ev->level_seed);
 			srand(_seed);
 			printf("process_smp_events(): Round reset request from cid%d (Seed=%d)\n", cid, _seed);
 			reset_game();

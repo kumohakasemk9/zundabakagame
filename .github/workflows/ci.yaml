@@ -1,9 +1,9 @@
 name: CI
 
 on:
- push:
-  branches:
-   - main
+	push:
+		branches:
+			- main
 
 jobs:
 # build-linux:
@@ -30,26 +30,26 @@ jobs:
 #      file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
 #      draft: false
 #
- build-windows:
-  runs-on: windows-latest
+	build-windows:
+		runs-on: windows-latest
 
-  steps:
+		steps:
 
-   - uses: actions/checkout@v2
+			- uses: actions/checkout@v2
    
-   - uses: robinraju/release-downloader@v1
-     name: download gvsbuild
-     with:
-      repository: 'wingtk/gvsbuild'
-      latest: true
-      filename: 'GTK3*.zip'
-      extract: true
-      out-file-path: 'gtk3'
+			- uses: robinraju/release-downloader@v1
+  				name: download gvsbuild
+				with:
+					repository: 'wingtk/gvsbuild'
+					latest: true
+					filename: 'GTK3*.zip'
+					extract: true
+					out-file-path: 'gtk3'
 
-   - uses: msys2/setup-msys2@v2
+			- uses: msys2/setup-msys2@v2
 
-   - name: msys2 build steps
-     run : |
-      make -f makefile-win
-      
-
+			- name: msys2 build steps
+				run : |
+					make -f makefile-win
+					cp /usr/bin/msys-2.0.dll .
+					7z a zundagame-bin-windows-msys2-gvsbuild-${{ github.RUN_NUMBER }} adwaitalegacy img zundagame.exe readme.md msys-2.0.dll
