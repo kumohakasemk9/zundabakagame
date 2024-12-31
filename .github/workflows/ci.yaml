@@ -80,3 +80,15 @@ jobs:
 
    - name: build
      run: make -f makefile-macos
+
+   - name: package program
+     run: tar cvf zundagame-bin-macos-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
+
+   - uses: xresloader/upload-to-github-release@v1
+     name: upload artifacts
+     env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     with:
+      file: zundagame-bin-macos-${{ github.RUN_NUMBER }}.tar.gz
+      draft: false
+
