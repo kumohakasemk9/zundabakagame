@@ -14,7 +14,7 @@
 CC=gcc
 CFLAGSEXTRA=`pkg-config --cflags cairo pangocairo openssl` -I/usr/X11R6/include -I/usr/X11R6/include/X11
 CFLAGS=-g3 -Wconversion $(CFLAGSEXTRA)
-LDFLAGS=-lcrypt `pkg-config --libs cairo pangocairo openssl` -L/usr/X11R6/lib -L/usr/X11R6/lib/X11 -lX11
+LDFLAGS=`pkg-config --libs cairo pangocairo openssl` -L/usr/X11R6/lib -L/usr/X11R6/lib/X11 -lX11
 OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o network.o ui.o
 OUTNAME=zundagame
 RELEASEOUT=game.tar.gz
