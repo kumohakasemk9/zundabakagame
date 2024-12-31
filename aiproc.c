@@ -389,6 +389,7 @@ void procai() {
 				break;
 			case TID_KUMO9_X24_ROBOT:
 				//playable is auto-attack enemy within radar diam
+				{
 				double m = 1.0 + (MapTechnologyLevel * 100);
 				if(d < (PLAYABLE_AUTOMACHINEGUN_DIAM + m) / 2) {
 					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0 ) {
@@ -399,6 +400,7 @@ void procai() {
 							Gobjs[i].timers[0] = 10;
 						}
 					}
+				}
 				}
 				break;
 			}
