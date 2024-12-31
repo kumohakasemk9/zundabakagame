@@ -6,7 +6,7 @@ on:
    - main
 
 jobs:
- build:
+ build-linux:
   runs-on: ubuntu-latest
 
   steps:
@@ -30,3 +30,15 @@ jobs:
      with:
       file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
       draft: false
+
+ build-macos:
+  runs-on: macos-latest
+
+  steps:
+
+   - name: code checkout
+     uses: actions/checkout@v2
+
+   - name: build program
+     run: make
+  
