@@ -40,6 +40,7 @@ jobs:
 
    - name: msys2 build steps
      run : |
-      curl -o GTK3_Gvsbuild_2024.12.0_x64.zip https://github.com/wingtk/gvsbuild/releases/download/2024.12.0/GTK3_Gvsbuild_2024.12.0_x64.zip
+      curl -o gvsbuild.zip https://github.com/wingtk/gvsbuild/releases/download/2024.12.0/GTK3_Gvsbuild_2024.12.0_x64.zip
+      7z x gvsbuild.zip
       
 
