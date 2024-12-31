@@ -1,6 +1,4 @@
 name: CI
-permissions:
- attestations: write
 
 on:
  push:
