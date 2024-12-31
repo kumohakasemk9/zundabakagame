@@ -53,8 +53,7 @@ int EBptr = 0;
 userinfo_t *UserInformations = NULL;
 int UserCount = 0;
 uint8_t ServerSalt[SALT_LENGTH];
-uint8_t RemainingDataBuffer[SIZE_NET_BUFFER];
-int RDBLength = 0;
+FILE *LogFile;
 
 void SendJoinPacket(int);
 void SendLeavePacket(int);
@@ -79,7 +78,6 @@ void recv_packet_handler(uint8_t*, size_t, int);
 ssize_t send_packet(void*, size_t, int);
 
 int main(int argc, char *argv[]) {
-	//TODO: Timeout mechanism
 	//Generate salt for user credential cipher
 	for(int i = 0; i < SALT_LENGTH; i++) {
 		ServerSalt[i] = random() % 0x100;
@@ -179,6 +177,14 @@ int main(int argc, char *argv[]) {
 		free(UserInformations);
 		return 1;
 	}
+	//Open Log File for Appeding
+	LogFile = fopen("log.txt", "a");
+	if(LogFile == NULL) {
+		perror("Can not open log.txt for writing");
+		close(ServerSocket);
+		free(UserInformations);
+		return 1;
+	}
 	//Server loop
 	printf("Server started at *:%d\n", portnum);
 	while(ProgramExit == 0) {
@@ -193,7 +199,7 @@ int main(int argc, char *argv[]) {
 					C[i].fd = -1;
 				}
 				//Process timeout
-				if(C[i].timeouttimer + 120 < time(NULL) ) {
+				if(C[i].timeouttimer + 30 < time(NULL) ) {
 					Log(i, "Timeout.\n");
 					close(C[i].fd);
 					C[i].fd = -1;
@@ -210,6 +216,7 @@ int main(int argc, char *argv[]) {
 	}
 	//Finish
 	printf("Closing server.\n");
+	fclose(LogFile);
 	close(ServerSocket);
 	free(UserInformations);
 	for(int i = 0; i < MAX_CLIENTS; i++) {
@@ -228,16 +235,21 @@ void Log(int cid, const char* ptn, ...) {
 	gettimeofday(&t, NULL);
 	td = t.tv_sec + ( (double)t.tv_usec / 1000000.0);
 	printf("[%.3f]", td);
+	fprintf(LogFile, "[%.3f]", td);
 	if(0 <= cid && cid <= MAX_CLIENTS - 1 && C[cid].fd != -1) {
 		printf("<%d", cid);
+		fprintf(LogFile, "<%d/%s/", cid, inet_ntoa(C[cid].ip) );
 		if(0 <= C[cid].uid && C[cid].uid <= UserCount) {
 			printf("/%s", UserInformations[C[cid].uid].usr);
+			fprintf(LogFile, "/%s", UserInformations[C[cid].uid].usr);
 		}
 		printf(">");
+		fprintf(LogFile, ">");
 	}
 	va_list varg;
 	va_start(varg, ptn);
 	vprintf(ptn, varg);
+	vfprintf(LogFile, ptn, varg);
 	va_end(varg);
 }
 
@@ -323,14 +335,15 @@ void NewClient() {
 			C[i].inread = 0;
 			C[i].rdlength = 0;
 			C[i].timeouttimer = time(NULL);
+			C[i].ip = ip;
+			C[i].port = prt;
 			C[i].fd = client;
-			Log(i, "New connection from %s:%d.\n", inet_ntoa(ip), prt);
+			Log(i, "New connection.\n");
+			//LogInFile(i, "New connection from %s:%d.\n", inet_ntoa(ip), prt);
 			if(MakeAsync(client) == -1) {
 				DisconnectWithReason(i, "Error.");
 				Log(i, "MakeAsync() failed.\n");
 			}
-			C[i].ip = ip;
-			C[i].port = prt;
 			SendGreetingsPacket(i);
 			return;
 		}
@@ -749,7 +762,7 @@ void DisconnectWithReason(int cid, char* reason) {
 		memcpy(&sendbuf[1], "OVERFLOW", 8);
 		rlen = 8;
 	}
-	send(C[cid].fd, sendbuf, rlen + 1, MSG_NOSIGNAL);
+	send_packet(sendbuf, rlen + 1, cid);
 	C[cid].closereq = 1;
 	SendLeavePacket(cid);
 }

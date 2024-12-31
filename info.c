@@ -316,7 +316,7 @@ const char* getlocalizedstring(int32_t stringid) {
 
 void lookup(obj_type_t i, LookupResult_t* r) {
 	if(!is_range(i, 0, MAX_TID - 1)) {
-		die("lookup() failed: bad tid: %d", i);
+		die("lookup() failed: bad tid: %d\n", i);
 		return;
 	}
 	r->initimgid = NUMINFO[i][0];
