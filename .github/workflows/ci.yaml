@@ -28,4 +28,4 @@ jobs:
      env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
      with:
-      file: tar cvf zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
+      file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
