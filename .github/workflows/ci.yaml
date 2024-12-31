@@ -23,6 +23,7 @@ jobs:
      run: tar cvf zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
 
    - uses: xresloader/upload-to-github-release@v1
+     name: upload artifacts
      env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
      with:
@@ -35,12 +36,20 @@ jobs:
   steps:
 
    - uses: actions/checkout@v2
+   
+   - uses: robinraju/release-downloader@v1
+     name: download gvsbuild
+     with:
+      repository: 'wingtk/gvsbuild'
+      latest: true
+      filename: 'GTK3*.zip'
+      extract: true
+      out-file-path: 'gtk3'
 
    - uses: msys2/setup-msys2@v2
 
    - name: msys2 build steps
      run : |
-      curl -o gvsbuild.zip https://github.com/wingtk/gvsbuild/releases/download/2024.12.0/GTK3_Gvsbuild_2024.12.0_x64.zip
-      7z x gvsbuild.zip
+     ls
       
 
