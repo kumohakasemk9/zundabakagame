@@ -30,4 +30,4 @@ jobs:
      with:
       file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
       draft: false
-      default-release-body: Automated build in `date` by github actions.
+      default_release_body: Automated build in `date` by github actions.
