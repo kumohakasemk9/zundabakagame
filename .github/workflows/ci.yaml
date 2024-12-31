@@ -19,3 +19,13 @@ jobs:
 
    - name: build program
      run: make
+
+   - name: make program package
+     run: tar cvf zundagame-bin-linux-$(GITHUB_RUN_BUMBER).tar.gz img adwaitalegacy zundagame readme.md
+
+   - name: Upload artifact
+     uses: xresloader/upload-to-github-release@v1
+     env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     with:
+      file: tar cvf zundagame-bin-linux-$(GITHUB_RUN_BUMBER).tar.gz
