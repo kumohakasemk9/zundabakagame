@@ -21,11 +21,11 @@ jobs:
      run: make
 
    - name: make program package
-     run: tar cvf zundagame-bin-linux-$GITHUB_RUN_NUMBER.tar.gz img adwaitalegacy zundagame readme.md
+     run: tar cvf zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
 
    - name: Upload artifact
      uses: xresloader/upload-to-github-release@v1
      env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
      with:
-      file: tar cvf zundagame-bin-linux-$GITHUB_RUN_NUMBER.tar.gz
+      file: tar cvf zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
