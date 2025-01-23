@@ -13,7 +13,7 @@
 
 CC=gcc
 CFLAGSEXTRA=`pkg-config --cflags cairo pangocairo x11 openssl`
-CFLAGS=-g3 -Wconversion $(CFLAGSEXTRA)
+CFLAGS=-g3 -Wall -Wconversion -Wextra $(CFLAGSEXTRA)
 LDFLAGS=`pkg-config --libs cairo x11 pangocairo openssl`
 OBJS=main.o graphics.o util.o info.o gamesys.o aiproc.o network.o ui.o
 OUTNAME=zundagame

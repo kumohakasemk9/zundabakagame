@@ -24,9 +24,11 @@ graphics.c: drawing functions
 void restore_color();
 
 double Fgcolor[4] = {1.0, 1.0, 1.0, 1.0}; //Selected FGcolor
-extern cairo_t* G; //Gamescreen cairo context
-extern cairo_surface_t* Plimgs[];
-extern PangoLayout *PangoL;
+cairo_t* G = NULL; //Gamescreen cairo context
+cairo_surface_t* Plimgs[IMAGE_COUNT];
+PangoLayout *PangoL;
+cairo_surface_t *Gsfc = NULL; //GameScreen surface
+extern const char* IMGPATHES[]; //preload image pathes
 
 //Draw hp bar at x, y with width w and height h, chp is current hp, fhp is full hp,
 //colorbg is background color, colorfg is foreground color.
@@ -221,4 +223,82 @@ void draw_polygon(double x, double y, int32_t num_points, double points[]) {
 	cairo_fill(G);
 }
 
+//Init task related to cairo and pango.
+int32_t init_graphics() {
+	//Create game screen and its content
+	Gsfc = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, WINDOW_WIDTH, WINDOW_HEIGHT);
+	G = cairo_create(Gsfc);
+	if(cairo_status(G) != CAIRO_STATUS_SUCCESS) {
+		printf("init_graphics(): Making game screen buffer failed.\n");
+		return -1;
+	}
+	
+	printf("Loading image assets.\n");
+	for(int32_t i = 0; i < IMAGE_COUNT; i++) {
+		Plimgs[i] = cairo_image_surface_create_from_png(IMGPATHES[i]);
+		if(cairo_surface_status(Plimgs[i]) != CAIRO_STATUS_SUCCESS) {
+			printf("init_graphics(): Error loading %s\n", IMGPATHES[i]);
+			return -1;
+		}
+	}
+	PangoL = pango_cairo_create_layout(G);
+	
+	//Setup font
+	loadfont("Ubuntu Mono,monospace");
+	set_font_size(FONT_DEFAULT_SIZE);
+	
+	return 0;
+}
 
+//Uninit task related to pango and cairo
+void uninit_graphics() {
+	//Unload images
+	for(uint8_t i = 0; i < IMAGE_COUNT; i++) {
+		if(Plimgs[i] != NULL) {
+			cairo_surface_destroy(Plimgs[i]);
+		}
+	}
+	
+	//Unload other resources
+	if(PangoL != NULL) {
+		g_object_unref(PangoL);
+	}
+	if(G != NULL) {
+		cairo_destroy(G);
+	}
+	if(Gsfc != NULL) {
+		cairo_surface_destroy(Gsfc);
+	}
+}
+
+//Get how string ctx occupy width if drawn in current font
+int32_t get_string_width(char* ctx) {
+	int32_t w;
+	pango_layout_set_text(PangoL, ctx, -1);
+	pango_layout_get_pixel_size(PangoL, &w, NULL);
+	//cairo_text_extents_t t;
+	//cairo_text_extents(G, ctx, &t);
+	//w = (int32_t)t.x_advance;
+	return w;
+}
+
+//Get maximum letter height of current selected font.
+int32_t get_font_height() {
+	//cairo_font_extents_t t;
+	int32_t h;
+	pango_layout_set_text(PangoL, "abcdefghijklmnopqrstuvwxyz", -1);
+	pango_layout_get_pixel_size(PangoL, NULL, &h);
+	//cairo_font_extents(G, &t);
+	//h = (int32_t)t.height;
+	return h;
+}
+
+//get image size of imgid
+void get_image_size(int32_t imgid, double *w, double *h) {
+	if(!is_range(imgid, 0, IMAGE_COUNT - 1)) {
+		die("get_image_size() failed: Bad imgid passed: %d\n", imgid);
+		return;
+	}
+	*w = (double)cairo_image_surface_get_width(Plimgs[imgid]);
+	*h = (double)cairo_image_surface_get_height(Plimgs[imgid]);
+}

@@ -20,9 +20,6 @@ gamesys.c: game process and related functions
 #include <math.h>
 #include <stdarg.h>
 
-#include <pango/pangocairo.h>
-#include <cairo/cairo.h>
-
 //gamesys.c
 void read_creds();
 void local2map(double, double, double*, double*);
@@ -49,10 +46,6 @@ void ebdist_cmd();
 void atkgain_cmd();
 void changetimeout_cmd();
 
-cairo_surface_t *Gsfc = NULL; //GameScreen surface
-cairo_t* G = NULL; //Gamescreen cairo context
-cairo_surface_t *Plimgs[IMAGE_COUNT]; //Preloaded images
-extern const char* IMGPATHES[]; //preload image pathes
 SMPProfile_t* t_SMPProf = NULL;
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
 int32_t ChatTimeout = 0; //Douncounting timer, chat will shown it this is not 0
@@ -92,7 +85,6 @@ extern int32_t SMPcid; //ID of our client (told from SMP server)
 int32_t StatusShowTimer; //For showstatus(), it countdowns and if it gots 0 status message disappears
 char StatusTextBuffer[BUFFER_SIZE]; //For showstatus(), status text storage
 int32_t CommandBufferMutex = 0; //If 1, we should not modify CommandBuffer
-PangoLayout *PangoL = NULL;
 int32_t DifEnemyBaseCount[4] = {1, 0, 0, 0}; //Default topright, bottomright, topleft and bottomleft enemy boss count
 int32_t DifEnemyBaseDist = 500; //Default enemy boss distance from each other
 double DifATKGain = 1.00; //Attack damage gain
@@ -967,27 +959,11 @@ int32_t gameinit() {
 	printf("sizeof(ev_changeplayablespeed_t): %d\n", sizeof(ev_changeplayablespeed_t) );
 
 	read_creds(); //read smp profiles
-	
-	//Create game screen and its content
-	Gsfc = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, WINDOW_WIDTH, WINDOW_HEIGHT);
-	G = cairo_create(Gsfc);
-	if(cairo_status(G) != CAIRO_STATUS_SUCCESS) {
-		printf("gameinit(): Making game screen buffer failed.\n");
+
+	if(init_graphics() == -1) {
+		printf("init_graphics() failed.\n");
 		do_finalize();
 		return -1;
-	}
-
-	//Load images into memory.
-	printf("Loading image assets.\n");
-	for(int32_t i = 0; i < IMAGE_COUNT; i++) {
-		Plimgs[i] = NULL;
-	}
-	for(int32_t i = 0; i < IMAGE_COUNT; i++) {
-		Plimgs[i] = cairo_image_surface_create_from_png(IMGPATHES[i]);
-		if(cairo_surface_status(Plimgs[i]) != CAIRO_STATUS_SUCCESS) {
-			printf("gameinit(): Error loading %s\n", IMGPATHES[i]);
-			return -1;
-		}
 	}
 	
 	detect_syslang();
@@ -998,12 +974,6 @@ int32_t gameinit() {
 	}
 	
 	check_data(); //Data Check
-
-	PangoL = pango_cairo_create_layout(G);
-	
-	//Setup font
-	loadfont("Ubuntu Mono,monospace");
-	set_font_size(FONT_DEFAULT_SIZE);
 	
 	reset_game(); //reset game round
 	return 0;
@@ -1024,23 +994,7 @@ void do_finalize() {
 		close_connection_silent();
 	}
 	
-	//Unload images
-	for(uint8_t i = 0; i < IMAGE_COUNT; i++) {
-		if(Plimgs[i] != NULL) {
-			cairo_surface_destroy(Plimgs[i]);
-		}
-	}
-	
-	//Unload other resources
-	if(PangoL != NULL) {
-		g_object_unref(PangoL);
-	}
-	if(G != NULL) {
-		cairo_destroy(G);
-	}
-	if(Gsfc != NULL) {
-		cairo_surface_destroy(Gsfc);
-	}
+	uninit_graphics();
 }
 
 //Read SMP Credentials from file

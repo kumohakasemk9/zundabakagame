@@ -484,7 +484,7 @@ void damage_object(int32_t dstid, int32_t srcid) {
 	//Decrease target HP
 	double m = 1.00;
 	//Apply DifATKGain if attacker is playable character
-	if(is_playable_character(Gobjs[srcid]) ) {
+	if(is_playable_character(Gobjs[srcid].tid) ) {
 		m = DifATKGain;
 	}
 	Gobjs[dstid].hp = constrain_number(Gobjs[dstid].hp - (Gobjs[srcid].damage * m) , 0, dstinfo.inithp);

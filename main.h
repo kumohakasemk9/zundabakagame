@@ -59,17 +59,15 @@ void getlocalcoord(int32_t, double*, double*);
 void game_paint();
 
 //util.c
-int32_t get_substring_width(char*, int32_t, int32_t);
 double scale_number(double, double, double);
 int32_t is_range_number(double, double, double);
 void utf8_substring(char*, int32_t, int32_t, char*, int32_t);
 void die(const char*, ...);
-int32_t get_font_height();
+int32_t get_substring_width(char*, int32_t, int32_t);
 int32_t utf8_strlen(char*);
 int32_t shrink_substring(char*, int32_t, int32_t, int32_t, int32_t*);
 int32_t is_range(int32_t, int32_t, int32_t);
-void get_image_size(int32_t, double*, double*);
-int32_t get_string_width(char*);
+
 int32_t randint(int32_t, int32_t);
 double get_current_time_ms();
 double constrain_number(double, double, double);
@@ -85,7 +83,6 @@ const char *getlocalizedstring(int32_t);
 void check_data();
 const char *getlocalizedcharactername(int32_t);
 const char *getlocalizeditemdesc(int32_t);
-
 
 //network.c
 void network_recv_task();
@@ -116,3 +113,8 @@ void draw_polygon(double, double, int32_t, double[]);
 void drawstring(double, double, char*);
 void drawsubstring(double, double, char*, int32_t, int32_t);
 int32_t drawstring_title(double, char*, int32_t);
+int32_t init_graphics();
+void uninit_graphics();
+int32_t get_string_width(char*);
+int32_t get_font_height();
+void get_image_size(int32_t, double*, double*);

@@ -35,6 +35,7 @@ change Character constant information structure to each function getters
 #include <sys/time.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <pthread.h>
 
 #include <netinet/tcp.h>
 #include <netinet/in.h>
@@ -55,25 +56,21 @@ int ConnectionSocket = -1;
 extern int32_t ProgramExiting;
 extern langid_t LangID;
 
-void sigalrm_handler(int);
-int install_handler(int, void (*)(int) );
+void redraw_win();
 void xwindowevent_handler(XEvent, Atom);
+void *thread_cb(void*);
 
-//Gametick timer, called every 10 mS
-void sigalrm_handler(int) {
-	gametick();
+void redraw_win() {
+	game_paint();
+	//Apply game screen
+	cairo_set_source_surface(GS, Gsfc, 0, 0);
+	cairo_paint(GS);
 }
 
 //X11 window event catcher
 void xwindowevent_handler(XEvent ev, Atom wmdel) {
 	if(ev.type == ClientMessage && ev.xclient.data.l[0] == wmdel) { //Alt+F4
 		ProgramExiting = 1;
-	} else if(ev.type == Expose) { //Redraw
-		game_paint();
-		//Apply game screen
-		cairo_set_source_surface(GS, Gsfc, 0, 0);
-		cairo_paint(GS);
-		XClearArea(Disp, Win, 0, 0, 1, 1, True); //request repaint
 	} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
 		//Get key char andd sym
 		char r;
@@ -122,31 +119,10 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 	}
 } 
 
-//useful sigaction wrapper
-int install_handler(int sign, void (*hwnd)(int) ) {
-	struct sigaction s;
-	memset(&s, 0, sizeof(struct sigaction) ); //init
-	s.sa_handler = hwnd;
-	return sigaction(sign, &s, NULL);
-}
-
 int main(int argc, char *argv[]) {
-	//Install timer handler and timer
-	if(install_handler(SIGALRM, sigalrm_handler) != 0) {
-		printf("main(): Could not prepare gametick timer!\n");
-		return 1;
-	}
-	struct itimerval tval = {
-		.it_interval.tv_sec = 0,
-		.it_interval.tv_usec = 10000,
-		.it_value.tv_sec = 0,
-		.it_value.tv_usec = 10000
-	};
-	if(setitimer(ITIMER_REAL, &tval, NULL) != 0) {
-		printf("main(): Could not set interval of gametick timer!\n");
-		return 1;
-	}
-	printf("gametick timer installed.\n");
+	//Set timer
+	pthread_t pth1;
+	pthread_create(&pth1, NULL, thread_cb, NULL);
 
 	//Init game
 	if(gameinit() == -1) {
@@ -202,10 +178,20 @@ int main(int argc, char *argv[]) {
 	XSetWMProtocols(Disp, Win, &WM_DELETE_WINDOW, 1);
 	XSelectInput(Disp, Win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ExposureMask | PointerMotionMask);
 	printf("Starting message loop.\n");
+	double tim = get_current_time_ms();
 	while(ProgramExiting == 0) {
 		XEvent e;
-		XNextEvent(Disp, &e);
-		xwindowevent_handler(e, WM_DELETE_WINDOW);
+		if(XPending(Disp) ) {
+			XNextEvent(Disp, &e);
+			xwindowevent_handler(e, WM_DELETE_WINDOW);
+		} else {
+			//redraw every 30mS
+			if(tim + 30 < get_current_time_ms() ) {
+				redraw_win();
+				tim = get_current_time_ms();
+			}
+			usleep(100);
+		}
 	}
 	
 	//Finalize
@@ -257,6 +243,19 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 	}
 	EVP_MD_CTX_free(evp);
 	return 0;
+}
+
+//Sub thread handler
+void *thread_cb(void* p) {
+	printf("Gametick thread is running now.\n");
+	double t1 = get_current_time_ms();
+	while(1) {
+		if(t1 + 10 < get_current_time_ms() ) { //10mS Timer
+			gametick();
+			t1 = get_current_time_ms();
+		}
+		usleep(100);
+	}
 }
 
 /*
@@ -316,6 +315,15 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 		freeaddrinfo(addr);
 		return -1;
 	}
+
+	//Make socket nonblock.
+	if(fcntl(ConnectionSocket, F_SETFL, O_NONBLOCK) == -1) {
+		printf("make_tcp_socket(): setting socket option failed.\n");
+		close(ConnectionSocket);
+		ConnectionSocket = -1;
+		freeaddrinfo(addr);
+		return -1;
+	}
 	
 	//Connect to node
 	if(connect(ConnectionSocket, addr->ai_addr, addr->ai_addrlen) != 0) {
@@ -324,18 +332,7 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 		ConnectionSocket = -1;
 	}
 	freeaddrinfo(addr);
-	if(ConnectionSocket == -1) {
-		return -1;
-	}
-	
-	//Make socket nonblock, set handler
-	if(fcntl(ConnectionSocket, F_SETFL, O_NONBLOCK) == -1) {
-		printf("make_tcp_socket(): setting socket option failed.\n");
-		close(ConnectionSocket);
-		ConnectionSocket = -1;
-		return -1;
-	}
-	
+	printf("make_tcp_socket(): Connection request sent!\n");
 	return 0;
 }
 

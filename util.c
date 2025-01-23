@@ -21,15 +21,9 @@ util.c: utility functions
 #include <stdarg.h>
 #include <sys/time.h>
 
-#include <cairo/cairo.h>
-#include <pango/pangocairo.h>
-
 size_t utf8_get_letter_bytelen(char*);
 
-extern PangoLayout *PangoL;
 extern int32_t ProgramExiting;
-extern cairo_t* G;
-extern cairo_surface_t* Plimgs[IMAGE_COUNT];
 
 //Scales number v in range of 0 - ma to 0 - mp
 double scale_number(double v, double ma, double mp) {
@@ -112,33 +106,11 @@ void die(const char *p, ...) {
 	ProgramExiting = 1;
 }
 
-//Get how string ctx occupy width if drawn in current font
-int32_t get_string_width(char* ctx) {
-	int32_t w;
-	pango_layout_set_text(PangoL, ctx, -1);
-	pango_layout_get_pixel_size(PangoL, &w, NULL);
-	//cairo_text_extents_t t;
-	//cairo_text_extents(G, ctx, &t);
-	//w = (int32_t)t.x_advance;
-	return w;
-}
-
 //get_string_width but substring version (from index st to ed)
 int32_t get_substring_width(char* ctx, int32_t st, int32_t ed) {
 	char b[BUFFER_SIZE];
 	utf8_substring(ctx, st, ed, b, sizeof(b) );
 	return get_string_width(b);
-}
-
-//Get maximum letter height of current selected font.
-int32_t get_font_height() {
-	//cairo_font_extents_t t;
-	int32_t h;
-	pango_layout_set_text(PangoL, "abcdefghijklmnopqrstuvwxyz", -1);
-	pango_layout_get_pixel_size(PangoL, NULL, &h);
-	//cairo_font_extents(G, &t);
-	//h = (int32_t)t.height;
-	return h;
 }
 
 //substring version of shrink_string()
@@ -174,16 +146,6 @@ int32_t is_range_number(double v, double ma, double mx) {
 //get random value
 int32_t randint(int32_t mi, int32_t ma) {
 	return mi + (rand() % (ma + 1 - mi) );
-}
-
-//get image size of imgid
-void get_image_size(int32_t imgid, double *w, double *h) {
-	if(!is_range(imgid, 0, IMAGE_COUNT - 1)) {
-		die("get_image_size() failed: Bad imgid passed: %d\n", imgid);
-		return;
-	}
-	*w = (double)cairo_image_surface_get_width(Plimgs[imgid]);
-	*h = (double)cairo_image_surface_get_height(Plimgs[imgid]);
 }
 
 size_t utf8_get_letter_bytelen(char *l) {
