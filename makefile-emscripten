@@ -1,0 +1,24 @@
+#Zundamon bakage (C) 2024 Kumohakase
+#https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0
+#Please consider supporting me through ko-fi or pateron
+#https://ko-fi.com/kumohakase
+#https://www.patreon.com/kumohakasemk8
+#
+#Zundamon bakage powered by cairo, X11.
+#
+#Zundamon is from https://zunko.jp/
+#(C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
+#
+#makefile-emscripten: build script for wasm (emspricten)
+
+CC=emcc
+CFLAGS=-g3 -Wall -Wconversion -Wextra -D__WASM
+LDFLAGS=--no-entry -s "EXPORTED_FUNCTIONS=['_gameinit', '_gametick', '_select_next_item', '_select_prev_item', '_use_item', '_execcmd', '_switch_character_move', '_keypress_handler', '_keyrelease_handler', '_mousemotion_handler']"
+OBJS=main-emscripten.o util.o info.o gamesys.o aiproc.o network.o
+OUTNAME=zundagame.wasm
+
+all: $(OBJS)
+	$(CC) $^ -lm -o $(OUTNAME) $(LDFLAGS)
+
+clean:
+	rm -f $(OBJS) $(OUTNAME)
