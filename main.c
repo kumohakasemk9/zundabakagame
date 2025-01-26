@@ -69,7 +69,7 @@ void redraw_win() {
 
 //X11 window event catcher
 void xwindowevent_handler(XEvent ev, Atom wmdel) {
-	if(ev.type == ClientMessage && ev.xclient.data.l[0] == wmdel) { //Alt+F4
+	if(ev.type == ClientMessage && (Atom)ev.xclient.data.l[0] == wmdel) { //Alt+F4
 		ProgramExiting = 1;
 	} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
 		//Get key char andd sym
@@ -126,27 +126,27 @@ int main(int argc, char *argv[]) {
 
 	//Init game
 	if(gameinit() == -1) {
-		printf("main(): gameinit() failed\n");
+		fail("main(): gameinit() failed\n");
 		do_finalize();
 		return 1;
 	}
-	printf("gameinit(): OK\n");
+	info("gameinit(): OK\n");
 	
 	//Connect to X display
 	Disp = XOpenDisplay(NULL);
 	if(Disp == NULL) {
-		printf("main(): Failed to open XDisplay.\n");
+		fail("main(): Failed to open XDisplay.\n");
 		do_finalize();
 		return 1;
 	}
-	printf("X11 opened.\n");
+	info("X11 opened.\n");
 	
 	//Create and show window
 	Window r = DefaultRootWindow(Disp);
 	Win = XCreateSimpleWindow(Disp, r, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, 0);
 	XStoreName(Disp, Win, "Zundamon game");
 	XMapWindow(Disp, Win);
-	printf("Window opened.\n");
+	info("Window opened.\n");
 
 	//Make game screen drawer and its graphic context
 	int s = DefaultScreen(Disp);
@@ -154,14 +154,14 @@ int main(int argc, char *argv[]) {
 	GSsfc = cairo_xlib_surface_create(Disp, Win, v, WINDOW_WIDTH, WINDOW_HEIGHT);
 	GS = cairo_create(GSsfc);
 	if(cairo_status(GS) != CAIRO_STATUS_SUCCESS) {
-		printf("main(): Failed to create game screen drawer.\n");
+		fail("main(): Failed to create game screen drawer.\n");
 		cairo_destroy(GS);
 		cairo_surface_destroy(GSsfc);
 		XDestroyWindow(Disp, Win);
 		XCloseDisplay(Disp);
 		do_finalize();
 	}
-	printf("Image buffer and Graphics context created.\n");
+	info("Image buffer and Graphics context created.\n");
 	
 	//Fix window size
 	XSizeHints sh = {
@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
 	Atom WM_DELETE_WINDOW = XInternAtom(Disp, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(Disp, Win, &WM_DELETE_WINDOW, 1);
 	XSelectInput(Disp, Win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ExposureMask | PointerMotionMask);
-	printf("Starting message loop.\n");
+	info("Starting message loop.\n");
 	double tim = get_current_time_ms();
 	while(ProgramExiting == 0) {
 		XEvent e;
@@ -226,18 +226,18 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 	if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
 		EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
 		EVP_DigestUpdate(evp, salt, SALT_LENGTH) != 1) {
-		printf("compute_passhash: Feeding data to SHA512 generator failed.\n");
+		warn("compute_passhash: Feeding data to SHA512 generator failed.\n");
 		EVP_MD_CTX_free(evp);
 		return -1;	
 	}
 	unsigned int l = 0;
 	if(EVP_DigestFinal_ex(evp, output, &l) != 1) {
-		printf("compute_passhash: SHA512 get digest failed.\n");
+		warn("compute_passhash: SHA512 get digest failed.\n");
 		EVP_MD_CTX_free(evp);
 		return -1;
 	}
 	if(l != SHA512_LENGTH) {
-		printf("compute_passhash: Desired length != Actual wrote length.\n");
+		warn("compute_passhash: Desired length != Actual wrote length.\n");
 		EVP_MD_CTX_free(evp);
 		return -1;
 	}
@@ -247,7 +247,7 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 
 //Sub thread handler
 void *thread_cb(void* p) {
-	printf("Gametick thread is running now.\n");
+	info("Gametick thread is running now.\n");
 	double t1 = get_current_time_ms();
 	while(1) {
 		if(t1 + 10 < get_current_time_ms() ) { //10mS Timer
@@ -291,7 +291,7 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 int32_t make_tcp_socket(char* hostname, char* port) {
 	//If already connected, this function will fail.
 	if(ConnectionSocket != -1) {
-		printf("make_tcp_socket(): already connected.\n");
+		warn("make_tcp_socket(): already connected.\n");
 		return -1;
 	}
 	
@@ -303,7 +303,7 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 	int32_t r = getaddrinfo(hostname, port, &hint, &addr);
 	if(r != 0) {
 		//getaddrinfo error
-		printf("make_tcp_socket(): getaddrinfo failed. (%d)\n", r);
+		warn("make_tcp_socket(): getaddrinfo failed. (%d)\n", r);
 		return -1;
 	}
 	
@@ -311,14 +311,14 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 	ConnectionSocket = socket(AF_INET, SOCK_STREAM, 0);
 	if(ConnectionSocket < 0) {
 		//Socket error
-		printf("make_tcp_socket(): socket creation failed.\n");
+		warn("make_tcp_socket(): socket creation failed.\n");
 		freeaddrinfo(addr);
 		return -1;
 	}
 
 	//Make socket nonblock.
 	if(fcntl(ConnectionSocket, F_SETFL, O_NONBLOCK) == -1) {
-		printf("make_tcp_socket(): setting socket option failed.\n");
+		warn("make_tcp_socket(): setting socket option failed.\n");
 		close(ConnectionSocket);
 		ConnectionSocket = -1;
 		freeaddrinfo(addr);
@@ -327,21 +327,22 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 	
 	//Connect to node
 	if(connect(ConnectionSocket, addr->ai_addr, addr->ai_addrlen) != 0) {
-		printf("make_tcp_socket(): connect failed. %s.\n", strerror(errno) );
+		warn("make_tcp_socket(): connect failed. %s.\n", strerror(errno) );
 		close(ConnectionSocket);
 		ConnectionSocket = -1;
 	}
 	freeaddrinfo(addr);
-	printf("make_tcp_socket(): Connection request sent!\n");
+	info("make_tcp_socket(): Connection request sent!\n");
 	return 0;
 }
 
 //Close current connection
 int32_t close_tcp_socket() {
 	if(ConnectionSocket == -1) {
-		printf("close_tcp_socket(): socket is not open!\n");
+		warn("close_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
+	info("closing remote connection\n");
 	close(ConnectionSocket);
 	ConnectionSocket = -1;
 	return 0;
@@ -350,15 +351,15 @@ int32_t close_tcp_socket() {
 //Send bytes to connected server
 ssize_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	if(ConnectionSocket == -1) {
-		printf("send_tcp_socket(): socket is not open!\n");
+		warn("send_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	ssize_t r = send(ConnectionSocket, ctx, ctxlen, MSG_NOSIGNAL);
 	if(r < 0) {
-		printf("send_tcp_socket(): send failed: %s\n", strerror(errno) );
+		warn("send_tcp_socket(): send failed: %s\n", strerror(errno) );
 		return -1;
 	} else if(r != ctxlen) {
-		printf("send_tcp_socket(): send failed. incomplete data send.\n");
+		warn("send_tcp_socket(): send failed. incomplete data send.\n");
 		return -1;
 	}
 	return r;
@@ -367,7 +368,7 @@ ssize_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 //Receive bytes from connected server, returns read bytes
 ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	if(ConnectionSocket == -1) {
-		printf("recv_tcp_socket(): socket is not open!\n");
+		warn("recv_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	ssize_t r = recv(ConnectionSocket, ctx, ctxlen, 0);
@@ -377,10 +378,11 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
 			return -1;
 		} else {
-			printf("recv_tcp_socket(): recv() failed: %s\n", strerror(errno) );
+			warn("recv_tcp_socket(): recv() failed: %s\n", strerror(errno) );
 			return -2;
 		}
 	}
+	return r;
 }
 
 void detect_syslang() {
@@ -388,10 +390,46 @@ void detect_syslang() {
 	for(int i = 0; i < 3; i++) {
 		char *t = getenv(LOCALEENVS[i]);
 		if(t != NULL && memcmp(t, "ja", 2) == 0) {
-			printf("Japanese locale detected.\n");
+			info("Japanese locale detected.\n");
 			LangID = LANGID_JP;
 			return;
 		}
 	}
-	printf("English locale detected\n");
+	info("English locale detected\n");
+}
+
+//get current time (unix epoch) in mS
+double get_current_time_ms() {
+	struct timeval t;
+	gettimeofday(&t, NULL);
+	return ( (double)t.tv_sec * 1000.0) + ( (double)t.tv_usec / 1000.0);
+}
+
+void warn(const char* c, ...) {
+	va_list varg;
+	printf("\x1b[33m");
+	va_start(varg, c);
+	vfprintf(stderr, c, varg);
+	va_end(varg);
+	printf("\x1b[0m");
+}
+
+void info(const char* c, ...) {
+	va_list varg;
+	va_start(varg, c);
+	vprintf(c, varg);
+	va_end(varg);
+}
+
+void fail(const char* c, ...) {
+	va_list varg;
+	va_start(varg, c);
+	vfail(c, varg);
+	va_end(varg);
+}
+
+void vfail(const char*c , va_list varg) {
+	printf("\x1b[31m");
+	vfprintf(stderr, c, varg);
+	printf("\x1b[0m");
 }

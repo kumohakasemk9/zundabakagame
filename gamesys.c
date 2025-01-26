@@ -45,6 +45,7 @@ void ebcount_cmd();
 void ebdist_cmd();
 void atkgain_cmd();
 void changetimeout_cmd();
+void chfont_cmd(char*);
 
 SMPProfile_t* t_SMPProf = NULL;
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
@@ -172,23 +173,22 @@ int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
 			set_speed_for_following(newid);
 		} else {
 			Gobjs[newid].tid = TID_NULL;
-			printf("add_character(): object destroyed, no target found.\n");
+			warn("add_character(): object destroyed, no target found.\n");
 		}
 	}
-	switch(tid) {
-	case TID_EARTH:
+	if(tid == TID_EARTH) {
 		Gobjs[newid].hp = 1; //For initial scene
-		break;
-	case TID_ENEMYBASE:
+		
+	} else if(tid == TID_ENEMYBASE) {
 		//tid = 1, zundamon star
 		//find earth and attempt to approach it
 		aim_earth(newid);
 		Gobjs[newid].hp = 1; //For initial scene
-		break;
-	case TID_KUMO9_X24_PCANNON:
+		
+	} else if(tid == TID_KUMO9_X24_PCANNON) {
 		//Kumo9's pcanon aims nearest facility
 		Gobjs[newid].aiming_target = find_nearest_unit(newid, KUMO9_X24_PCANNON_RANGE, UNITTYPE_FACILITY);
-		break;
+		
 	}
 	return newid;
 }
@@ -205,12 +205,12 @@ void chat(char* c) {
 		die("gamesys.c: chat() failed: message too long.\n");
 	}
 	strcpy(ChatMessages[0], c);
-	printf("[chat] %s\n", c);
+	info("[chat] %s\n", c);
 }
 
 void chatf(const char* p, ...) {
 	va_list v;
-	int32_t r;
+	ssize_t r;
 	char b[BUFFER_SIZE];
 	va_start(v, p);
 	r = vsnprintf(b, sizeof(b), p, v);
@@ -381,21 +381,21 @@ int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilte
 void gametick() {
 	//gametick, called for every 10mS
 	double beforetime = get_current_time_ms(); //prepare for measure running time
-
-	network_recv_task();
-
+	
 	//Take care of chat timeout and timers
 	if(ChatTimeout != 0) { ChatTimeout--; }
 	if(StatusShowTimer != 0) { StatusShowTimer--; }
 
 	//SMP Processing
+	#ifndef __EMSCRIPTEN__
+	network_recv_task();
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		process_smp();
 	}
-
+	#endif
+	
 	//If game is not in playing state, do special process
-	switch(GameState) {
-	case GAMESTATE_INITROUND:
+	if(GameState == GAMESTATE_INITROUND) {
 		//Starting animation: Slowly increase enemy base and the earth hp
 		for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 			if(Gobjs[i].tid == TID_EARTH || Gobjs[i].tid == TID_ENEMYBASE) {
@@ -418,8 +418,7 @@ void gametick() {
 			}
 		}
 		return;
-	case GAMESTATE_GAMECLEAR:
-	case GAMESTATE_GAMEOVER:
+	} else if( GameState == GAMESTATE_GAMECLEAR || GameState == GAMESTATE_GAMEOVER) {
 		//Init game in 5 sec.
 		StateChangeTimer++;
 		//Pause playable character
@@ -428,15 +427,13 @@ void gametick() {
 			reset_game();
 			return; //Not doing AI proc after init game, or bug.
 		}
-		break;
-	case GAMESTATE_DEAD:
+	} else if( GameState == GAMESTATE_DEAD) {
 		//Respawn in 10 sec
 		StateChangeTimer--;
 		if(StateChangeTimer == 0) {
 			spawn_playable_me();
 			GameState = GAMESTATE_PLAYING;
 		}
-		break;
 	}
 	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
 		proc_playable_op();
@@ -471,7 +468,7 @@ void proc_playable_op() {
 		return;
 	}
 	if(Gobjs[PlayingCharacterID].tid == -1) {
-		printf("proc_playable_op(): Player TID is -1??\n");
+		warn("proc_playable_op(): Player TID is -1??\n");
 		return;
 	}
 	PlayableInfo_t plinf;
@@ -542,7 +539,7 @@ void use_skill(int32_t cid, int32_t sid, PlayableInfo_t plinf) {
 		return;
 	}
 	if(!is_playable_character(Gobjs[cid].tid) ) {
-		printf("use_skill(): target object is not playable!\n");
+		warn("use_skill(): target object is not playable!\n");
 		return;
 	}
 	Gobjs[cid].timers[sid + 1] = plinf.skillinittimers[sid];
@@ -702,7 +699,7 @@ void execcmd() {
 
 	} else if(memcmp(CommandBuffer, "/chfont ", 8) == 0) {
 		//Load font list
-		loadfont(&CommandBuffer[8]);
+		chfont_cmd(&CommandBuffer[8]);
 
 	} else if(strcmp(CommandBuffer, "/connect") == 0) {
 		//Connect to SMP server
@@ -751,10 +748,19 @@ void changetimeout_cmd() {
 	int32_t i = (int32_t)strtol(&CommandBuffer[11], NULL, 10);
 	if(!is_range(i, 0, 1000) ) {
 		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-		printf("changetimeout_cmd(): paraneter must be 0 to 1000.\n");
+		warn("changetimeout_cmd(): paraneter must be 0 to 1000.\n");
 		return;
 	}
 	NetworkTimeout = i;
+}
+
+void chfont_cmd(char* flist) {
+	#ifdef __WASM
+		warn("Can not be used in this build!\n");
+		chatf( (char*)getlocalizedstring(TEXT_UNAVAILABLE) );
+	#else
+		loadfont(flist);
+	#endif
 }
 
 void ebcount_cmd() {
@@ -770,7 +776,7 @@ void ebcount_cmd() {
 			minim = 1;
 		}
 		if(!is_range(t[i], minim, 4) ) {
-			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+			warn( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 			return;
 		}
 
@@ -809,7 +815,7 @@ void atkgain_cmd() {
 void smp_cmd() {
 	//Changing selecting smp prof id (Can't be changed in SMP) (id)
 	if(SMPStatus != NETWORK_DISCONNECTED) {
-		printf("smp_cmd(): /smp: in connection, you can not change SMP profile.\n");
+		warn("smp_cmd(): /smp: in connection, you can not change SMP profile.\n");
 		chat( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
 		return;
 	}
@@ -907,7 +913,7 @@ void spawn_playable_me() {
 		if(is_range(i, 0, MAX_CLIENTS - 1) ) {
 			SMPPlayerInfo[i].playable_objid = PlayingCharacterID;
 		} else {
-			printf("spawn_playable(): Could not register my playable character id to list.\n");
+			warn("spawn_playable(): Could not register my playable character id to list.\n");
 		}
 	}
 }
@@ -942,31 +948,33 @@ void showstatus(const char* ctx, ...) {
 
 int32_t gameinit() {
 	//Gameinit function, load assets and more. Called when program starts.
-	printf("Welcome to zundagame. Initializing: %s\n", VERSION_STRING);
-	printf("%s\n", CONSOLE_CREDIT_STRING);
+	info("Welcome to zundagame. Initializing: %s\n", VERSION_STRING);
+	info("%s\n", CONSOLE_CREDIT_STRING);
+	info("Build date: %s\n", __TIMESTAMP__);
 	
 	//Debug
-	printf("sizeof(event_hdr_t): %d\n", sizeof(event_hdr_t) );
-	printf("sizeof(np_greeter_t): %d\n", sizeof(np_greeter_t) );
-	printf("sizeof(userlist_hdr_t): %d\n", sizeof(userlist_hdr_t) );
-	printf("sizeof(ev_placeitem_t): %d\n", sizeof(ev_placeitem_t) );
-	printf("sizeof(ev_useskill_t): %d\n", sizeof(ev_useskill_t) );
-	printf("sizeof(ev_changeplayablespeed_t): %d\n", sizeof(ev_changeplayablespeed_t) );
-	printf("sizeof(ev_chat_t): %d\n", sizeof(ev_chat_t) );
-	printf("sizeof(ev_reset_t): %d\n", sizeof(ev_reset_t) );
-	printf("sizeof(ev_hello_t): %d\n", sizeof(ev_hello_t) );
-	printf("sizeof(ev_bye_t): %d\n", sizeof(ev_bye_t) );
-	printf("sizeof(ev_changeplayablespeed_t): %d\n", sizeof(ev_changeplayablespeed_t) );
-
-	read_creds(); //read smp profiles
-
-	if(init_graphics() == -1) {
-		printf("init_graphics() failed.\n");
-		do_finalize();
-		return -1;
-	}
+	info("sizeof(event_hdr_t): %ld\n", sizeof(event_hdr_t) );
+	info("sizeof(np_greeter_t): %ld\n", sizeof(np_greeter_t) );
+	info("sizeof(userlist_hdr_t): %ld\n", sizeof(userlist_hdr_t) );
+	info("sizeof(ev_placeitem_t): %ld\n", sizeof(ev_placeitem_t) );
+	info("sizeof(ev_useskill_t): %ld\n", sizeof(ev_useskill_t) );
+	info("sizeof(ev_changeplayablespeed_t): %ld\n", sizeof(ev_changeplayablespeed_t) );
+	info("sizeof(ev_chat_t): %ld\n", sizeof(ev_chat_t) );
+	info("sizeof(ev_reset_t): %ld\n", sizeof(ev_reset_t) );
+	info("sizeof(ev_hello_t): %ld\n", sizeof(ev_hello_t) );
+	info("sizeof(ev_bye_t): %ld\n", sizeof(ev_bye_t) );
+	info("sizeof(ev_changeplayablespeed_t): %ld\n", sizeof(ev_changeplayablespeed_t) );
 	
-	detect_syslang();
+	#ifndef __WASM
+		read_creds(); //read smp profiles
+		if(init_graphics() == -1) {
+			fail("init_graphics() failed.\n");
+			return -1;
+		}
+		detect_syslang();
+	#else
+		info("Compiled with -D__WASM\n, skipping graphics, file io and language autodetect feature.\n");
+	#endif
 	
 	//Initialize Chat Message Slots
 	for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {
@@ -980,21 +988,22 @@ int32_t gameinit() {
 }
 
 void do_finalize() {
-	printf("do_finalize(): bye. thank you for playing.\n");
+	info("do_finalize(): bye. thank you for playing.\n");
 	//Finalize
 	ProgramExiting = 1; //Notify that program is exiting
 	
-	//Clean SMP profiles
-	if(SMPProfs != NULL) {
-		free(SMPProfs);
-	}
-	
-	//Close Network Connection
-	if(SMPStatus != NETWORK_DISCONNECTED) {
-		close_connection_silent();
-	}
-	
-	uninit_graphics();
+	#ifndef __WASM
+		//Clean SMP profiles
+		if(SMPProfs != NULL) {
+			free(SMPProfs);
+		}
+		
+		//Close Network Connection
+		if(SMPStatus != NETWORK_DISCONNECTED) {
+			close_connection_silent();
+		}
+		uninit_graphics();
+	#endif
 }
 
 //Read SMP Credentials from file
@@ -1002,7 +1011,7 @@ void read_creds() {
 	FILE* f = fopen("credentials.txt", "r");
 	char buf[BUFFER_SIZE];
 	if(f == NULL) {
-		printf("Can not open credentials.txt: %s\n", strerror(errno) );
+		warn("Can not open credentials.txt: %s\n", strerror(errno) );
 		return;
 	}
 	int lineno = 0;
@@ -1022,19 +1031,19 @@ void read_creds() {
 				t2 = strchr(t, '\n');
 			}
 			if(t2 == NULL) {
-				printf("read_creds(): credentials.txt:%d: No splitter letter, parsing skipped for the line.\n", lineno);
+				warn("read_creds(): credentials.txt:%d: No splitter letter, parsing skipped for the line.\n", lineno);
 				err = 1;
 				break;
 			}
 			//Measure distance to the letter
 			size_t reclen = (size_t)t2 - (size_t)t;
 			if(reclen >= rec_size[i]) {
-				printf("read_creds(): credentials.txt:%d: Record size overflow, persing skipped for the line.\n", lineno);
+				warn("read_creds(): credentials.txt:%d: Record size overflow, persing skipped for the line.\n", lineno);
 				err = 1;
 				break;
 			}
 			if(reclen == 0) {
-				printf("read_creds(): credentials.txt:%d: Empty record detected, parsing skipped for this line.\n", lineno);
+				warn("read_creds(): credentials.txt:%d: Empty record detected, parsing skipped for this line.\n", lineno);
 				err = 1;
 				break;
 			}
@@ -1046,18 +1055,18 @@ void read_creds() {
 		if(err) {
 			continue;
 		}
-		printf("SMP Credential %d: Host: %s, Port: %s, User: %s\n", SMPProfCount, t_rec.host, t_rec.port, t_rec.usr);
+		info("SMP Credential %d: Host: %s, Port: %s, User: %s\n", SMPProfCount, t_rec.host, t_rec.port, t_rec.usr);
 		//If no error occurs, allocate memory for new record and copy.
 		if(SMPProfs == NULL) {
 			SMPProfs = malloc(sizeof(SMPProfile_t) );
 			if(SMPProfs == NULL) {
-				printf("read_creds(): insufficient memory, malloc failure.\n");
+				warn("read_creds(): insufficient memory, malloc failure.\n");
 				return;
 			}
 		} else {
 			t_SMPProf = realloc(SMPProfs, sizeof(SMPProfile_t) * (size_t)(SMPProfCount + 1) );
 			if(t_SMPProf == NULL) {
-				printf("read_creds(): insufficient memory, realloc failure.\n");
+				warn("read_creds(): insufficient memory, realloc failure.\n");
 				free(SMPProfs);
 				SMPProfs = NULL;
 				return;
@@ -1162,7 +1171,7 @@ void keypress_handler(char kc, specialkey_t ks) {
 		if(ks == SPK_ENTER) {
 			//Enter
 			CommandCursor = -1;
-			execcmd(CommandBuffer);
+			execcmd();
 		} else if(ks == SPK_BS) {
 			//BackSpace
 			if(CommandCursor > 0 && !CommandBufferMutex) {
@@ -1200,7 +1209,7 @@ void keypress_handler(char kc, specialkey_t ks) {
 					utf8_insertstring(CommandBuffer, s, CommandCursor, sizeof(CommandBuffer) );
 					CommandCursor += 1;
 				} else {
-					printf("commandmode_keyhandler(): Append letter failed: Buffer full.\n");
+					warn("commandmode_keyhandler(): Append letter failed: Buffer full.\n");
 				}
 				CommandBufferMutex = 0;
 			}

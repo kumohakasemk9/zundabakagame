@@ -42,6 +42,7 @@ void procai() {
 	uint16_t powerplant_cnt = 0;
 	int32_t tmpreqpowerlevel = 0;
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
+		obj_type_t tid = Gobjs[i].tid;
 		if(Gobjs[i].tid == TID_NULL) {continue;}
 		LookupResult_t srcinfo;
 		lookup(Gobjs[i].tid, &srcinfo);
@@ -51,7 +52,7 @@ void procai() {
 				//Facility will make big explosion if destroyed
 				int32_t r = add_character(TID_EXPLOSION, Gobjs[i].x, Gobjs[i].y, i);
 				Gobjs[r].hitdiameter = 500;
-			} else if(Gobjs[i].tid != TID_ALLYBULLET && Gobjs[i].tid != TID_ENEMYBULLET) {
+			} else if(tid != TID_ALLYBULLET && tid != TID_ENEMYBULLET) {
 				//other than bullets and planets, explodes when dead
 				add_character(TID_EXPLOSION, Gobjs[i].x, Gobjs[i].y, i);
 			}
@@ -63,7 +64,7 @@ void procai() {
 			} else {
 				//If SMP remote player is dead, respawn after several times
 				if(SMPStatus == NETWORK_LOGGEDIN) {
-					if(is_playable_character(Gobjs[i].tid) ) {
+					if(is_playable_character(tid) ) {
 						for(int32_t j = 0; j < MAX_CLIENTS; j++) {
 							if(SMPPlayerInfo[j].playable_objid == i) {
 								//Set specific player's SMP character respawn timer.
@@ -81,7 +82,7 @@ void procai() {
 		Gobjs[i].x = constrain_number(Gobjs[i].x + Gobjs[i].sx, 0, MAP_WIDTH);
 		Gobjs[i].y = constrain_number(Gobjs[i].y + Gobjs[i].sy, 0, MAP_HEIGHT);
 		//Missile, Bullet will be erased when they reach to map edge
-		if(Gobjs[i].tid == TID_ALLYBULLET || Gobjs[i].tid == TID_MISSILE || Gobjs[i].tid == TID_ENEMYBULLET) {
+		if(tid == TID_ALLYBULLET || tid == TID_MISSILE || tid == TID_ENEMYBULLET) {
 			if(Gobjs[i].x == 0 || Gobjs[i].y == 0 || Gobjs[i].x == MAP_WIDTH || Gobjs[i].y == MAP_HEIGHT) {
 				Gobjs[i].tid = TID_NULL;
 				continue; //skip further process
@@ -96,14 +97,11 @@ void procai() {
 			Gobjs[i].timeout--;
 			if(Gobjs[i].timeout == 0) {
 				//missiles, zundamine will explode when timeout
-				switch(Gobjs[i].tid) {
-				case TID_MISSILE:
-				case TID_KUMO9_X24_MISSILE:
+				obj_type_t tid = Gobjs[i].tid;
+				if(tid == TID_MISSILE || tid == TID_KUMO9_X24_MISSILE) {
 					add_character(TID_ALLYEXPLOSION, Gobjs[i].x, Gobjs[i].y, i); //Explode
-				break;
-				case TID_ZUNDAMONMINE:
+				} else if(tid == TID_ZUNDAMONMINE) {
 					add_character(TID_ENEMYEXPLOSION, Gobjs[i].x, Gobjs[i].y, i); //Explode
-				break;
 				}
 				Gobjs[i].tid = TID_NULL;
 				continue;
@@ -111,13 +109,15 @@ void procai() {
 		}
 		//Calculate required Power
 		tmpreqpowerlevel += srcinfo.requirepower;
-		switch(Gobjs[i].tid) {
-		case TID_EARTH:
+		
+		//AI Processes for each object types
+		
+		if(tid == TID_EARTH) {
 			earthcount++;
 			//Apply recovery according to MapTechnologyLevel
 			Gobjs[i].hp = constrain_number(Gobjs[i].hp + MapTechnologyLevel, 0, srcinfo.inithp);
-			break;
-		case TID_ENEMYBASE:
+			
+		} else if(tid == TID_ENEMYBASE) {
 			enemybasecount++;
 			//Generate random zundamon every 20 sec
 			if(Gobjs[i].timers[0] == 0) {
@@ -141,8 +141,8 @@ void procai() {
 					Gobjs[i].sy = 0;
 				}
 			}
-			break;
-		case TID_ZUNDAMON1:
+			
+		} else if(tid == TID_ZUNDAMON1) {
 			//Generate zundamon mine every 5 sec
 			if(Gobjs[i].timers[0] == 0) {
 				Gobjs[i].timers[0] = 500;
@@ -151,9 +151,8 @@ void procai() {
 			//Follow nearest object
 			Gobjs[i].aiming_target = find_nearest_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT | UNITTYPE_FACILITY);
 			set_speed_for_following(i);
-			break;
-		case TID_ZUNDAMON2:
-		case TID_ZUNDAMON3:
+			
+		} else if (tid == TID_ZUNDAMON2 || tid == TID_ZUNDAMON3) {
 			//Generate zundamon mine every 3 sec
 			if(Gobjs[i].timers[0] == 0) {
 				Gobjs[i].timers[0] = 300;
@@ -171,9 +170,8 @@ void procai() {
 				Gobjs[i].aiming_target = OBJID_INVALID;
 			}
 			set_speed_for_following(i);
-			break;
-		case TID_ZUNDAMONMINE:
-		case TID_ZUNDAMON_KAMIKAZE:
+			
+		} else if(tid == TID_ZUNDAMONMINE || tid == TID_ZUNDAMON_KAMIKAZE) {
 			//Follow enemy persistently
 			if(!is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
 				//if aiming_target is not set, find new object to aim
@@ -186,9 +184,8 @@ void procai() {
 				Gobjs[i].aiming_target = OBJID_INVALID;
 			}
 			set_speed_for_following(i);
-			break;
-		case TID_ENEMYZUNDALASER:
-		case TID_KUMO9_X24_LASER:
+			
+		} else if(tid == TID_ENEMYZUNDALASER || tid == TID_KUMO9_X24_LASER) {
 			//Damage aimed target if they are in range
 			if(is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
 				if(Gobjs[Gobjs[i].aiming_target].tid != TID_NULL && get_distance(i, Gobjs[i].aiming_target) < Gobjs[i].hitdiameter / 2) {
@@ -217,16 +214,15 @@ void procai() {
 				}
 			}
 			continue; //Laser object has own damaging system, skip hit detection
-		case TID_ALLYEXPLOSION:
-		case TID_ENEMYEXPLOSION:
-		case TID_EXPLOSION:
+			
+		} else if(tid == TID_ALLYEXPLOSION || tid == TID_ENEMYEXPLOSION || tid == TID_EXPLOSION) {
 			Gobjs[i].hitdiameter = (uint16_t)constrain_i32(Gobjs[i].hitdiameter - 3, 0, 65535);
 			if(Gobjs[i].hitdiameter == 0) {
 				Gobjs[i].tid = TID_NULL;
 				continue;
 			}
-			break;
-		case TID_KUMO9_X24_ROBOT:
+			
+		} else if(tid == TID_KUMO9_X24_ROBOT) {
 			//Missile Skill
 			if(Gobjs[i].timers[1] != 0) {
 				if(Gobjs[i].timers[1] % 50 == 0) {
@@ -241,24 +237,24 @@ void procai() {
 			}
 			// Positron canon
 			if(Gobjs[i].timers[3] != 0) {
-				int32_t r = add_character(TID_KUMO9_X24_PCANNON, Gobjs[i].x, Gobjs[i].y, i);
+				add_character(TID_KUMO9_X24_PCANNON, Gobjs[i].x, Gobjs[i].y, i);
 				Gobjs[i].timers[3] = 0;
 			}
-			break;
-		case TID_RESEARCHMENT_CENTRE:
+			
+		} else if(tid == TID_RESEARCHMENT_CENTRE) {
 			if(MapRequiredEnergyLevel <= MapEnergyLevel) {tecstar_count++;} //Count number of researchment centre
-			break;
-		case TID_MONEY_GENE:
+			
+		} else if(tid == TID_MONEY_GENE) {
 			//Money gene will give 2 parts per 10 sec
 			if(Gobjs[i].timers[0] == 0 && MapRequiredEnergyLevel <= MapEnergyLevel) {
 				Gobjs[i].timers[0] = 1000;
 				Money += 2;
 			}
-			break;
-		case TID_POWERPLANT:
+			
+		} else if(tid == TID_POWERPLANT) {
 			powerplant_cnt++;
-			break;
-		case TID_KUMO9_X24_PCANNON:
+			
+		} else if(tid == TID_KUMO9_X24_PCANNON) {
 			if(is_range(Gobjs[i].parentid, 0, MAX_OBJECT_COUNT - 1) && Gobjs[Gobjs[i].parentid].tid == TID_KUMO9_X24_ROBOT) {
 				//Parent is ok
 				Gobjs[i].x = Gobjs[Gobjs[i].parentid].x;
@@ -278,6 +274,7 @@ void procai() {
 			}
 			continue; //This object don't need normal hitdetection
 		}
+		
 		//Hitdetection proc
 		for(uint16_t j = 0; j < MAX_OBJECT_COUNT; j++) {
 			if(i == j) { continue; }
@@ -295,8 +292,7 @@ void procai() {
 				}
 			}
 			//radar detection
-			switch(Gobjs[i].tid) {
-			case TID_EARTH:
+			if(tid == TID_EARTH) {
 				if(d < (EARTH_RADAR_DIAM / 2) ) {
 					//Earth radar
 					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0 ) {
@@ -314,8 +310,8 @@ void procai() {
 						}
 					}
 				}
-				break;
-			case TID_FORT:
+				
+			} else if(tid == TID_FORT) {
 				if(d < (FORT_RADAR_DIAM / 2) && MapRequiredEnergyLevel <= MapEnergyLevel) {
 					//Fort radar
 					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0 ) {
@@ -332,8 +328,8 @@ void procai() {
 						}
 					}
 				}
-				break;
-			case TID_PIT:
+				
+			} else if(tid == TID_PIT) {
 				if(d < (PIT_RADAR_DIAM / 2) && MapRequiredEnergyLevel <= MapEnergyLevel) {
 					//Pit radar
 					if(dstinfo.teamid == TEAMID_ALLY && (dstinfo.objecttype & UNITTYPE_UNIT) ) {
@@ -343,9 +339,8 @@ void procai() {
 						}
 					}
 				}
-				break;
-			case TID_ZUNDAMON2:
-			case TID_ZUNDAMON3:
+				
+			} else if(tid == TID_ZUNDAMON2 || tid == TID_ZUNDAMON3) {
 				//Zundamon 2 and 3 will spawn bullet if obj is close
 				if(d < (ZUNDAMON2_RADAR_DIAM / 2) ) {
 					if(dstinfo.teamid == TEAMID_ALLY && dstinfo.inithp != 0 ) {
@@ -367,8 +362,8 @@ void procai() {
 						}
 					}
 				}
-				break;
-			case TID_ENEMYBASE:
+				
+			} else if(tid == TID_ENEMYBASE) {
 				if(d < ENEMYBASE_RADAR_DIAM / 2) {
 					if(dstinfo.teamid == TEAMID_ALLY && dstinfo.inithp != 0 ) {
 						//g_print("gametick(): ENEMYBASE(%d): ally unit approaching.\n", i);
@@ -386,10 +381,9 @@ void procai() {
 						}
 					}
 				}
-				break;
-			case TID_KUMO9_X24_ROBOT:
+				
+			} else if(tid == TID_KUMO9_X24_ROBOT) {
 				//playable is auto-attack enemy within radar diam
-				{
 				double m = 1.0 + (MapTechnologyLevel * 100);
 				if(d < (PLAYABLE_AUTOMACHINEGUN_DIAM + m) / 2) {
 					if(dstinfo.teamid == TEAMID_ENEMY && dstinfo.inithp != 0 ) {
@@ -401,9 +395,8 @@ void procai() {
 						}
 					}
 				}
-				}
-				break;
 			}
+			
 		}
 	}
 	//Determine map technology level
@@ -494,25 +487,25 @@ void damage_object(int32_t dstid, int32_t srcid) {
 		//g_print("damage_object(): Object %d is dead.\n", i);
 
 		//If enemy unit is dead, give money to ally team
-		switch(Gobjs[dstid].tid) {
-		case TID_ZUNDAMON1:
+		obj_type_t tid = Gobjs[dstid].tid;
+		if(tid == TID_ZUNDAMON1) {
 			Money += 5;
-			break;
-		case TID_ZUNDAMON2:
+			
+		} else if(tid == TID_ZUNDAMON2) {
 			Money += 10;
-			break;
-		case TID_ZUNDAMON3:
+			
+		} else if(tid == TID_ZUNDAMON3) {
 			Money += 20;
-			break;
-		case TID_ENEMYBASE:
+			
+		} else if(tid == TID_ENEMYBASE) {
 			Money += 100;
-			break;
-		case TID_ZUNDAMON_KAMIKAZE:
+			
+		} else if(tid == TID_ZUNDAMON_KAMIKAZE) {
 			Money += 4;
-			break;
-		case TID_ZUNDAMONMINE:
+
+		} else if(tid == TID_ZUNDAMONMINE) {
 			Money += 1;
-			break;
+			
 		}
 
 		//Write deathlog if facilities or unit dead
@@ -521,27 +514,23 @@ void damage_object(int32_t dstid, int32_t srcid) {
 			//printlog("Object %d (srcid=%d) killed %d.\n", srcid, killerid, dstid);
 			//Minecraft style death log
 			int32_t deathreasonid = 16;
-			switch(Gobjs[srcid].tid) {
-				case TID_EXPLOSION:
-				case TID_ALLYEXPLOSION:
-				case TID_ENEMYEXPLOSION:
-					//blown up
-					deathreasonid = 11;
-					break;
-				case TID_ENEMYBULLET:
+			tid = Gobjs[srcid].tid;
+			if(tid == TID_EXPLOSION || tid == TID_ALLYEXPLOSION || tid == TID_ENEMYEXPLOSION) {
+				//blown up
+				deathreasonid = 11;
+					
+			} else if(tid == TID_ENEMYBULLET) {
 					//Zundad
 					deathreasonid = 13;
-					break;
-				case TID_ENEMYZUNDALASER:
-				case TID_KUMO9_X24_LASER:
-				case TID_KUMO9_X24_MISSILE_RESIDUE:
+					
+			} else if(tid == TID_ENEMYZUNDALASER || tid == TID_KUMO9_X24_LASER || tid == TID_KUMO9_X24_MISSILE_RESIDUE) {
 					//Burnt into crisp
 					deathreasonid = 14;
-					break;
-				case TID_KUMO9_X24_PCANNON:
+					
+			} else if(tid == TID_KUMO9_X24_PCANNON) {
 					//Annihilated
 					deathreasonid = 15;
-					break;
+					
 			}
 			char smpkiller[UNAME_SIZE + 2] = "", smpvictim[UNAME_SIZE + 2] = "";
 			//If SMP, show smp username

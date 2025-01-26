@@ -15,13 +15,11 @@ util.c: utility functions
 
 #include "main.h"
 
-#include <wchar.h>
 #include <string.h>
-#include <locale.h>
 #include <stdarg.h>
 #include <sys/time.h>
 
-size_t utf8_get_letter_bytelen(char*);
+size_t utf8_get_letter_bytelen(char);
 
 extern int32_t ProgramExiting;
 
@@ -53,7 +51,7 @@ int32_t constrain_i32(int32_t v, int32_t mi, int32_t mx) {
 void utf8_substring(char* src, int32_t st, int32_t ed, char *dst, int32_t dstlen) {
 	char* s;
 	char* e;
-	uint32_t subl;
+	int32_t subl;
 	ed = constrain_i32(ed, 0, (int32_t)utf8_strlen(src) ); //Restrict ed not to be greater than src letter count
 	if(st > ed || dstlen < 2) {
 		die("utf8_substring() failed. Parameters error: st=%d, ed=%d, dstlen=%d\n", st, ed, dstlen);
@@ -61,12 +59,12 @@ void utf8_substring(char* src, int32_t st, int32_t ed, char *dst, int32_t dstlen
 	}
 	s = utf8_strlen_to_pointer(src, st);
 	e = utf8_strlen_to_pointer(src, ed);
-	subl = (uint32_t)(e - s);
+	subl = (int32_t)(e - s);
 	if(subl + 1 > dstlen) {
 		die("util.c: utf8_substring() failed. No enough buffer for substring.\n");
 		return;
 	}
-	memcpy(dst, s, subl);
+	memcpy(dst, s, (size_t)subl);
 	dst[subl] = '\0';
 }
 
@@ -101,31 +99,9 @@ int32_t utf8_insertstring(char *dst, char *src, int32_t pos, size_t dstlen) {
 void die(const char *p, ...) {
 	va_list v;
 	va_start(v, p);
-	vprintf(p, v);
+	vfail(p, v);
 	va_end(v);
 	ProgramExiting = 1;
-}
-
-//get_string_width but substring version (from index st to ed)
-int32_t get_substring_width(char* ctx, int32_t st, int32_t ed) {
-	char b[BUFFER_SIZE];
-	utf8_substring(ctx, st, ed, b, sizeof(b) );
-	return get_string_width(b);
-}
-
-//substring version of shrink_string()
-int32_t shrink_substring(char *ctx, int32_t wid, int32_t st, int32_t ed, int32_t* widr) {
-	int32_t l = constrain_i32(ed, 0, utf8_strlen(ctx) );
-	int32_t w = wid + 10;
-	//Delete one letter from ctx in each loops, continue until string width fits in wid
-	while(l > 0) {
-		w = get_substring_width(ctx, st, l);
-		if(widr != NULL) {*widr = w;}
-		if(w < wid || l <= 1) { return l; }
-		l--;
-		//g_print("%d %d\n", l, w);
-	}
-	return 1;
 }
 
 //check if v is in range from ma to mx
@@ -148,44 +124,27 @@ int32_t randint(int32_t mi, int32_t ma) {
 	return mi + (rand() % (ma + 1 - mi) );
 }
 
-size_t utf8_get_letter_bytelen(char *l) {
-	int32_t c = (int32_t)l[0];
-	if(is_range(c, 0, 127) ) {
+size_t utf8_get_letter_bytelen(char c) {
+	uint8_t _c = (uint8_t)c;
+	if(is_range(_c, 0, 127) ) {
 		return 1;
-	} else if(is_range(c, 194, 223) ) {
+	} else if(is_range(_c, 194, 223) ) {
 		return 2;
-	} else if(is_range(c, 224, 239) ) {
+	} else if(is_range(_c, 224, 239) ) {
 		return 3;
-	} else if(is_range(c, 240, 247) ) {
+	} else if(is_range(_c, 240, 247) ) {
 		return 4;
 	}
-	printf("utf8_get_letter_bytelen(): Bad UTF8 sequence!\n");
+	warn("utf8_get_letter_bytelen(): Bad UTF8 sequence!\n");
 	return 1;
 }
 
 //UTF-8 compatible strlen
 int32_t utf8_strlen(char* ctx) {
-	setlocale(LC_ALL, "en_US.utf8"); //Needed for mbrlen
-	mbstate_t mb;
 	int32_t lcnt = 0;
-	ssize_t bl = 0; //byte offset
-	memset(&mb, 0, sizeof(mbstate_t) );
-	while(lcnt < BUFFER_SIZE) {
-		ssize_t r = (ssize_t)mbrlen(&ctx[bl], 4, &mb);
-		//if first byte is utf8 header, get next byte to examine entire letter byte size
-		if(r == -2) {
-			bl++;
-			r = (ssize_t)mbrlen(&ctx[bl], 4, &mb);
-			if(r == -1 || r == -2) {
-				printf("utf8_strlen_test(): Bad UTF8, decorder terminated.\n");
-				return 0;
-			}
-		} else if(r == 0) {
-			return lcnt; //null terminator detected
-		} else if(r == -1) {
-			printf("utf8_strlen_test(): Bad UTF8, decorder terminated.\n");
-		}
-		bl += r; //advance byte count to point next letter
+	size_t bl = 0; //byte offset
+	while(ctx[bl] && lcnt < BUFFER_SIZE) {
+		bl += utf8_get_letter_bytelen(ctx[bl]);
 		lcnt++;
 	}
 	return lcnt;
@@ -193,36 +152,14 @@ int32_t utf8_strlen(char* ctx) {
 
 //Get pointer that starts from letter index letterpos for utf8
 char *utf8_strlen_to_pointer(char *ctx, int32_t letterpos) {
-	setlocale(LC_ALL, "en_US.utf8"); //Needed for mbrlen
-	mbstate_t mb;
 	int32_t lcnt = 0;
 	int32_t t = constrain_i32(letterpos, 0, BUFFER_SIZE);
-	ssize_t bl = 0; //byte offset
-	memset(&mb, 0, sizeof(mbstate_t) );
+	size_t bl = 0; //byte offset
 	while(lcnt < t) {
-		ssize_t r = (ssize_t)mbrlen(&ctx[bl], 4, &mb);
-		//if first byte is utf8 header, get next byte to examine entire letter byte size
-		if(r == -2) {
-			bl++;
-			r = (ssize_t)mbrlen(&ctx[bl], 4, &mb);
-			if(r == -1 || r == -2) {
-				printf("utf8_strlen_test(): Bad UTF8, decorder terminated.\n");
-				return NULL;
-			}
-		} else if(r == 0) {
-			return NULL; //null terminator detected
-		} else if(r == -1) {
-			printf("utf8_strlen_test(): Bad UTF8, decorder terminated.\n");
-		}
-		bl += r; //advance byte count to point next letter
+		bl += utf8_get_letter_bytelen(ctx[bl]);
 		lcnt++;
 	}
 	return &ctx[bl];
 }
 
-//get current time (unix epoch) in mS
-double get_current_time_ms() {
-	struct timeval t;
-	gettimeofday(&t, NULL);
-	return ( (double)t.tv_sec * 1000.0) + ( (double)t.tv_usec / 1000.0);
-}
+

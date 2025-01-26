@@ -14,7 +14,7 @@ zunda-defs.h: definitions
 */
 
 //Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function added (feature add), 3 will increase if function update (bugfix)
-#define VERSION_STRING "10.2.0-30dec2024"
+#define VERSION_STRING "11.0.0-26Jan-2025"
 #define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
 #define CONSOLE_CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0\n" \
 							  "Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社\n" \

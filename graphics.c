@@ -93,7 +93,7 @@ void drawstringf(double x, double y, const char *p, ...) {
 	char b[BUFFER_SIZE];
 	va_list v;
 	va_start(v, p);
-	int32_t r = vsnprintf(b, sizeof(b), p, v);
+	ssize_t r = vsnprintf(b, sizeof(b), p, v);
 	va_end(v);
 	//Safety check
 	if(r >= sizeof(b) || r == -1) {
@@ -229,15 +229,15 @@ int32_t init_graphics() {
 	Gsfc = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, WINDOW_WIDTH, WINDOW_HEIGHT);
 	G = cairo_create(Gsfc);
 	if(cairo_status(G) != CAIRO_STATUS_SUCCESS) {
-		printf("init_graphics(): Making game screen buffer failed.\n");
+		fail("init_graphics(): Making game screen buffer failed.\n");
 		return -1;
 	}
 	
-	printf("Loading image assets.\n");
+	info("Loading image assets.\n");
 	for(int32_t i = 0; i < IMAGE_COUNT; i++) {
 		Plimgs[i] = cairo_image_surface_create_from_png(IMGPATHES[i]);
 		if(cairo_surface_status(Plimgs[i]) != CAIRO_STATUS_SUCCESS) {
-			printf("init_graphics(): Error loading %s\n", IMGPATHES[i]);
+			fail("init_graphics(): Error loading %s\n", IMGPATHES[i]);
 			return -1;
 		}
 	}
@@ -302,3 +302,27 @@ void get_image_size(int32_t imgid, double *w, double *h) {
 	*w = (double)cairo_image_surface_get_width(Plimgs[imgid]);
 	*h = (double)cairo_image_surface_get_height(Plimgs[imgid]);
 }
+
+//get_string_width but substring version (from index st to ed)
+int32_t get_substring_width(char* ctx, int32_t st, int32_t ed) {
+	char b[BUFFER_SIZE];
+	utf8_substring(ctx, st, ed, b, sizeof(b) );
+	return get_string_width(b);
+}
+
+//substring version of shrink_string()
+int32_t shrink_substring(char *ctx, int32_t wid, int32_t st, int32_t ed, int32_t* widr) {
+	int32_t l = constrain_i32(ed, 0, utf8_strlen(ctx) );
+	int32_t w = wid + 10;
+	//Delete one letter from ctx in each loops, continue until string width fits in wid
+	while(l > 0) {
+		w = get_substring_width(ctx, st, l);
+		if(widr != NULL) {*widr = w;}
+		if(w < wid || l <= 1) { return l; }
+		l--;
+		//g_print("%d %d\n", l, w);
+	}
+	return 1;
+}
+
+

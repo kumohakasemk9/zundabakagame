@@ -25,7 +25,7 @@ void draw_info();
 void draw_mchotbar(double, double);
 void draw_lolhotbar(double, double);
 void draw_game_object(int32_t, LookupResult_t, double, double);
-void draw_shapes(int32_t, LookupResult_t, double, double);
+void draw_shapes(int32_t, double, double);
 
 extern cairo_t* G; //Gamescreen cairo context
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game Objects
@@ -149,7 +149,7 @@ void draw_game_main() {
 				draw_game_object(i, t, x, y);
 			} else if(Gobjs[i].imgid == -1) {
 				//imgid == -1 means shapes
-				draw_shapes(i, t, x, y);
+				draw_shapes(i, x, y);
 			}
 		}
 	}
@@ -209,11 +209,12 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 	}
 }
 
-void draw_shapes(int32_t idx, LookupResult_t t, double x, double y) {
+void draw_shapes(int32_t idx, double x, double y) {
 	if(!is_range(idx, 0, MAX_OBJECT_COUNT - 1)) {
 		die("draw_game_object(): bad idx, how can you do that!?\n");
 		return;
 	}
+	obj_type_t tid = Gobjs[idx].tid;
 	if(DebugMode) {
 		chcolor(0xffffffff, 1);
 		drawstringf(x, y, "(Shape) ID=%d", idx);
@@ -221,61 +222,48 @@ void draw_shapes(int32_t idx, LookupResult_t t, double x, double y) {
 	//draw shapes
 	double d = 0;
 	if(DebugMode) {
-		switch(Gobjs[idx].tid) {
-			case TID_EARTH:
-				d = EARTH_RADAR_DIAM;
-			break;
-			case TID_ENEMYBASE:
-				d = ENEMYBASE_RADAR_DIAM;
-			break;
-			case TID_PIT:
-				d = PIT_RADAR_DIAM;
-			break;
-			case TID_FORT:
-				d = FORT_RADAR_DIAM;
-			break;
-			case TID_ZUNDAMON2:
-				d = ZUNDAMON2_RADAR_DIAM;
-			break;
-			case TID_ZUNDAMON3:
-				d = ZUNDAMON3_RADAR_DIAM;
-			break;
-			case TID_KUMO9_X24_ROBOT:
-				d = PLAYABLE_AUTOMACHINEGUN_DIAM;
-				break;
+		if(tid == TID_EARTH) {
+			d = EARTH_RADAR_DIAM;
+		} else if(tid == TID_ENEMYBASE) {
+			d = ENEMYBASE_RADAR_DIAM;
+		} else if(tid == TID_PIT) {
+			d = PIT_RADAR_DIAM;
+		} else if(tid == TID_FORT) {
+			d = FORT_RADAR_DIAM;
+		} else if(tid == TID_ZUNDAMON2) {
+			d = ZUNDAMON2_RADAR_DIAM;
+		} else if(tid == TID_ZUNDAMON3) {
+			d = ZUNDAMON3_RADAR_DIAM;
+		} else if(tid == TID_KUMO9_X24_ROBOT) {
+			d = PLAYABLE_AUTOMACHINEGUN_DIAM;
 		}
 	}
-	if(Gobjs[idx].tid == TID_ALLYEXPLOSION || Gobjs[idx].tid == TID_ENEMYEXPLOSION || Gobjs[idx].tid == TID_EXPLOSION) {
+	if(tid == TID_ALLYEXPLOSION || tid == TID_ENEMYEXPLOSION || tid == TID_EXPLOSION) {
 		d = Gobjs[idx].hitdiameter;
 	}
-	switch(Gobjs[idx].tid) {
-		case TID_ALLYEXPLOSION:
-			chcolor(0x7000A0FF, 1);
-		break;
-		case TID_ENEMYEXPLOSION:
-			chcolor(0x70ffa000, 1);
-		break;
-		case TID_EXPLOSION:
-			chcolor(0x70ff0000, 1);
-		break;
-		case TID_KUMO9_X24_PCANNON:
-			d = Gobjs[idx].timeout;
-			chcolor(COLOR_KUMO9_X24_PCANNON, 1);
-			break;
+	if(tid == TID_ALLYEXPLOSION) {
+		chcolor(0x7000A0FF, 1);
+	} else if(tid == TID_ENEMYEXPLOSION) {
+		chcolor(0x70ffa000, 1);
+	} else if(tid == TID_EXPLOSION) {
+		chcolor(0x70ff0000, 1);
+	} else if(tid == TID_KUMO9_X24_PCANNON) {
+		d = Gobjs[idx].timeout;
+		chcolor(COLOR_KUMO9_X24_PCANNON, 1);
 	}
 	if(d != 0) {
 		//Draw circle
 		fillcircle(x, y, d);
 	}
-	if(Gobjs[idx].tid == TID_ENEMYZUNDALASER || Gobjs[idx].tid == TID_KUMO9_X24_LASER || (Gobjs[idx].tid == TID_KUMO9_X24_PCANNON && Gobjs[idx].timeout < 20) ) {
+	if(tid == TID_ENEMYZUNDALASER || tid == TID_KUMO9_X24_LASER || (tid == TID_KUMO9_X24_PCANNON && Gobjs[idx].timeout < 20) ) {
 		//Draw laser obj
 		uint32_t lasercolour = 0xc07f00ff;
 		double laserwidth = 5;
-		if(Gobjs[idx].tid == TID_ENEMYZUNDALASER) {
+		if(tid == TID_ENEMYZUNDALASER) {
 			//Apply EnemyZundaColourLaser if TID is TID_ENEMYZUNDALASER
 			lasercolour = 0xa000ff00;
 			laserwidth = 20;
-		} else if(Gobjs[idx].tid == TID_KUMO9_X24_PCANNON) {
+		} else if(tid == TID_KUMO9_X24_PCANNON) {
 			lasercolour = COLOR_KUMO9_X24_PCANNON;
 			laserwidth = 30;
 		}
@@ -352,9 +340,6 @@ void draw_cui() {
 }
 
 void draw_info() {
-	//Draw additional information
-	int32_t fh = get_font_height();
-
 	//Draw Error Message if there are error
 	if(StatusShowTimer != 0) {
 		/*if(!is_range(RecentErrorId, 0, MAX_STRINGS - 1) ) {
@@ -369,23 +354,22 @@ void draw_info() {
 	if(GameState != GAMESTATE_PLAYING) {
 		chcolor(COLOR_TEXTCMD, 1);
 		int32_t r;
-		switch(GameState) {
-		case GAMESTATE_INITROUND:
+		if(GameState == GAMESTATE_INITROUND) {
 			r = drawstring_title(100, (char*)getlocalizedstring(2), 48);
 			drawstring_title(120 + r, (char*)getlocalizedstring(3), FONT_DEFAULT_SIZE);
-			break;
-		case GAMESTATE_GAMEOVER:
+			
+		} else if(GameState == GAMESTATE_GAMEOVER) {
 			r = drawstring_title(100, (char*)getlocalizedstring(6), 48);
 			drawstring_title(120 + r, (char*)getlocalizedstring(7), FONT_DEFAULT_SIZE);
-			break;
-		case GAMESTATE_GAMECLEAR:
+			
+		} else if(GameState == GAMESTATE_GAMECLEAR) {
 			r = drawstring_title(100, (char*)getlocalizedstring(8), 48);
 			drawstring_title(120 + r, (char*)getlocalizedstring(9), FONT_DEFAULT_SIZE);
-			break;
-		case GAMESTATE_DEAD:
+			
+		} else if(GameState == GAMESTATE_DEAD) {
 			r = drawstring_title(100, (char*)getlocalizedstring(4), 48);
 			drawstring_title(120 + r, (char*)getlocalizedstring(5), FONT_DEFAULT_SIZE);
-			break;
+			
 		}
 	}
 

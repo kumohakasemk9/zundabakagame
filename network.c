@@ -57,7 +57,7 @@ void network_recv_task() {
 	uint8_t b[NET_BUFFER_SIZE];
 	ssize_t r = recv_tcp_socket(b, NET_BUFFER_SIZE);
 	if(r == 0) { //If recv returns 0, disconnected
-		printf("network_recv_task(): disconnected from server.\n");
+		warn("network_recv_task(): disconnected from server.\n");
 		showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
 		close_connection_silent();
 		return;
@@ -66,20 +66,21 @@ void network_recv_task() {
 		//Check for timeout
 		TimeoutTimer++;
 		if(NetworkTimeout != 0 && TimeoutTimer >= NetworkTimeout) {
-			printf("network_recv_task(): Timed out, no packet longer than timeout.\n");
+			warn("network_recv_task(): Timed out, no packet longer than timeout.\n");
 			showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
 			close_connection_silent();
 		}
 		return;
 	} else if(r == -2) { //recv error
-		printf("network_recv_task(): recv failed\n");
+		warn("network_recv_task(): recv failed\n");
 		showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
 		close_connection_silent();
 		return;
 	}
 	TimeoutTimer = 0;
 
-	//Dumped received data
+	/*
+	//Dump received data
 	if( (NetworkDebugFlag & NET_DEBUG_RAW) != 0) {
 		printf("RX: ");
 		for(size_t i = 0; i < r; i++) {
@@ -87,6 +88,7 @@ void network_recv_task() {
 		}
 		printf("\n");
 	}
+	*/
 
 	//Process data
 	//Length 0-FD    XX
@@ -111,14 +113,14 @@ void network_recv_task() {
 			lenhdrsize = 3;
 			if(remain >= lenhdrsize) {
 				uint16_t *_v = (uint16_t*)&tmpbuf[p + 1];
-				reqsize = network2host_fconv_16(*_v) + 3;
+				reqsize = (size_t)(network2host_fconv_16(*_v) + 3);
 			} else {
 				break; //Not enough packet received
 			}
 		}
 		//Check buffer overflow
 		if(reqsize > NET_BUFFER_SIZE) {
-			printf("network_recv_task(): data length exceeds buffer size. closing connection.\n");
+			warn("network_recv_task(): data length exceeds buffer size. closing connection.\n");
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
@@ -128,11 +130,13 @@ void network_recv_task() {
 		} else {
 			//show received packet
 			if( (NetworkDebugFlag & NET_DEBUG_PACKET) != 0) {
+				/*
 				printf("PACKET (%d): ", reqsize);
 				for(size_t i = 0; i < reqsize; i++) {
 					printf("%02x ", tmpbuf[p + i]);
 				}
 				printf("\n");
+				*/
 			}
 			pkt_recv_handler(&tmpbuf[p + lenhdrsize], reqsize - lenhdrsize);
 		}
@@ -153,7 +157,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		char reason[NET_BUFFER_SIZE];
 		memcpy(reason, &pkt[1], plen - 1);
 		reason[plen - 1] = 0;
-		printf("pkt_recv_handler(): Disconnect request: %s\n", reason);
+		info("pkt_recv_handler(): Disconnect request: %s\n", reason);
 		//Request to show chat message 
 		chatf("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
 		close_connection_silent();
@@ -161,14 +165,14 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		//greetings response
 		//Security update: avoid sending credentials for multiple times
 		if(SMPcid != -1) {
-			printf("pkt_recv_handler(): Duplicate greetings packet.\n");
+			warn("pkt_recv_handler(): Duplicate greetings packet.\n");
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
 		//Data length check
 		if(plen != sizeof(np_greeter_t) ) {
-			printf("pkt_recv_handler(): Too short greetings packet.\n");
+			warn("pkt_recv_handler(): Too short greetings packet.\n");
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
@@ -176,7 +180,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		np_greeter_t *p = (np_greeter_t*)pkt;
 		SMPcid = (int32_t)p->cid;
 		memcpy(SMPsalt, p->salt, SALT_LENGTH);
-		printf("pkt_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
+		info("pkt_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
 		//printf("net_recv_handler(): Salt: ");
 		//for(int32_t i = 0; i < SALT_LENGTH; i++) {
 		//	printf("%02x", p->salt[i]);
@@ -185,15 +189,15 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		net_server_send_cmd(NP_LOGIN_WITH_PASSWORD); //Send credentials
 	} else if(pkt[0] == NP_LOGIN_WITH_PASSWORD) {
 		//Login response: returns current userlist
-		int32_t p = 1;
+		size_t p = 1;
 		int32_t c = 0;
 		while(p < plen && c < MAX_CLIENTS) {
 			//Convert header
 			userlist_hdr_t *uhdr = (userlist_hdr_t*)&pkt[p];
-			int32_t csiz = sizeof(userlist_hdr_t) + uhdr->uname_len;
+			size_t csiz = sizeof(userlist_hdr_t) + (size_t)(uhdr->uname_len);
 			//Length check
 			if(p + csiz > plen) {
-				printf("pkt_recv_handler(): Bad login response\n");
+				warn("pkt_recv_handler(): Bad login response\n");
 				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 				close_connection_silent();
 				return;
@@ -207,17 +211,17 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 			p += csiz;
 		}
 		if(c >= MAX_CLIENTS) {
-			printf("pkt_recv_handler(): Bad login response\n");
+			warn("pkt_recv_handler(): Bad login response\n");
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			close_connection_silent();
 			return;
 		}
 		SMPStatus = NETWORK_LOGGEDIN;
-		printf("pkt_recv_handler(): Login successful response.\n");
+		warn("pkt_recv_handler(): Login successful response.\n");
 	} else if(pkt[0] == NP_EXCHANGE_EVENTS) {
 		//Exchange event response
 		if(plen >= NET_BUFFER_SIZE) {
-			printf("pkt_recv_handler(): GetEvent: Buffer overflow.\n");
+			warn("pkt_recv_handler(): GetEvent: Buffer overflow.\n");
 			close_connection_silent();
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 		}
@@ -227,32 +231,37 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 	} else {
 		close_connection_silent();
 		showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-		printf("pkt_recv_handler(): Unknown Packet (%d): ", plen);
+		warn("pkt_recv_handler(): Unknown Packet (%ld): ", plen);
 		for(size_t i = 0; i < plen; i++) {
-			printf("%02x ", pkt[i]);
+			warn("%02x ", pkt[i]);
 		}
-		printf("\n");
+		warn("\n");
 	}
 }
 
 //Connect to specified address
 void connect_server() {
+	#ifdef __NOREMOTE
+		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
+		warn("connect_server(): This build's remote play is disabled.\n");
+		return;
+	#endif
 	//Check for parameter
 	if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
-		printf("connect_server(): Bad profile number.\n", SMPProfCount);
+		warn("connect_server(): Bad profile number: %d\n", SMPProfCount);
 		return;
 	}
 
 	//If already connected, return
 	if(SMPStatus != NETWORK_DISCONNECTED) {
 		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
-		printf("connect_server(): Already connected.\n");
+		warn("connect_server(): Already connected.\n");
 		return;
 	}
 
 	//Announce and reset variables
 	showstatus("%s %s", getlocalizedstring(17), SMPProfs[SelectedSMPProf].host);
-	printf("connect_server(): Attempting to connect to %s:%s\n", SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
+	info("connect_server(): Attempting to connect to %s:%s\n", SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
 	RXSMPEventLen = 0;
 	TXSMPEventLen = 0;
 	TRXBLength = 0;
@@ -289,7 +298,7 @@ void net_server_send_cmd(server_command_t cmd) {
 	cmdbuf[0] = (uint8_t)cmd;
 	if(cmd == NP_EXCHANGE_EVENTS) {
 		if(TXSMPEventLen + 1 >= NET_BUFFER_SIZE) {
-			printf("net_server_send_cmd(): ADD_EVENT: Packet buffer overflow.\n");
+			warn("net_server_send_cmd(): ADD_EVENT: Packet buffer overflow.\n");
 			close_connection_silent();
 			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 			return;
@@ -299,20 +308,20 @@ void net_server_send_cmd(server_command_t cmd) {
 		TXSMPEventLen = 0;
 	} else if(cmd == NP_LOGIN_WITH_PASSWORD) {
 		if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
-			printf("net_server_send_command(): NP_LOGIN_WITH_PASSWORD: Bad SMPSelectedProf number!!\n");
+			warn("net_server_send_command(): NP_LOGIN_WITH_PASSWORD: Bad SMPSelectedProf number!!\n");
 			return;
 		}
-		printf("net_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: Attempeting to login to SMP server as %s\n", SMPProfs[SelectedSMPProf].usr);
+		warn("net_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: Attempeting to login to SMP server as %s\n", SMPProfs[SelectedSMPProf].usr);
 		//Make login key (SHA512 of username+password+salt)
 		uint8_t ph[SHA512_LENGTH];
 		if(compute_passhash(SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].pwd, SMPsalt, ph) != 0)  {
-			printf("np_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: calculating hash failed.\n");
+			warn("np_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: calculating hash failed.\n");
 			return;
 		}
 		memcpy(&cmdbuf[1], ph, SHA512_LENGTH); //combine command and hash
 		ctxlen = SHA512_LENGTH + 1;
 	} else {
-		printf("net_server_send_command(): Bad command.\n");
+		warn("net_server_send_command(): Bad command.\n");
 		return;
 	}
 
@@ -325,15 +334,15 @@ void net_server_send_cmd(server_command_t cmd) {
 	} else if(is_range( (int32_t)ctxlen, 0xfe, 0xffff) ) {
 		uint16_t *p = (uint16_t*)&cmdbuf[1];
 		buf[0] = 0xfe;
-		*p = network2host_fconv_16( (uint16_t)ctxlen);
+		*p = (uint16_t)network2host_fconv_16( (uint16_t)ctxlen);
 		hdrlen = 3;
 	} else {
-		printf("net_server_send_cmd(): incompatible packet size, not sending packet.\n");
+		warn("net_server_send_cmd(): incompatible packet size, not sending packet.\n");
 		return;
 	}
 	size_t totallen = ctxlen + hdrlen;
 	if(totallen > NET_BUFFER_SIZE) {
-		printf("net_server_send_command(): buffer overflow, not sending packet.\n");
+		warn("net_server_send_command(): buffer overflow, not sending packet.\n");
 		return;
 	}
 	memcpy(&buf[hdrlen], cmdbuf, ctxlen);
@@ -367,7 +376,7 @@ void process_smp() {
 			size_t rem = RXSMPEventLen - ptr;
 			//Parse event record header
 			if(rem < sizeof(event_hdr_t) ) {
-				printf("process_smp(): header read failed, rem:%d, ptr: %d\n", rem, ptr);
+				warn("process_smp(): header read failed, rem:%ld, ptr: %ld\n", rem, ptr);
 				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 				close_connection_silent();
 				return;
@@ -378,7 +387,7 @@ void process_smp() {
 			size_t reclen = evlen + sizeof(event_hdr_t);
 			uint8_t* evhead = &RXSMPEventBuffer[ptr + (int32_t)sizeof(event_hdr_t)];
 			if(rem < reclen) {
-				printf("process_smp(): Too short event record. rem: %d, ptr: %d\n", rem, ptr);
+				warn("process_smp(): Too short event record. rem: %ld, ptr: %ld\n", rem, ptr);
 				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 				close_connection_silent();
 				return;
@@ -448,7 +457,7 @@ void stack_packet(event_type_t etype, ...) {
 		if(is_range( (int32_t)chatplen, 0, NET_CHAT_LIMIT - 1) ) {
 			pktlen = sizeof(ev_chat_t) + chatplen;
 		} else {
-			printf("net_stack_packet(): CHAT: too long message\n");
+			warn("net_stack_packet(): CHAT: too long message\n");
 			pktlen = 0;
 		}
 		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
@@ -477,12 +486,12 @@ void stack_packet(event_type_t etype, ...) {
 			memcpy(poff, &ev, sizeof(ev_changeplayableid_t) );
 		}
 	} else {
-		printf("net_stack_packet(): unknown packet type.\n");
+		warn("net_stack_packet(): unknown packet type.\n");
 		pktlen = 0;
 	}
 	va_end(varg);
 	if(TXSMPEventLen + pktlen >= NET_BUFFER_SIZE) {
-		printf("net_stack_packet(): TX SMP buffer overflow.\n");
+		warn("net_stack_packet(): TX SMP buffer overflow.\n");
 		close_connection_silent();
 		showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
 	} else {
@@ -493,12 +502,12 @@ void stack_packet(event_type_t etype, ...) {
 //Process smp events (evbuf: content, evlen: length, cid: event owner id)
 void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 	//Decode packet
-	int32_t evp = 0;
+	size_t evp = 0;
 	while(evp < evlen) {
 		ssize_t remaining = (ssize_t)evlen - (ssize_t)evp;
 		if(evbuf[evp] == EV_CHANGE_PLAYABLE_SPEED) {
 			if(remaining < sizeof(ev_changeplayablespeed_t) ) {
-				printf("process_smp_events(): Too short EV_CHANGE_PLAYABLE_SPEED packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_CHANGE_PLAYABLE_SPEED packet, decoder will terminate.\n");
 				return;
 			}
 			ev_changeplayablespeed_t *ev = (ev_changeplayablespeed_t*)&evbuf[evp];
@@ -513,19 +522,19 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 						Gobjs[p_objid].sx = sx;
 						Gobjs[p_objid].sy = sy;
 					} else {
-						printf("process_smp_events(): CHANGE_PALYABLE_SPEED: Character of CID%d is not generated yet.\n");
+						warn("process_smp_events(): CHANGE_PLAYABLE_SPEED: Character of CID%d is not generated yet.\n", p_objid);
 					}
 				} else {
 					//Not registed in client list.
-					printf("process_smp_events(): CHANGE_PLAYABLE_SPEED: CID%d is not registered yet.\n", cid);
+					warn("process_smp_events(): CHANGE_PLAYABLE_SPEED: CID%d is not registered yet.\n", cid);
 				}
 			} else {
-				printf("process_smp_events(): CHANGE_PLAYABLE_SPEED: packet check failed.\n");
+				warn("process_smp_events(): CHANGE_PLAYABLE_SPEED: packet check failed.\n");
 			}
-			evp += (int32_t)sizeof(ev_changeplayablespeed_t);
+			evp += sizeof(ev_changeplayablespeed_t);
 		} else if(evbuf[evp] == EV_PLACE_ITEM) {
 			if(remaining < sizeof(ev_placeitem_t) ) {
-				printf("process_smp_events(): Too short EV_PLACE_ITEM packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_PLACE_ITEM packet, decoder will terminate.\n");
 				return;
 			}
 			//ItemPlace
@@ -540,21 +549,21 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				if(is_range(i, 0, MAX_CLIENTS - 1) ) {
 					int32_t p_objid = SMPPlayerInfo[i].playable_objid;
 					if(is_range(p_objid, 0, MAX_OBJECT_COUNT - 1) ) {
-						printf("process_smp_events(): PLACE_ITEM: cid=%d, tid=%d, x=%f, y=%f\n", cid, tid, x, y);
-						int32_t objid = add_character(tid, x, y, i);
+						info("process_smp_events(): PLACE_ITEM: cid=%d, tid=%d, x=%f, y=%f\n", cid, tid, x, y);
+						add_character(tid, x, y, i);
 					} else {
-						printf("process_smp_events(): PLACE_ITEM ignored, CID%d does not have playable character.\n", cid);
+						warn("process_smp_events(): PLACE_ITEM ignored, CID%d does not have playable character.\n", cid);
 					}
 				} else {
-					printf("process_smp_events(): CID%d is not in client list yet!\n", cid);
+					warn("process_smp_events(): CID%d is not in client list yet!\n", cid);
 				}
 			} else {
-				printf("process_smp_events(): PLACE_ITEM: packet check failed.\n");
+				warn("process_smp_events(): PLACE_ITEM: packet check failed.\n");
 			}
-			evp += (int32_t)sizeof(ev_placeitem_t);
+			evp += sizeof(ev_placeitem_t);
 		} else if(evbuf[evp] == EV_USE_SKILL) {
 			if(remaining < sizeof(ev_useskill_t) ) {
-				printf("process_smp_events(): Too short EV_USE_SKILL packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_USE_SKILL packet, decoder will terminate.\n");
 				return;
 			}
 			//UseSkill
@@ -573,15 +582,15 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 						//g_print("process_smp_events(): USESKILL: User cid%d has invalid playable_objid.\n", cid);
 					}
 				} else {
-					printf("process_smp_events(): USESKILL: cid%d is not in client list yet.\n", cid);
+					warn("process_smp_events(): USESKILL: cid%d is not in client list yet.\n", cid);
 				}
 			} else {
-				printf("process_smp_events(): USESKILL: packet check failed.\n");
+				warn("process_smp_events(): USESKILL: packet check failed.\n");
 			}
-			evp += (int32_t)sizeof(ev_useskill_t);
+			evp += sizeof(ev_useskill_t);
 		} else if(evbuf[evp] == EV_CHAT) {
 			if(remaining < sizeof(ev_chat_t) ) {
-				printf("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
 				return;
 			}
 			//Chat on other client
@@ -590,7 +599,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 			ssize_t cpktlen = (ssize_t)network2host_fconv_16(ev->clen);
 			char* netchat = (char*)&evbuf[evp + (int32_t)sizeof(ev_chat_t)];
 			if((ssize_t)remaining < (ssize_t)sizeof(ev_chat_t) + cpktlen) {
-				printf("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
 				return;
 			}
 			//Security check
@@ -604,42 +613,42 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 					chatf("<%s> %s", SMPPlayerInfo[cid].usr, ctx);
 				}
 			} else {
-				printf("procss_smp_events(): CHAT: packet too large.\n");
+				warn("procss_smp_events(): CHAT: packet too large.\n");
 			}
-			evp += (int32_t)sizeof(ev_chat_t) + (int32_t)cpktlen;
+			evp += sizeof(ev_chat_t) + cpktlen;
 		} else if(evbuf[evp] == EV_RESET) {
 			if(remaining < sizeof(ev_reset_t) ) {
-				printf("process_smp_events(): Too short EV_RESET packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_RESET packet, decoder will terminate.\n");
 				return;
 			}
 			ev_reset_t *ev = (ev_reset_t*)&evbuf[evp];
 			uint32_t _seed = (uint32_t)network2host_fconv_32(ev->level_seed);
 			srand(_seed);
-			printf("process_smp_events(): Round reset request from cid%d (Seed=%d)\n", cid, _seed);
+			info("process_smp_events(): Round reset request from cid%d (Seed=%d)\n", cid, _seed);
 			reset_game();
-			evp += (int32_t)sizeof(ev_reset_t);
+			evp += sizeof(ev_reset_t);
 		} else if(evbuf[evp] == EV_HELLO) {
 			//Another client connect event
 			if(remaining < sizeof(ev_hello_t) ) {
-				printf("process_smp_events(): Too short EV_HELLO packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_HELLO packet, decoder will terminate.\n");
 				return;
 			}
 			ev_hello_t *ev = (ev_hello_t*)&evbuf[evp];
 			int32_t fcid = (int32_t)ev->cid;
 			size_t funame_len = (size_t)ev->uname_len;
 			if(remaining < (size_t)sizeof(ev_hello_t) + funame_len) {
-				printf("process_smp_events(): Too short EV_HELLO packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_HELLO packet, decoder will terminate.\n");
 				return;
 			}
 			char funame[UNAME_SIZE];
 			if(funame_len >= UNAME_SIZE) {
-				printf("process_smp_events(): EV_HELLO packet username too large.\n");
+				warn("process_smp_events(): EV_HELLO packet username too large.\n");
 				return;
 			}
 			memcpy(funame, &evbuf[evp + (int32_t)sizeof(ev_hello_t)], funame_len);
 			funame[funame_len] = 0;
 			if(cid == -1) {
-				printf("process_smp_events(): Another client joined: %s(%d).\n", funame, fcid);
+				info("process_smp_events(): Another client joined: %s(%d).\n", funame, fcid);
 				chatf("%s %s", funame, getlocalizedstring(22) );
 				//Register client info
 				for(int32_t i = 0; i < MAX_CLIENTS; i++) {
@@ -652,20 +661,20 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 					}
 				}
 			} else {
-				printf("process_smp_events(): EV_JOIN: security check failed.\n");
+				warn("process_smp_events(): EV_JOIN: security check failed.\n");
 			}
-			evp += (int32_t)sizeof(ev_hello_t) + (int32_t)funame_len;
+			evp += sizeof(ev_hello_t) + funame_len;
 			} else if(evbuf[evp] == EV_BYE) {
 			//Another client disconnect event
 			if(remaining < sizeof(ev_bye_t) ) {
-				printf("process_smp_events(): Too short EV_BYE packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_BYE packet, decoder will terminate.\n");
 				return;
 			}
 			ev_bye_t *ev = (ev_bye_t*)&evbuf[evp];
 			int32_t fcid = (int32_t)ev->cid;
 			//This packet should issued from cid -1 (server)
 			if(cid == -1) {
-				printf("process_smp_events(): Another client disconnected: %d.\n", fcid);
+				info("process_smp_events(): Another client disconnected: %d.\n", fcid);
 				//Clean up left user's playable character
 				int32_t i = lookup_smp_player_from_cid(fcid);
 				if(is_range(i, 0, MAX_CLIENTS) ) {
@@ -674,37 +683,38 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 					if(is_range(0, j, MAX_OBJECT_COUNT - 1) ) {
 						Gobjs[j].tid = TID_NULL;
 					} else {
-						printf("process_smp_events(): CID%d does not have playable character.\n", cid);
+						warn("process_smp_events(): CID%d does not have playable character.\n", cid);
 					}
 					SMPPlayerInfo[i].cid = -1;
 				} else {
-					printf("process_smp_events(): CID%d is not on client list.\n", cid);
+					warn("process_smp_events(): CID%d is not on client list.\n", cid);
 				}
 			} else {
-				printf("process_smp_events(): EV_BYE: security check failed.\n");
+				warn("process_smp_events(): EV_BYE: security check failed.\n");
 			}
-			evp += (int32_t)sizeof(ev_bye_t);
+			evp += sizeof(ev_bye_t);
 		} else if(evbuf[evp] == EV_CHANGE_PLAYABLE_ID) {
 			//Another client playable id change
 			if(remaining < sizeof(ev_changeplayableid_t) ) {
-				printf("process_smp_events(): Too short EV_CHANGE_PLAYABLE_ID packet, decoder will terminate.\n");
+				warn("process_smp_events(): Too short EV_CHANGE_PLAYABLE_ID packet, decoder will terminate.\n");
 				return;
 			}
 			ev_changeplayableid_t *ev = (ev_changeplayableid_t*)&evbuf[evp];
 			//Param check
 			if(is_range(ev->pid, 0, PLAYABLE_CHARACTERS_COUNT - 1) ) {
-				printf("process_smp_events(): Another client(%d) playable id changed to %d\n", cid, ev->pid);
+				info("process_smp_events(): Another client(%d) playable id changed to %d\n", cid, ev->pid);
 				int32_t i = lookup_smp_player_from_cid(cid);
 				if(is_range(i, 0, MAX_CLIENTS) ) {
 					SMPPlayerInfo[i].pid = ev->pid;
 				} else {
-					printf("process_smp_events(): EV_CHANGE_PLAYABLE_ID: cid %d is not registed.\n", cid);
+					warn("process_smp_events(): EV_CHANGE_PLAYABLE_ID: cid %d is not registed.\n", cid);
 				}
 			} else {
-				printf("process_smp_events(): EV_CHANGE_PLAYABLE_ID: parameter check failed.\n");
+				warn("process_smp_events(): EV_CHANGE_PLAYABLE_ID: parameter check failed.\n");
 			}
+			evp += sizeof(ev_changeplayableid_t);
 		} else {
-			printf("process_smp_events(): Unknown event type, decorder terminated.\n");
+			warn("process_smp_events(): Unknown event type, decorder terminated.\n");
 			break;
 		}
 	}
