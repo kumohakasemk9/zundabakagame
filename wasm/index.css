@@ -1,0 +1,12 @@
+body {
+	background-color: black;
+	color: white;
+}
+
+a {
+	color: skyblue;
+}
+
+canvas {
+	border: solid white 1px;
+}
