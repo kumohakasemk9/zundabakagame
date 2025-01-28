@@ -42,14 +42,14 @@ jobs:
      run: make TARGET=WASM
    - name: prepare page content
      run: |
-      mv zundagame.wasm wasm/
-      mv img wasm/
-      mv adwaitalegacy wasm/
-      ls wasm
+      mkdir deploy
+      mv zundagame.wasm deploy/
+      mv img deploy/
+      mv adwaitalegacy deploy/
+      mv wasm/index* deploy/
 
    - uses: actions/configure-pages@v5
    - uses: actions/upload-pages-artifact@v3
      with:
-      path: wasm
-   - run: ls
+      path: deploy
    - uses: actions/deploy-pages@v4
