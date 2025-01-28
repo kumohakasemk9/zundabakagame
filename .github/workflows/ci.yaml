@@ -6,28 +6,11 @@ on:
 
 jobs:
 
- build-wasm:
+ build-linux:
   runs-on: ubuntu-latest
   permissions:
-   contents: read
-   pages: write
-   id-token: write 
-  environment:
-   name: github-pages
-   url: ${{ steps.deployment.outputs.page_url }}
+   contents: read 
   steps:
    - uses: actions/checkout@v4
-   - name: prepare emscripten
-     run: sudo apt-get -y install emscripten
-
-   - name: build wasm
-     run: make TARGET=WASM
-
-   - name: compress files
-     run: |
-      mv wasm/index* .
-      tar cvf github-pages.tar.gz img adwaitalegacy readme.md zundagame.wasm index*
-
-   - uses: actions/configure-pages@v5
-   - uses: actions/deploy-pages@v4
-     id: deployment
+   - name: build
+     run: make
