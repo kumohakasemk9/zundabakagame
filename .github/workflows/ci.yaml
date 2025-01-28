@@ -3,12 +3,12 @@ on:
  push:
   branches:
    - main
-permissions:
- contents: write
 jobs:
 
  build-mac:
   runs-on: macos-latest
+  permissions:
+   contents: write
   steps:
    - uses: actions/checkout@v2
    - name: prepare dependencies
@@ -28,6 +28,11 @@ jobs:
 
  build-wasm:
   runs-on: ubuntu-latest
+  permissions:
+   contents: read
+   pages: write
+   id-token: write
+
   steps:
    - uses: actions/checkout@v2
    - name: prepare emscripten
@@ -41,3 +46,10 @@ jobs:
       mv img wasm/
       mv adwaitalegacy wasm/
       ls wasm
+
+   - uses: actions/configure-pages@v5
+   - uses: actions/upload-pages-artifact@v3
+     with:
+      path: wasm
+   - run: ls
+   - uses: actions/deploy-pages@v4
