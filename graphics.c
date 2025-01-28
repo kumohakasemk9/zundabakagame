@@ -21,8 +21,6 @@ graphics.c: drawing functions
 #include <pango/pangocairo.h>
 #include <cairo/cairo.h>
 
-void restore_color();
-
 double Fgcolor[4] = {1.0, 1.0, 1.0, 1.0}; //Selected FGcolor
 cairo_t* G = NULL; //Gamescreen cairo context
 cairo_surface_t* Plimgs[IMAGE_COUNT];
@@ -30,14 +28,10 @@ PangoLayout *PangoL;
 cairo_surface_t *Gsfc = NULL; //GameScreen surface
 extern const char* IMGPATHES[]; //preload image pathes
 
-//Draw hp bar at x, y with width w and height h, chp is current hp, fhp is full hp,
-//colorbg is background color, colorfg is foreground color.
-void draw_hpbar(double x, double y, double w, double h, double chp, double fhp, uint32_t colorbg, uint32_t colorfg) {
-	chcolor(colorbg, 1);
-	fillrect(x, y, w, h);
-	double bw = scale_number(chp, fhp, w);
-	chcolor(colorfg, 1);
-	fillrect(x, y, bw, h);
+//Clear screen with black
+void clear_screen() {
+	cairo_set_source_rgb(G, 0, 0, 0);
+	cairo_paint(G);
 }
 
 //Change drawing color to colorcode, backup if savecolor is 1
@@ -80,51 +74,6 @@ void drawstring(double x, double y, char* ctx) {
 	cairo_move_to(G, x, y); // + get_font_height() - 2);
 	//cairo_show_text(G, ctx);
 	pango_cairo_show_layout(G, PangoL);
-}
-
-//draw substring ctx (index sp to ed) in pos x, y
-void drawsubstring(double x, double y, char* ctx, int32_t st, int32_t ed) {
-	char b[BUFFER_SIZE];
-	utf8_substring(ctx, st, ed, b, sizeof(b));
-	drawstring(x, y, b);
-}
-
-void drawstringf(double x, double y, const char *p, ...) {
-	char b[BUFFER_SIZE];
-	va_list v;
-	va_start(v, p);
-	ssize_t r = vsnprintf(b, sizeof(b), p, v);
-	va_end(v);
-	//Safety check
-	if(r >= sizeof(b) || r == -1) {
-		die("gutil.c: drawstringf() failed: formatted string not null terminated, input format string too long?\n");
-		return;
-	}
-	//Print
-	drawstring(x, y, b);
-}
-
-//draw string and let it fit in width wid using newline. if bg is 1, string will have rectangular background
-double drawstring_inwidth(double x, double y, char* ctx, int32_t wid, int32_t bg) {
-	double ty = y;
-	int32_t cp = 0;
-	int32_t ch = get_font_height();
-	int32_t ml = utf8_strlen(ctx);
-	while(cp < ml) {
-		//Write a adjusted string to fit in wid
-		int32_t a;
-		int32_t t = shrink_substring(ctx, wid, cp, ml, &a);
-		if(bg) {
-			chcolor(COLOR_TEXTBG, 0);
-			fillrect(x, ty, a, ch + 5);
-			restore_color();
-		}
-		drawsubstring(x, ty, ctx, cp, t);
-	//	g_print("Substring: %d %d\n", cp, t);
-		cp = t;
-		ty += ch + 5;
-	}
-	return ty;
 }
 
 //draw image in pos x, y
@@ -177,21 +126,6 @@ void hollowrect(double x, double y, double w, double h){
 	cairo_stroke(G);
 }
 
-int32_t drawstring_title(double y, char* ctx, int32_t s) {
-	//cairo_set_font_size(G, s);
-	set_font_size(s);
-	int32_t w = get_string_width(ctx);
-	int32_t h = get_font_height();
-	double x = (WINDOW_WIDTH / 2) - (w / 2);
-	chcolor(COLOR_TEXTBG, 0);
-	fillrect(x, y, w, h);
-	restore_color();
-	drawstring(x, y, ctx);
-	//cairo_set_font_size(G, FONT_DEFAULT_SIZE);
-	set_font_size(FONT_DEFAULT_SIZE);
-	return h;
-}
-
 //Set font size to s
 void set_font_size(int32_t s) {
 	const PangoFontDescription *pfd = pango_layout_get_font_description(PangoL);
@@ -203,7 +137,7 @@ void set_font_size(int32_t s) {
 }
 
 //load fonts from fontlist and use it for text drawing
-void loadfont(const char* fontlist) {
+void loadfont(char* fontlist) {
 	PangoFontDescription *desc;
 	desc = pango_font_description_from_string (fontlist);
 	pango_layout_set_font_description (PangoL, desc);
@@ -301,28 +235,6 @@ void get_image_size(int32_t imgid, double *w, double *h) {
 	}
 	*w = (double)cairo_image_surface_get_width(Plimgs[imgid]);
 	*h = (double)cairo_image_surface_get_height(Plimgs[imgid]);
-}
-
-//get_string_width but substring version (from index st to ed)
-int32_t get_substring_width(char* ctx, int32_t st, int32_t ed) {
-	char b[BUFFER_SIZE];
-	utf8_substring(ctx, st, ed, b, sizeof(b) );
-	return get_string_width(b);
-}
-
-//substring version of shrink_string()
-int32_t shrink_substring(char *ctx, int32_t wid, int32_t st, int32_t ed, int32_t* widr) {
-	int32_t l = constrain_i32(ed, 0, utf8_strlen(ctx) );
-	int32_t w = wid + 10;
-	//Delete one letter from ctx in each loops, continue until string width fits in wid
-	while(l > 0) {
-		w = get_substring_width(ctx, st, l);
-		if(widr != NULL) {*widr = w;}
-		if(w < wid || l <= 1) { return l; }
-		l--;
-		//g_print("%d %d\n", l, w);
-	}
-	return 1;
 }
 
 

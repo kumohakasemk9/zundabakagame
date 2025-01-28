@@ -1,5 +1,6 @@
 const importobj = {
 	env : {
+		console_put : console_put,
 		clear_screen : clear_screen,
 		chcolor : chcolor,
 		restore_color : restore_color,
@@ -30,7 +31,8 @@ var CurrentFontSize = "18pt";
 var IMAGE_COUNT;
 var loadedimgcnt = 0;
 var SavedColor;
-var St;
+var GTTime = 0, GTTimeCnt = 0, GTTimeAvg = 0;
+var DTime = 0, DTimeCnt = 0, DTimeAvg = 0;
 
 addEventListener("load", function() {
 	//Check window size
@@ -47,7 +49,7 @@ addEventListener("load", function() {
 	
 	updateStatus("Loading WASM...", 0, 0);
 	const XHR = new XMLHttpRequest();
-	XHR.open("POST", "zundagame.wasm");
+	XHR.open("POST", "../zundagame.wasm");
 	XHR.addEventListener("load", wasm_load_cb);
 	XHR.responseType = 'arraybuffer';
 	XHR.send();
@@ -62,6 +64,10 @@ async function wasm_load_cb(ev) {
 	ZundaGame = wasm.instance.exports;
 	MemView = new DataView(ZundaGame.memory.buffer);
 	
+	l = navigator.language;
+	if(l.includes("ja") ) {
+		ZundaGame.set_language(1);
+	}
 	ZundaGame.gameinit();
 	
 	//Load images
@@ -70,7 +76,7 @@ async function wasm_load_cb(ev) {
 	l = new Array();
 	b = ZundaGame.getIMGPATHES();
 	IMAGE_COUNT = ZundaGame.getImageCount();
-	console.log(IMAGE_COUNT + " images need to be loaded.");
+	console.log(`${IMAGE_COUNT} images need to be loaded.`);
 	for(var i = 0; i < IMAGE_COUNT; i++) {
 		eptr = MemView.getUint32(b + (i * 4), true);
 		s = pointer_to_str(eptr);
@@ -85,9 +91,9 @@ async function wasm_load_cb(ev) {
 }
 
 function img_load_cb(evt) {
-	console.log(evt.target.src + " loaded.");
+	console.log(`${evt.target.src} loaded.`);
 	loadedimgcnt++;
-	updateStatus("Loading images (" + loadedimgcnt + "/" + IMAGE_COUNT + ")...");
+	updateStatus(`Loading images (${loadedimgcnt}/${IMAGE_COUNT})...`);
 	
 	//start main process when all images loaded.
 	if(loadedimgcnt == IMAGE_COUNT) {
@@ -104,15 +110,38 @@ function img_load_cb(evt) {
 
 function gametick() {
 	if(ZundaGame.isProgramExiting() == 0) {
+		tbefore = performance.now();
 		ZundaGame.gametick();
+		tafter = performance.now();
+		GTTime += tafter - tbefore;
+		GTTimeCnt++;
+		if(GTTimeCnt >= 10) {
+			GTTimeAvg = GTTime / GTTimeCnt;
+			GTTime = 0;
+			GTimeAvg = 0;
+		}
 	}
 }
 
 function drawgame() {
+	p = document.getElementById('profiler');
 	if(ZundaGame.isProgramExiting() == 0) {
+		tbefore = performance.now();
 		ZundaGame.game_paint();
+		tafter = performance.now();
+		DTime += tafter - tbefore;
+		DTimeCnt++;
+		if(DTimeCnt >= 10) {
+			DTimeAvg = DTime / DTimeCnt;
+			DTime = 0;
+			DTimeCnt = 0;
+		}
+		t = GTTimeAvg.toFixed(3);
+		t2 = DTimeAvg.toFixed(3);
+		p.innerText = `running Tick: ${t} Draw: ${t2}`;
 	} else {
 		updateStatus("Error");
+		p.innerText = "error";
 	}
 }
 
@@ -181,6 +210,7 @@ function keydown_cb(evt) {
 			ZundaGame.cmd_cursor_forward();
 		} else if(evt.key.length == 1 && 0x20 <= c && c <= 0x7e) {
 			ZundaGame.cmd_putch(c);
+			evt.preventDefault();
 		}
 	} else {
 		if(evt.key == "q" || evt.key == "Q") {
@@ -193,6 +223,9 @@ function keydown_cb(evt) {
 			ZundaGame.use_item();
 		} else if(evt.key == "t" || evt.key == "T") {
 			ZundaGame.start_command_mode(0);
+		} else if(evt.key == "/") {
+			ZundaGame.start_command_mode(1);
+			evt.preventDefault();
 		}
 	}
 }
@@ -282,14 +315,14 @@ function drawstring(x, y, pc) {
 
 //int32_t
 function set_font_size(s) {
-	CurrentFontSize = s + "pt";
-	G.font = CurrentFontSize + " " + CurrentFont;
+	CurrentFontSize = `${s}pt`;
+	G.font = `${CurrentFontSize} ${CurrentFont}`;
 }
 
 //char*
 function loadfont(s) {
 	CurrentFont = pointer_to_str(s);
-	G.font = CurrentFontSize + " " + CurrentFont;
+	G.font = `${CurrentFontSize} ${CurrentFont}`;
 }
 
 //double, double, int32_t, double[]
@@ -327,3 +360,13 @@ function get_image_size(iid, px, py) {
 	MemView.setFloat64(py, IMGS[iid].height, true);
 }
 
+function console_put(a, l) {
+	s = "[WASM] " + pointer_to_str(a);
+	if(l == 0) {
+		console.log(s);
+	} else if(l == 1) {
+		console.warn(s);
+	} else {
+		console.err(s);
+	}
+}

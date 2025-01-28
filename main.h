@@ -16,28 +16,34 @@ main.h: integrated header file
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <time.h>
 
 #include "zunda-defs.h"
 #include "zunda-server.h"
 #include "zunda-structs.h"
+
+#ifdef __WASM
+	#define WASMIMPORT extern
+#else
+	#define WASMIMPORT
+#endif
 
 //main.c
 void detect_syslang();
 int32_t make_tcp_socket(char*, char*);
 int32_t close_tcp_socket();
 ssize_t send_tcp_socket(uint8_t*, size_t);
-int32_t install_io_handler();
 ssize_t recv_tcp_socket(uint8_t*, size_t);
 int16_t network2host_fconv_16(uint16_t);
 int32_t network2host_fconv_32(uint32_t);
 uint16_t host2network_fconv_16(int16_t);
 uint32_t host2network_fconv_32(int32_t);
-int32_t compute_passhash(char*, char*, uint8_t*, uint8_t*);
-double get_current_time_ms();
+WASMIMPORT int32_t compute_passhash(char*, char*, uint8_t*, uint8_t*);
 void warn(const char*, ...);
 void info(const char*, ...);
 void fail(const char*, ...);
 void vfail(const char*, va_list);
+double get_elapsed_time(struct timespec);
 
 //gamesys.c
 void gametick();
@@ -59,15 +65,12 @@ void reset_game();
 void use_skill(int32_t, int32_t, PlayableInfo_t);
 void getlocalcoord(int32_t, double*, double*);
 
-
-
 //util.c
 double scale_number(double, double, double);
 int32_t is_range_number(double, double, double);
 void utf8_substring(char*, int32_t, int32_t, char*, int32_t);
 void die(const char*, ...);
 int32_t utf8_strlen(char*);
-
 int32_t is_range(int32_t, int32_t, int32_t);
 int32_t randint(int32_t, int32_t);
 double constrain_number(double, double, double);
@@ -96,32 +99,28 @@ int32_t lookup_smp_player_from_cid(int32_t);
 //aiproc.c
 void procai();
 
-#ifndef __NOGRAPHICS
-	//grapics.c
-	void loadfont(const char*);
-	void set_font_size(int32_t);
-	void chcolor(uint32_t, int32_t);
-	void fillcircle(double, double, double);
-	void drawimage(double, double, int32_t);
-	void fillrect(double, double, double, double);
-	void drawstringf(double, double, const char*, ...);
-	void hollowrect(double, double, double, double);
-	void draw_hpbar(double, double, double, double, double, double, uint32_t, uint32_t);
-	double drawstring_inwidth(double, double, char*, int32_t, int32_t);
-	void drawline(double, double, double, double, double);
-	void drawimage_scale(double, double, double, double, int32_t);
-	void draw_polygon(double, double, int32_t, double[]);
-	void drawstring(double, double, char*);
-	void drawsubstring(double, double, char*, int32_t, int32_t);
-	int32_t drawstring_title(double, char*, int32_t);
+//ui.c
+void game_paint();
+
+//grapics.c
+WASMIMPORT void clear_screen();
+WASMIMPORT void chcolor(uint32_t, int32_t);
+WASMIMPORT void restore_color();
+WASMIMPORT void fillcircle(double, double, double);
+WASMIMPORT void fillrect(double, double, double, double);
+WASMIMPORT void hollowrect(double, double, double, double);
+WASMIMPORT void draw_polygon(double, double, int32_t, double[]);
+WASMIMPORT void drawline(double, double, double, double, double);
+WASMIMPORT void drawimage_scale(double, double, double, double, int32_t);
+WASMIMPORT void drawimage(double, double, int32_t);
+WASMIMPORT void get_image_size(int32_t, double*, double*);
+WASMIMPORT void drawstring(double, double, char*);
+WASMIMPORT int32_t get_string_width(char*);
+WASMIMPORT int32_t get_font_height();
+WASMIMPORT void loadfont(char*);
+WASMIMPORT void set_font_size(int32_t);
+
+#ifndef __WASM
 	int32_t init_graphics();
 	void uninit_graphics();
-	int32_t get_string_width(char*);
-	int32_t get_font_height();
-	void get_image_size(int32_t, double*, double*);
-	int32_t get_substring_width(char*, int32_t, int32_t);
-	int32_t shrink_substring(char*, int32_t, int32_t, int32_t, int32_t*);
-
-	//ui.c
-	void game_paint();
 #endif

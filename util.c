@@ -17,7 +17,6 @@ util.c: utility functions
 
 #include <string.h>
 #include <stdarg.h>
-#include <sys/time.h>
 
 size_t utf8_get_letter_bytelen(char);
 

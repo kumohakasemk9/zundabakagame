@@ -29,7 +29,32 @@ jobs:
      with:
       file: zundagame-bin-linux-${{ github.RUN_NUMBER }}.tar.gz
       draft: false
-      
+
+ build-macos:
+  runs-on: macos-latest
+
+  steps:
+  
+   - uses: actions/checkout@v2
+
+   - name: install build dependencies
+     run: |
+      brew install --cask xquartz
+      brew install pango
+
+   - name: build
+     run: make -f makefile-macos
+
+   - name: package program
+     run: tar cvf zundagame-bin-macos-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
+
+   - uses: xresloader/upload-to-github-release@v1
+     name: upload artifacts
+     env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     with:
+      file: zundagame-bin-macos-${{ github.RUN_NUMBER }}.tar.gz
+      draft: false
 
  build-windows:
   runs-on: windows-latest
@@ -66,29 +91,18 @@ jobs:
       file: zundagame-bin-windows-msys2-gvsbuild-${{ github.RUN_NUMBER }}.zip
       draft: false
 
- build-macos:
-  runs-on: macos-latest
+ build-wasm:
+  runs-on: ubuntu-lastest
 
   steps:
-  
-   - uses: actions/checkout@v2
 
-   - name: install build dependencies
+   - uses: action/checkout@v2
+   
+   - name: build program
+     run: make -f makefile-emscripten
+
+   - name: upload to separate branch
      run: |
-      brew install --cask xquartz
-      brew install pango
-
-   - name: build
-     run: make -f makefile-macos
-
-   - name: package program
-     run: tar cvf zundagame-bin-macos-${{ github.RUN_NUMBER }}.tar.gz img adwaitalegacy zundagame readme.md
-
-   - uses: xresloader/upload-to-github-release@v1
-     name: upload artifacts
-     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-     with:
-      file: zundagame-bin-macos-${{ github.RUN_NUMBER }}.tar.gz
-      draft: false
-
+       git branch deploy
+       git add zundagame.wasm
+       git commit -m "wasm auto build"

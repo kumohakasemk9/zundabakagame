@@ -440,4 +440,4 @@ int32_t is_playable_character(obj_type_t tid) {
 		return 1;
 	}
 	return 0;
-}
+} 

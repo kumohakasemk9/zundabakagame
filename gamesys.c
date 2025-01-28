@@ -19,6 +19,7 @@ gamesys.c: game process and related functions
 #include <errno.h>
 #include <math.h>
 #include <stdarg.h>
+#include <time.h>
 
 //gamesys.c
 void read_creds();
@@ -45,7 +46,13 @@ void ebcount_cmd();
 void ebdist_cmd();
 void atkgain_cmd();
 void changetimeout_cmd();
-void chfont_cmd(char*);
+void cmd_enter();
+void cmd_cancel();
+void cmd_cursor_back();
+void cmd_cursor_forward();
+void cmd_putch(char);
+void modifyKeyFlags(keyflags_t, int32_t);
+void switch_debug_info();
 
 SMPProfile_t* t_SMPProf = NULL;
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
@@ -380,14 +387,18 @@ int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilte
 
 void gametick() {
 	//gametick, called for every 10mS
-	double beforetime = get_current_time_ms(); //prepare for measure running time
-	
+	#ifndef __WASM
+		//prepare for measure running time
+		struct timespec tbefore;
+		clock_gettime(CLOCK_REALTIME, &tbefore);
+	#endif
+
 	//Take care of chat timeout and timers
 	if(ChatTimeout != 0) { ChatTimeout--; }
 	if(StatusShowTimer != 0) { StatusShowTimer--; }
 
 	//SMP Processing
-	#ifndef __EMSCRIPTEN__
+	#ifndef __WASM
 	network_recv_task();
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		process_smp();
@@ -448,18 +459,19 @@ void gametick() {
 
 	procai(); //process all game objects and hitdetects
 
-	//Measure running time
-	double rt = get_current_time_ms() - beforetime;
-	static double avgt = 0;
-	static int32_t avgc = 0;
-	avgt += rt;
-	avgc++;
-	//Calculate avg of 10 times, then reset
-	if(avgc >= 10) {
-		GameTickTime = avgt / 10;
-		avgc = 0;
-		avgt = 0;
-	}
+	#ifndef __WASM
+		//Measure running time
+		static double avgt = 0;
+		static int32_t avgc = 0;
+		avgt += get_elapsed_time(tbefore);
+		avgc++;
+		//Calculate avg of 10 times, then reset
+		if(avgc >= 10) {
+			GameTickTime = avgt / 10;
+			avgc = 0;
+			avgt = 0;
+		}
+	#endif
 }
 
 void proc_playable_op() {
@@ -699,7 +711,7 @@ void execcmd() {
 
 	} else if(memcmp(CommandBuffer, "/chfont ", 8) == 0) {
 		//Load font list
-		chfont_cmd(&CommandBuffer[8]);
+		loadfont(&CommandBuffer[8]);
 
 	} else if(strcmp(CommandBuffer, "/connect") == 0) {
 		//Connect to SMP server
@@ -752,15 +764,6 @@ void changetimeout_cmd() {
 		return;
 	}
 	NetworkTimeout = i;
-}
-
-void chfont_cmd(char* flist) {
-	#ifdef __WASM
-		warn("Can not be used in this build!\n");
-		chatf( (char*)getlocalizedstring(TEXT_UNAVAILABLE) );
-	#else
-		loadfont(flist);
-	#endif
 }
 
 void ebcount_cmd() {
@@ -967,7 +970,7 @@ int32_t gameinit() {
 	
 	#ifndef __WASM
 		read_creds(); //read smp profiles
-		if(init_graphics() == -1) {
+		if(init_graphics() == -1) { //Graphics init
 			fail("init_graphics() failed.\n");
 			return -1;
 		}
@@ -1079,10 +1082,78 @@ void read_creds() {
 	fclose(f);
 }
 
+//Execute typed command and exit command mode
+void cmd_enter() {
+	CommandCursor = -1;
+	execcmd();
+}
+
+//Cancel command mode without execute
+void cmd_cancel() {
+	CommandCursor = -1;
+}
+
+//Move cursor back in command mode
+void cmd_cursor_back() {
+	if(CommandCursor > 0) {CommandCursor--;}
+}
+
+//Move cursor forward in command mode
+void cmd_cursor_forward() {
+	if(CommandCursor < utf8_strlen(CommandBuffer) ) {
+		CommandCursor++;
+	}
+}
+
+//Remove a single letter before cursor in command mode
+void cmd_backspace() {
+	if(CommandCursor > 0 && !CommandBufferMutex) {
+		CommandBufferMutex = 1;
+		char *s = utf8_strlen_to_pointer(CommandBuffer, CommandCursor - 1); //String after Deletion
+		char *s2 = utf8_strlen_to_pointer(CommandBuffer, CommandCursor); //String after current cursor
+		//Shift left string
+		for(uint16_t i = 0; i < strlen(s) + 1; i++) {
+			s[i] = s2[i];
+		}
+		CommandCursor--;
+		CommandBufferMutex = 0;
+	}
+}
+
+//Put single letter after cursor in command mode
+void cmd_putch(char c) {
+	if(is_range(c, 0x20, 0x7e) && !CommandBufferMutex) {
+		CommandBufferMutex = 1;
+		char s[] = {c, 0};
+		if(strlen(CommandBuffer) + strlen(s) + 1 <= sizeof(CommandBuffer) ) {
+			utf8_insertstring(CommandBuffer, s, CommandCursor, sizeof(CommandBuffer) );
+			CommandCursor += 1;
+		} else {
+			warn("commandmode_keyhandler(): Append letter failed: Buffer full.\n");
+		}
+		CommandBufferMutex = 0;
+	}
+}
+
+//Set or reset bit of KeyFlags, s 1: set, 0: reset; f: bitmask
+void modifyKeyFlags(keyflags_t f, int32_t s) {
+	if(s == 0) {
+		KeyFlags &= ~f;
+	} else {
+		KeyFlags |= f;
+	}
+}
+
 void mousemotion_handler(int32_t x, int32_t y) {
 	//Called when mouse moved, save mouse location value
 	CursorX = (int32_t)x;
 	CursorY = (int32_t)y;
+}
+
+//Switch debug info
+void switch_debug_info() {
+	DebugStatType++;
+	if(DebugStatType > 2) {DebugStatType = 0;} //0 to 2	
 }
 
 void keypress_handler(char kc, specialkey_t ks) {
@@ -1160,59 +1231,34 @@ void keypress_handler(char kc, specialkey_t ks) {
 		default:
 			if(ks == SPK_F3) {
 				//F3 Key
-				DebugStatType++;
-				if(DebugStatType > 2) {DebugStatType = 0;} //0 to 2
+				switch_debug_info();
 			}
-			break;
 		}
 	} else {
 		//command mode
 		//printf("%02d\n", kc);
 		if(ks == SPK_ENTER) {
 			//Enter
-			CommandCursor = -1;
-			execcmd();
+			cmd_enter();
 		} else if(ks == SPK_BS) {
 			//BackSpace
-			if(CommandCursor > 0 && !CommandBufferMutex) {
-				CommandBufferMutex = 1;
-				char *s = utf8_strlen_to_pointer(CommandBuffer, CommandCursor - 1); //String after Deletion
-				char *s2 = utf8_strlen_to_pointer(CommandBuffer, CommandCursor); //String after current cursor
-				//Shift left string
-				for(uint16_t i = 0; i < strlen(s) + 1; i++) {
-					s[i] = s2[i];
-				}
-				CommandCursor--;
-				CommandBufferMutex = 0;
-			}
+			cmd_backspace();
 		} else if(ks == SPK_LEFT) {
 			//LeftArrow
-			if(CommandCursor > 0) {CommandCursor--;}
+			cmd_cursor_back();
 		} else if(ks == SPK_RIGHT) {
 			//RightArrow
-			if(CommandCursor < utf8_strlen(CommandBuffer) ) {
-				CommandCursor++;
-			}
+			cmd_cursor_forward();
 		} else if(kc == 0x16) {
 			//CtrlV
 			//gdk_clipboard_read_text_async(GClipBoard, NULL, clipboard_read_handler, NULL);
 		} else if(ks == SPK_ESC) {
 			//Escape
-			CommandCursor = -1;
+			cmd_cancel();
 		} else {
 			//Others
 			//printf("%d\n", keycode);
-			if(is_range(kc, 0x20, 0x7e) && !CommandBufferMutex) {
-				CommandBufferMutex = 1;
-				char s[] = {kc, 0};
-				if(strlen(CommandBuffer) + strlen(s) + 1 <= sizeof(CommandBuffer) ) {
-					utf8_insertstring(CommandBuffer, s, CommandCursor, sizeof(CommandBuffer) );
-					CommandCursor += 1;
-				} else {
-					warn("commandmode_keyhandler(): Append letter failed: Buffer full.\n");
-				}
-				CommandBufferMutex = 0;
-			}
+			cmd_putch(kc);
 		}
 	}
 }

@@ -16,9 +16,9 @@ ui.c: gamescreen drawing
 #include "main.h"
 
 #include <string.h>
-#include <cairo/cairo.h>
+#include <stdarg.h>
+#include <time.h>
 
-//ui.c
 void draw_game_main();
 void draw_cui();
 void draw_info();
@@ -26,8 +26,14 @@ void draw_mchotbar(double, double);
 void draw_lolhotbar(double, double);
 void draw_game_object(int32_t, LookupResult_t, double, double);
 void draw_shapes(int32_t, double, double);
+void draw_hpbar(double, double, double, double, double, double, uint32_t, uint32_t);
+double drawstring_inwidth(double, double, char*, int32_t, int32_t);
+void drawsubstring(double, double, char*, int32_t, int32_t);
+int32_t drawstring_title(double, char*, int32_t);
+void drawstringf(double, double, const char*, ...);
+int32_t get_substring_width(char*, int32_t, int32_t);
+int32_t shrink_substring(char*, int32_t, int32_t, int32_t, int32_t*);
 
-extern cairo_t* G; //Gamescreen cairo context
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game Objects
 extern int32_t CameraX, CameraY; //Camera Position
 extern int32_t CommandCursor; //Command System Related
@@ -61,16 +67,16 @@ double DrawTime; //DrawTime (in milliseconds)
 extern double GameTickTime;
 extern int32_t AddingTID; //Debug mode appending object id
 extern int32_t DebugStatType;
+
 //Paint event of window client, called for every 30mS
 void game_paint() {
 	//Prepare to measure
-	static int32_t dtmc = 0;
-	static double sdt = 0;
-	double beforetime = get_current_time_ms();
+	#ifndef __WASM
+		struct timespec tbefore;
+		clock_gettime(CLOCK_REALTIME, &tbefore);
+	#endif
 
-	//Clear screen
-	cairo_set_source_rgb(G, 0, 0, 0);
-	cairo_paint(G);
+	clear_screen();
 
 	//Draw game
 	draw_game_main(); //draw characters
@@ -78,16 +84,19 @@ void game_paint() {
 	draw_mchotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
 	draw_lolhotbar(LHOTBAR_XOFF, LHOTBAR_YOFF); //draw lol like hotbar
 	draw_info(); //draw game information
-
-	//Calculate draw time (AVG)
-	sdt += get_current_time_ms() - beforetime;
-	dtmc++;
-	//measure 10 times, calculate avg amd reset
-	if(dtmc >= 10) {
-		DrawTime = sdt / 10;
-		sdt = 0;
-		dtmc = 0;
-	} 
+	#ifndef __WASM
+		//Calculate draw time (AVG)
+		static int32_t dtmc = 0;
+		static double sdt = 0;
+		sdt += get_elapsed_time(tbefore);
+		dtmc++;
+		//measure 10 times, calculate avg amd reset
+		if(dtmc >= 10) {
+			DrawTime = sdt / 10;
+			sdt = 0;
+			dtmc = 0;
+		}
+	#endif 
 }
 
 void draw_game_main() {
@@ -301,7 +310,7 @@ void draw_cui() {
 				objc++;
 			}
 		}
-		drawstringf(0, 0, "System: %.2f %.2f%% %.2f%%", DrawTime, GameTickTime / 10.0, (double)objc / (double)MAX_OBJECT_COUNT); //System Statics
+		drawstringf(0, 0, "System: %.2f %.2f (%.2f%%) %.2f%%", DrawTime, GameTickTime, GameTickTime / 10.0, (double)objc / (double)MAX_OBJECT_COUNT); //System Statics
 	} else if(DebugStatType == 2) {
 		drawstringf(0, 0, "Input: (%d, %d) (%d, %d) 0x%02x", CameraX, CameraY, CursorX, CursorY, KeyFlags); //Input Statics
 	}
@@ -524,3 +533,97 @@ void draw_mchotbar(double offsx, double offsy) {
 		}
 	}
 }
+
+//Draw hp bar at x, y with width w and height h, chp is current hp, fhp is full hp,
+//colorbg is background color, colorfg is foreground color.
+void draw_hpbar(double x, double y, double w, double h, double chp, double fhp, uint32_t colorbg, uint32_t colorfg) {
+	chcolor(colorbg, 1);
+	fillrect(x, y, w, h);
+	double bw = scale_number(chp, fhp, w);
+	chcolor(colorfg, 1);
+	fillrect(x, y, bw, h);
+}
+
+//draw substring ctx (index sp to ed) in pos x, y
+void drawsubstring(double x, double y, char* ctx, int32_t st, int32_t ed) {
+	char b[BUFFER_SIZE];
+	utf8_substring(ctx, st, ed, b, sizeof(b));
+	drawstring(x, y, b);
+}
+
+void drawstringf(double x, double y, const char *p, ...) {
+	char b[BUFFER_SIZE];
+	va_list v;
+	va_start(v, p);
+	ssize_t r = vsnprintf(b, sizeof(b), p, v);
+	va_end(v);
+	//Safety check
+	if(r >= sizeof(b) || r == -1) {
+		die("gutil.c: drawstringf() failed: formatted string not null terminated, input format string too long?\n");
+		return;
+	}
+	//Print
+	drawstring(x, y, b);
+}
+
+//draw string and let it fit in width wid using newline. if bg is 1, string will have rectangular background
+double drawstring_inwidth(double x, double y, char* ctx, int32_t wid, int32_t bg) {
+	double ty = y;
+	int32_t cp = 0;
+	int32_t ch = get_font_height();
+	int32_t ml = utf8_strlen(ctx);
+	while(cp < ml) {
+		//Write a adjusted string to fit in wid
+		int32_t a;
+		int32_t t = shrink_substring(ctx, wid, cp, ml, &a);
+		if(bg) {
+			chcolor(COLOR_TEXTBG, 0);
+			fillrect(x, ty, a, ch + 5);
+			restore_color();
+		}
+		drawsubstring(x, ty, ctx, cp, t);
+	//	g_print("Substring: %d %d\n", cp, t);
+		cp = t;
+		ty += ch + 5;
+	}
+	return ty;
+}
+
+int32_t drawstring_title(double y, char* ctx, int32_t s) {
+	//cairo_set_font_size(G, s);
+	set_font_size(s);
+	int32_t w = get_string_width(ctx);
+	int32_t h = get_font_height();
+	double x = (WINDOW_WIDTH / 2) - (w / 2);
+	chcolor(COLOR_TEXTBG, 0);
+	fillrect(x, y, w, h);
+	restore_color();
+	drawstring(x, y, ctx);
+	//cairo_set_font_size(G, FONT_DEFAULT_SIZE);
+	set_font_size(FONT_DEFAULT_SIZE);
+	return h;
+}
+
+//get_string_width but substring version (from index st to ed)
+int32_t get_substring_width(char* ctx, int32_t st, int32_t ed) {
+	char b[BUFFER_SIZE];
+	utf8_substring(ctx, st, ed, b, sizeof(b) );
+	return get_string_width(b);
+}
+
+//substring version of shrink_string()
+int32_t shrink_substring(char *ctx, int32_t wid, int32_t st, int32_t ed, int32_t* widr) {
+	int32_t l = constrain_i32(ed, 0, utf8_strlen(ctx) );
+	int32_t w = wid + 10;
+	//Delete one letter from ctx in each loops, continue until string width fits in wid
+	while(l > 0) {
+		w = get_substring_width(ctx, st, l);
+		if(widr != NULL) {*widr = w;}
+		if(w < wid || l <= 1) { return l; }
+		l--;
+		//g_print("%d %d\n", l, w);
+	}
+	return 1;
+}
+
+

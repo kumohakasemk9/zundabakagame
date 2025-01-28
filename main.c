@@ -32,7 +32,6 @@ change Character constant information structure to each function getters
 #include <openssl/evp.h>
 
 #include <unistd.h>
-#include <sys/time.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <pthread.h>
@@ -46,6 +45,7 @@ change Character constant information structure to each function getters
 
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 Display *Disp = NULL; //XDisplay
 Window Win; //XWindow
@@ -178,7 +178,8 @@ int main(int argc, char *argv[]) {
 	XSetWMProtocols(Disp, Win, &WM_DELETE_WINDOW, 1);
 	XSelectInput(Disp, Win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ExposureMask | PointerMotionMask);
 	info("Starting message loop.\n");
-	double tim = get_current_time_ms();
+	struct timespec tbefore;
+	clock_gettime(CLOCK_REALTIME, &tbefore);
 	while(ProgramExiting == 0) {
 		XEvent e;
 		if(XPending(Disp) ) {
@@ -186,9 +187,9 @@ int main(int argc, char *argv[]) {
 			xwindowevent_handler(e, WM_DELETE_WINDOW);
 		} else {
 			//redraw every 30mS
-			if(tim + 30 < get_current_time_ms() ) {
+			if(get_elapsed_time(tbefore) > 30) {
 				redraw_win();
-				tim = get_current_time_ms();
+				clock_gettime(CLOCK_REALTIME, &tbefore);
 			}
 			usleep(100);
 		}
@@ -248,11 +249,12 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 //Sub thread handler
 void *thread_cb(void* p) {
 	info("Gametick thread is running now.\n");
-	double t1 = get_current_time_ms();
+	struct timespec tbefore;
+	clock_gettime(CLOCK_REALTIME, &tbefore);
 	while(1) {
-		if(t1 + 10 < get_current_time_ms() ) { //10mS Timer
+		if(get_elapsed_time(tbefore) > 10) { //10mS Timer
 			gametick();
-			t1 = get_current_time_ms();
+			clock_gettime(CLOCK_REALTIME, &tbefore);
 		}
 		usleep(100);
 	}
@@ -385,26 +387,6 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	return r;
 }
 
-void detect_syslang() {
-	const char *LOCALEENVS[] = {"LANG", "LANGUAGE", "LC_ALL"};
-	for(int i = 0; i < 3; i++) {
-		char *t = getenv(LOCALEENVS[i]);
-		if(t != NULL && memcmp(t, "ja", 2) == 0) {
-			info("Japanese locale detected.\n");
-			LangID = LANGID_JP;
-			return;
-		}
-	}
-	info("English locale detected\n");
-}
-
-//get current time (unix epoch) in mS
-double get_current_time_ms() {
-	struct timeval t;
-	gettimeofday(&t, NULL);
-	return ( (double)t.tv_sec * 1000.0) + ( (double)t.tv_usec / 1000.0);
-}
-
 void warn(const char* c, ...) {
 	va_list varg;
 	printf("\x1b[33m");
@@ -432,4 +414,29 @@ void vfail(const char*c , va_list varg) {
 	printf("\x1b[31m");
 	vfprintf(stderr, c, varg);
 	printf("\x1b[0m");
+}
+
+void detect_syslang() {
+	const char *LOCALEENVS[] = {"LANG", "LANGUAGE", "LC_ALL"};
+	for(int i = 0; i < 3; i++) {
+		char *t = getenv(LOCALEENVS[i]);
+		if(t != NULL && memcmp(t, "ja", 2) == 0) {
+			info("Japanese locale detected.\n");
+			LangID = LANGID_JP;
+			return;
+		}
+	}
+}
+
+//Get elapsed time from tbefore and return double in millisecond unit
+double get_elapsed_time(struct timespec tbefore) {
+	struct timespec tafter;
+	clock_gettime(CLOCK_REALTIME, &tafter);
+	double sec_diff = (double)tafter.tv_sec - (double)tbefore.tv_sec;
+	double nsec_diff = (double)tafter.tv_nsec - (double)tbefore.tv_nsec;
+	if(nsec_diff < 0) {
+		sec_diff--;
+		nsec_diff = 1000000000 - nsec_diff;
+	}
+	return (sec_diff * 1000) + (nsec_diff / 1000000);
 }
