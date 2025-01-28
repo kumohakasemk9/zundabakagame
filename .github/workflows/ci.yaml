@@ -33,7 +33,8 @@ jobs:
    - name: prepare emscripten
      run: sudo apt-get -y install emscripten
    
-   - run: make
+   - name: make
+     run: make TARGET=WASM
    - name: prepare page content
      run: |
       mv zundagame.wasm wasm/
