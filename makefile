@@ -17,7 +17,7 @@ PKGCONF=pkg-config cairo pangocairo openssl
 CFLAGS=$(COMCFLAGS) `$(PKGCONF) --cflags`
 LDFLAGS=`$(PKGCONF) --libs` -lX11 -lm
 COMOBJS=util.o info.o gamesys.o aiproc.o network.o ui.o
-OBJS=zundagame.o graphics.o $(COMOBJS)
+OBJS=$(COMOBJS) zundagame.o graphics.o
 OUTNAME=zundagame
 
 ifeq ($(TARGET),WASM)
