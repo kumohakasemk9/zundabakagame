@@ -1,8 +1,6 @@
 name: build
 
 jobs:
- permissions:
-  contents: write
 
  build-linux:
   runs-on: ubuntu-latest
