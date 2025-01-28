@@ -49,7 +49,7 @@ addEventListener("load", function() {
 	
 	updateStatus("Loading WASM...", 0, 0);
 	const XHR = new XMLHttpRequest();
-	XHR.open("POST", "zundagame.wasm");
+	XHR.open("GET", "zundagame.wasm");
 	XHR.addEventListener("load", wasm_load_cb);
 	XHR.responseType = 'arraybuffer';
 	XHR.send();
