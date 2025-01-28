@@ -32,32 +32,3 @@ jobs:
      with:
       file: zundagame-mac
       draft: false
- 
- build-win:
-  runs-on: windows-latest
-  steps:
-   - uses: actions/checkout@v2
-   - name: prepare dependencies
-     uses: robinraju/release-downloader@v1
-     with:
-      repository: 'wingtk/gvsbuild'
-      latest: true
-      filename: 'GTK3*.zip'
-      extract: true
-      out-file-path: 'gtk3'
-
-  - uses: msys2/setup-msys2@v2
-    id: msys2
-    with:
-     msystem: MSYS
-
-  - name: build
-    run: |
-     make TARGET=WIN32
-     cp ${{ steps.msys2.outputs.msys2-location }}/usr/bin/msys-2.0.dll .
-     7z a zundagame-win32.zip msys-2.0.dll zundagame.exe
-   
-  - uses: xresloader/upload-to-github-release@v1
-    with:
-     file: zundagame-win32.zip
-     draft: false
