@@ -1,6 +1,11 @@
-name: build
+on:
+ push:
+  branches:
+   - main
 
 jobs:
+ permissions:
+  content: write
 
  build-linux:
   runs-on: ubuntu-latest
