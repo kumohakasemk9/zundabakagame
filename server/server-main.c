@@ -23,7 +23,7 @@
 #define SIZE_EVENT_BUFFER 8192
 #define SIZE_NET_BUFFER 512
 
-#include <zunda-server.h>
+#include <inc/zunda-server.h>
 
 //User Information Struct
 typedef struct {

@@ -13,7 +13,7 @@ Zundamon is from https://zunko.jp/
 aiproc.c: Character AI
 */
 
-#include "main.h"
+#include "inc/zundagame.h"
 
 #include <string.h>
 

@@ -13,7 +13,7 @@ Zundamon is from https://zunko.jp/
 info.c: game object information and localization info
 */
 
-#include "main.h"
+#include "inc/zundagame.h"
 
 extern langid_t LangID;
 

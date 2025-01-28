@@ -13,7 +13,7 @@ Zundamon is from https://zunko.jp/
 graphics.c: drawing functions
 */
 
-#include "main.h"
+#include "inc/zundagame.h"
 
 #include <stdarg.h>
 #include <math.h>

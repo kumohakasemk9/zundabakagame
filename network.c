@@ -13,7 +13,7 @@ Zundamon is from https://zunko.jp/
 network.c: process network packets
 */
 
-#include "main.h"
+#include "inc/zundagame.h"
 
 #include <string.h>
 #include <stdarg.h>

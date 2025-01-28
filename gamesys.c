@@ -13,7 +13,7 @@ Zundamon is from https://zunko.jp/
 gamesys.c: game process and related functions
 */
 
-#include "main.h"
+#include "inc/zundagame.h"
 
 #include <string.h>
 #include <errno.h>
