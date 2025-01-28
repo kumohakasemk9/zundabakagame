@@ -14,11 +14,23 @@ jobs:
    - uses: actions/checkout@v2
    - name: prepare dependics
      run: sudo apt-get install -y libcairo2-dev libpango1.0-dev
-   - name: build
-     run: make
-   - name: upload release
-     uses: xresloader/upload-to-github-release@v1
+   - run: make
+   - uses: xresloader/upload-to-github-release@v1
      with:
       file: zundagame
       draft: false
   
+ build-mac:
+  runs-on: macos-latest
+  permissions:
+   contents: write
+  steps:
+   - uses: actions/checkout@v2
+   - name: build
+     run: |
+      make TARGET=MACOS
+      mv zundagame zundagame-mac
+   - uses: xresloader/upload-to-github-release@v1
+     with:
+      file: zundagame-mac
+      draft: false
