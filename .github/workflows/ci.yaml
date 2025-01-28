@@ -2,10 +2,9 @@ on:
  push:
   branches:
    - main
-
+permissions:
+ content: write
 jobs:
- permissions:
-  content: write
 
  build-linux:
   runs-on: ubuntu-latest
