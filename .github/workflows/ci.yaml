@@ -35,7 +35,7 @@ jobs:
    
    - run: make
    - name: prepare page content
-   - run: |
+     run: |
       mv zundagame.wasm wasm/
       mv img wasm/
       mv adwaitalegacy wasm/
