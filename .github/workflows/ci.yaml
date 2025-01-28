@@ -1,0 +1,29 @@
+ name: CI
+
+on:
+ push:
+  branches:
+   - main
+
+jobs:
+ build-wasm:
+  
+  runs-on: ubuntu-latest
+  
+  steps:
+   
+   - uses: actions/checkout@v4
+
+   - name: build wasm
+     run: make TARGET=WASM
+
+   - name: compress files
+     run: |
+      mv wasm/index* .
+      tar cvf github-pages img adwaitalegacy readme.md zundagame.wasm index*
+   
+   - uses: actions/configure-pages@v5
+
+   - uses: actions/upload-pages-artifact@v3
+
+   - uses: actions/deploy-pages@v4
