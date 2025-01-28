@@ -9,7 +9,7 @@ Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
 windows-zunda-main.c: windows entry point, windows apis, socket wrapper.
 */
-#include "main.h"
+#include "inc/zundagame.h"
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>

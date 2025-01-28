@@ -1,3 +1,4 @@
+name: CI
 on:
  push:
   branches:
@@ -6,18 +7,6 @@ permissions:
  contents: write
 jobs:
 
- build-linux:
-  runs-on: ubuntu-latest
-  steps:
-   - uses: actions/checkout@v2
-   - name: prepare dependencies
-     run: sudo apt-get install -y libcairo2-dev libpango1.0-dev
-   - run: make
-   - uses: xresloader/upload-to-github-release@v1
-     with:
-      file: zundagame
-      draft: false
-  
  build-mac:
   runs-on: macos-latest
   steps:
@@ -27,7 +16,7 @@ jobs:
       brew install --cask xquartz
       brew install pango
 
-   - name: build
+   - name: make
      run: |
       make TARGET=MACOS
       mv zundagame zundagame-mac
@@ -37,28 +26,17 @@ jobs:
       file: zundagame-mac
       draft: false
 
- build-windows:
-  runs-on: windows-latest
+ build-wasm:
+  runs-on: ubuntu-latest
   steps:
-   - uses: actions/checkout@v2   
-   - uses: robinraju/release-downloader@v1
-     name: download gvsbuild
-     with:
-      repository: 'wingtk/gvsbuild'
-      latest: true
-      filename: 'GTK3*.zip'
-      extract: true
-      out-file-path: 'gtk3'
-   - uses: msys2/setup-msys2@v2
-     id: msys2
-     with:
-      msystem: MSYS
-   - name: build
-     run : |
-      make TARGET=WIN32
-      cp ${{ steps.msys2.outputs.msys2-location }}/usr/bin/msys-2.0.dll .
-      7z a zundagame-win32.zip zundagame.exe msys-2.0.dll
-   - uses: xresloader/upload-to-github-release@v1
-     with:
-      file: zundagame-win32.zip
-      draft: false
+   - uses: actions/checkout@v2
+   - name: prepare emscripten
+     run: sudo apt-get -y install emscripten
+   
+   - run: make
+   - name: prepare page content
+   - run: |
+      mv zundagame.wasm wasm/
+      mv img wasm/
+      mv adwaitalegacy wasm/
+      ls wasm
