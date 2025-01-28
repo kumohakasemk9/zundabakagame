@@ -443,3 +443,15 @@ void vfail(const char*c , va_list varg) {
 	vfprintf(stderr, c, varg);
 	printf("\x1b[0m");
 }
+
+double get_elapsed_time(struct timespec tbefore) {
+	struct timespec tafter;
+	clock_gettime(CLOCK_REALTIME, &tafter);
+	double sec_diff = (double)tafter.tv_sec - (double)tbefore.tv_sec;
+	double nsec_diff = (double)tafter.tv_nsec - (double)tbefore.tv_nsec;
+	if(nsec_diff < 0) {
+		sec_diff--;
+		nsec_diff = 1000000000 - nsec_diff;
+	}
+	return (sec_diff * 1000) + (nsec_diff / 1000000);
+}
