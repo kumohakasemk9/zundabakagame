@@ -14,7 +14,7 @@ main-emscripten.c: wasm functions
 
 */
 
-#include "inc/zundagame.h"
+#include "../inc/zundagame.h"
 #include <stdarg.h>
 
 #include <arpa/inet.h>
