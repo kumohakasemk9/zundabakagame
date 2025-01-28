@@ -70,7 +70,7 @@ comes at last. (Do not eorry if you are in windows, in windows code, cr
 is recognized as newline instead.)   
    
 # Prepareation
-1. Library needed: `cairo` `x11`
+1. Library needed: `cairo` `x11` `pango`
 2. `git clone https://github.com/kumohakasemk9/zundabakagame.git`
 3. `cd zundabakagame-master`
 4.	`make`
