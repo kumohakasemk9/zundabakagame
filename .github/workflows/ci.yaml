@@ -12,7 +12,7 @@ jobs:
    contents: write
   steps:
    - uses: actions/checkout@v2
-   - name: prepare dependics
+   - name: prepare dependencies
      run: sudo apt-get install -y libcairo2-dev libpango1.0-dev
    - run: make
    - uses: xresloader/upload-to-github-release@v1
@@ -26,10 +26,16 @@ jobs:
    contents: write
   steps:
    - uses: actions/checkout@v2
+   - name: prepare dependencies
+     run: |
+      brew install --cask xquartz
+      brew install pango
+
    - name: build
      run: |
       make TARGET=MACOS
       mv zundagame zundagame-mac
+
    - uses: xresloader/upload-to-github-release@v1
      with:
       file: zundagame-mac
