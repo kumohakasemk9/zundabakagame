@@ -26,7 +26,7 @@ jobs:
    - name: compress files
      run: |
       mv wasm/index* .
-      tar cvf github-pages img adwaitalegacy readme.md zundagame.wasm index*
+      tar cvf github-pages.tar.gz img adwaitalegacy readme.md zundagame.wasm index*
 
    - uses: actions/configure-pages@v5
    - uses: actions/deploy-pages@v4
