@@ -16,3 +16,8 @@ jobs:
      run: sudo apt-get install -y libcairo2-dev libpango1.0-dev
    - name: build
      run: make
+   - name: upload release
+     uses: xresloader/upload-to-github-release@v1
+     with:
+      file: zundagame
+      draft: false
