@@ -49,7 +49,7 @@ addEventListener("load", function() {
 	
 	updateStatus("Loading WASM...", 0, 0);
 	const XHR = new XMLHttpRequest();
-	XHR.open("GET", "zundagame.wasm");
+	XHR.open("GET", "../zundagame.wasm");
 	XHR.addEventListener("load", wasm_load_cb);
 	XHR.responseType = 'arraybuffer';
 	XHR.send();
@@ -83,7 +83,7 @@ async function wasm_load_cb(ev) {
 		l.push(s);
 		img = new Image();
 		img.addEventListener("load", img_load_cb);
-		img.src = s;
+		img.src = `../${s}`;
 		IMGS.push(img);
 	}
 	console.log(l);

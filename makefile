@@ -25,14 +25,7 @@ ifeq ($(TARGET),WASM)
 	OBJS=wasm/zundagame-wasm.o $(COMOBJS)
 	CFLAGS=$(COMCFLAGS) -D__WASM
 	LDFLAGS=--no-entry -s "EXPORTED_FUNCTIONS=['_gameinit', '_gametick', '_select_next_item', '_select_prev_item', '_use_item', '_switch_character_move', '_game_paint', '_isProgramExiting', '_is_cmd_mode', '_getIMGPATHES', '_getImageCount', '_modifyKeyFlags', '_cmd_putch', '_cmd_enter', '_cmd_cancel', '_cmd_cursor_back', '_cmd_cursor_forward', '_cmd_backspace', '_start_command_mode', '_mousemotion_handler', '_set_language']" -s ERROR_ON_UNDEFINED_SYMBOLS=0
-	OUTNAME=zundagame.wasm
-endif
-
-ifeq ($(TARGET),WIN32)
-	PKGCONF=gtk3/bin/pkg-config cairo pangocairo pango
-	CFLAGS=$(COMCFLAGS) `$(PKGCONF) --cflags`
-	LDFLAGS=`$(PKGCONF) --libs` -lbcrypt -lws2_32
-	OBJS=zundagame-win32.o graphics.o $(COMOBJS)
+	OUTNAME=wasm/zundagame.wasm
 endif
 
 all: $(OBJS)
