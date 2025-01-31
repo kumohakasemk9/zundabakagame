@@ -169,8 +169,3 @@ void vfail(const char* c, va_list v) {
 	vsnprintf(buf, BUFFER_SIZE, c, v);
 	console_put(buf, 2);
 }
-
-double get_elapsed_time(struct timespec tbefore) {
-	die("WASM version should not call this.\n");
-	return 0; //No profiler for WASM version.
-}
