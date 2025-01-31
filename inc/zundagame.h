@@ -16,7 +16,6 @@ main.h: integrated header file
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <time.h>
 
 #include "zunda-defs.h"
 #include "zunda-server.h"
@@ -43,7 +42,6 @@ void warn(const char*, ...);
 void info(const char*, ...);
 void fail(const char*, ...);
 void vfail(const char*, va_list);
-double get_elapsed_time(struct timespec);
 
 //gamesys.c
 void gametick();
@@ -77,6 +75,7 @@ double constrain_number(double, double, double);
 char *utf8_strlen_to_pointer(char*, int32_t);
 int32_t utf8_insertstring(char*, char*, int32_t, size_t);
 int32_t constrain_i32(int32_t, int32_t, int32_t);
+double get_current_time_ms();
 
 //info.c
 void lookup(obj_type_t, LookupResult_t*);

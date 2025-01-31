@@ -43,7 +43,6 @@ change Character constant information structure to each function getters
 
 #include <errno.h>
 #include <string.h>
-#include <time.h>
 
 Display *Disp = NULL; //XDisplay
 Window Win; //XWindow
@@ -176,8 +175,7 @@ int main(int argc, char *argv[]) {
 	XSetWMProtocols(Disp, Win, &WM_DELETE_WINDOW, 1);
 	XSelectInput(Disp, Win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ExposureMask | PointerMotionMask);
 	info("Starting message loop.\n");
-	struct timespec tbefore;
-	clock_gettime(CLOCK_REALTIME, &tbefore);
+	double tbefore = get_current_time_ms();
 	while(ProgramExiting == 0) {
 		XEvent e;
 		if(XPending(Disp) ) {
@@ -185,9 +183,9 @@ int main(int argc, char *argv[]) {
 			xwindowevent_handler(e, WM_DELETE_WINDOW);
 		} else {
 			//redraw every 30mS
-			if(get_elapsed_time(tbefore) > 30) {
+			if(get_current_time_ms() > tbefore + 30) {
 				redraw_win();
-				clock_gettime(CLOCK_REALTIME, &tbefore);
+				tbefore = get_current_time_ms();
 			}
 			usleep(100);
 		}
@@ -247,12 +245,11 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 //Sub thread handler
 void *thread_cb(void* p) {
 	info("Gametick thread is running now.\n");
-	struct timespec tbefore;
-	clock_gettime(CLOCK_REALTIME, &tbefore);
+	double tbefore = get_current_time_ms();
 	while(1) {
-		if(get_elapsed_time(tbefore) > 10) { //10mS Timer
+		if(get_current_time_ms() > 10 + tbefore) { //10mS Timer
 			gametick();
-			clock_gettime(CLOCK_REALTIME, &tbefore);
+			tbefore = get_current_time_ms();
 		}
 		usleep(100);
 	}
@@ -424,17 +421,4 @@ void detect_syslang() {
 			return;
 		}
 	}
-}
-
-//Get elapsed time from tbefore and return double in millisecond unit
-double get_elapsed_time(struct timespec tbefore) {
-	struct timespec tafter;
-	clock_gettime(CLOCK_REALTIME, &tafter);
-	double sec_diff = (double)tafter.tv_sec - (double)tbefore.tv_sec;
-	double nsec_diff = (double)tafter.tv_nsec - (double)tbefore.tv_nsec;
-	if(nsec_diff < 0) {
-		sec_diff--;
-		nsec_diff = 1000000000 - nsec_diff;
-	}
-	return (sec_diff * 1000) + (nsec_diff / 1000000);
 }

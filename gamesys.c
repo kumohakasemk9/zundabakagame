@@ -389,8 +389,7 @@ void gametick() {
 	//gametick, called for every 10mS
 	#ifndef __WASM
 		//prepare for measure running time
-		struct timespec tbefore;
-		clock_gettime(CLOCK_REALTIME, &tbefore);
+		double tbefore = get_current_time_ms();
 	#endif
 
 	//Take care of chat timeout and timers
@@ -463,7 +462,7 @@ void gametick() {
 		//Measure running time
 		static double avgt = 0;
 		static int32_t avgc = 0;
-		avgt += get_elapsed_time(tbefore);
+		avgt += get_current_time_ms() - tbefore;
 		avgc++;
 		//Calculate avg of 10 times, then reset
 		if(avgc >= 10) {

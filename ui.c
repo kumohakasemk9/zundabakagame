@@ -72,8 +72,7 @@ extern int32_t DebugStatType;
 void game_paint() {
 	//Prepare to measure
 	#ifndef __WASM
-		struct timespec tbefore;
-		clock_gettime(CLOCK_REALTIME, &tbefore);
+		double tbefore = get_current_time_ms();
 	#endif
 
 	clear_screen();
@@ -88,7 +87,7 @@ void game_paint() {
 		//Calculate draw time (AVG)
 		static int32_t dtmc = 0;
 		static double sdt = 0;
-		sdt += get_elapsed_time(tbefore);
+		sdt += get_current_time_ms() - tbefore;
 		dtmc++;
 		//measure 10 times, calculate avg amd reset
 		if(dtmc >= 10) {

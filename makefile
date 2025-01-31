@@ -20,6 +20,12 @@ COMOBJS=util.o info.o gamesys.o aiproc.o network.o ui.o
 OBJS=$(COMOBJS) zundagame.o graphics.o
 OUTNAME=zundagame
 
+ifeq ($(TARGET),WIN32)
+	OBJS=$(COMOBJS) graphics.o zundagame-win32.o
+	CFLAGS=$(COMCFLAGS) -I../gvsbuild/include/pango-1.0 -I../gvsbuild/include/cairo -I../gvsbuild/include/pixman-1 -I../gvsbuild/include/libmount -I../gvsbuild/include/blkid -I../gvsbuild/include/fribidi -I../gvsbuild/include/harfbuzz -I../gvsbuild/include/freetype2 -I../gvsbuild/include/libpng16 -I../gvsbuild/include/glib-2.0 -I../gvsbuild/lib/glib-2.0/include -I../gvsbuild/include/sysprof-6 -pthread
+	LDFLAGS=-lbcrypt -lws2_32 -lm -lpangocairo-1.0 -lpango-1.0 -lgobject-2.0 -lglib-2.0 -lharfbuzz -lcairo
+endif
+
 ifeq ($(TARGET),WASM)
 	CC=emcc
 	OBJS=wasm/zundagame-wasm.o $(COMOBJS)

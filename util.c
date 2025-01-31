@@ -17,6 +17,7 @@ util.c: utility functions
 
 #include <string.h>
 #include <stdarg.h>
+#include <time.h> //Do not include with windows.h, it will break windows compatibility
 
 size_t utf8_get_letter_bytelen(char);
 
@@ -161,4 +162,9 @@ char *utf8_strlen_to_pointer(char *ctx, int32_t letterpos) {
 	return &ctx[bl];
 }
 
-
+//get current time (unix epoch) in mS
+double get_current_time_ms() {
+	struct timespec t;
+	clock_gettime(CLOCK_REALTIME, &t);
+	return ( (double)t.tv_sec * 1000.0) + ( (double)t.tv_nsec / 1000000.0);
+}
