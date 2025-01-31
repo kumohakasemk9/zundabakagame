@@ -50,7 +50,7 @@ jobs:
       cp -r img deploy
       cp -r adwaitalegacy deploy
       cp wasm/index* deploy
-      cp wasm/zundagame.wasm .
+      cp wasm/zundagame.wasm deploy
 
    - uses: actions/configure-pages@v5
    - uses: actions/upload-pages-artifact@v3
