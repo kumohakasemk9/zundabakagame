@@ -1,0 +1,61 @@
+on:
+ push:
+  branches:
+   - main
+permissions:
+ contents: write
+jobs:
+  
+ build-mac:
+  runs-on: macos-latest
+  steps:
+   - uses: actions/checkout@v2
+   - name: prepare dependencies
+     run: |
+      brew install --cask xquartz
+      brew install pango
+
+   - name: build
+     run: |
+      make
+      mv zundagame zundagame-mac
+
+   - uses: xresloader/upload-to-github-release@v1
+     with:
+      file: zundagame-mac
+      draft: false
+
+ build-pages:
+  runs-on: ubuntu-latest
+  environment:
+   name: github-pages
+   url: ${{ steps.deployment.outputs.page_url }}
+
+  permissions:
+   contents: read
+   pages: write
+   id-token: write
+
+  steps:
+   - uses: actions/checkout@v2
+   - name: prepare dependencies
+     run: apt-get -y install emscripten
+   
+   - name: build
+     run: make TARGET=WASM
+
+   - name: prepare page
+     run: |
+      mkdir deploy
+      cp -r img deploy
+      cp -r adwaitalegacy deploy
+      cp wasm/index* deploy
+      cp wasm/zundagame.wasm .
+
+   - uses: actions/configure-pages@v5
+   - uses: actions/upload-pages-artifact@v3
+     with:
+      path: deploy
+
+   - uses: actions/deploy-pages@v4
+     id: deployment
