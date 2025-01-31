@@ -39,7 +39,7 @@ jobs:
   steps:
    - uses: actions/checkout@v2
    - name: prepare dependencies
-     run: apt-get -y install emscripten
+     run: sudo apt-get -y install emscripten
    
    - name: build
      run: make TARGET=WASM
