@@ -1,5 +1,9 @@
 const importobj = {
 	env : {
+		make_tcp_socket : make_tcp_socket,
+		close_tcp_socket : close_tcp_socket,
+		send_tcp_socket : send_tcp_socket,
+		compute_passhash : compute_passhash,
 		console_put : console_put,
 		clear_screen : clear_screen,
 		chcolor : chcolor,
@@ -369,4 +373,20 @@ function console_put(a, l) {
 	} else {
 		console.err(s);
 	}
+}
+
+function make_tcp_socket(peeraddr, port) {
+	
+}
+
+function send_tcp_socket(data, len) {
+	
+}
+
+function close_tcp_socket() {
+	
+}
+
+function compute_passhash(p1, p2, p3, p4) {
+	
 }

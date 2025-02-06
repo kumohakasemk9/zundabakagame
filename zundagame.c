@@ -312,6 +312,9 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 		freeaddrinfo(addr);
 		return -1;
 	}
+	
+	int opt = 1;
+	setsockopt(ConnectionSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt) );
 
 	//Make socket nonblock.
 	if(fcntl(ConnectionSocket, F_SETFL, O_NONBLOCK) == -1) {
@@ -323,13 +326,14 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 	}
 	
 	//Connect to node
-	if(connect(ConnectionSocket, addr->ai_addr, addr->ai_addrlen) != 0) {
+	if(connect(ConnectionSocket, addr->ai_addr, addr->ai_addrlen) != 0 && errno != EINPROGRESS) {
 		warn("make_tcp_socket(): connect failed. %s.\n", strerror(errno) );
 		close(ConnectionSocket);
 		ConnectionSocket = -1;
+		freeaddrinfo(addr);
+		return -1;
 	}
 	freeaddrinfo(addr);
-	info("make_tcp_socket(): Connection request sent!\n");
 	return 0;
 }
 

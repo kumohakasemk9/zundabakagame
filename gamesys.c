@@ -54,7 +54,6 @@ void cmd_putch(char);
 void modifyKeyFlags(keyflags_t, int32_t);
 void switch_debug_info();
 
-SMPProfile_t* t_SMPProf = NULL;
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
 int32_t ChatTimeout = 0; //Douncounting timer, chat will shown it this is not 0
 GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game object memory
@@ -398,11 +397,11 @@ void gametick() {
 
 	//SMP Processing
 	#ifndef __WASM
-	network_recv_task();
+		network_recv_task();
+	#endif
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		process_smp();
 	}
-	#endif
 	
 	//If game is not in playing state, do special process
 	if(GameState == GAMESTATE_INITROUND) {
@@ -1063,17 +1062,17 @@ void read_creds() {
 			SMPProfs = malloc(sizeof(SMPProfile_t) );
 			if(SMPProfs == NULL) {
 				warn("read_creds(): insufficient memory, malloc failure.\n");
+				fclose(f);
 				return;
 			}
 		} else {
-			t_SMPProf = realloc(SMPProfs, sizeof(SMPProfile_t) * (size_t)(SMPProfCount + 1) );
-			if(t_SMPProf == NULL) {
+			SMPProfile_t *t = realloc(SMPProfs, sizeof(SMPProfile_t) * (size_t)(SMPProfCount + 1) );
+			if(t == NULL) {
 				warn("read_creds(): insufficient memory, realloc failure.\n");
-				free(SMPProfs);
-				SMPProfs = NULL;
+				fclose(f);
 				return;
 			}
-			SMPProfs = t_SMPProf;
+			SMPProfs = t;
 		}
 		memcpy(&SMPProfs[SMPProfCount], &t_rec, sizeof(SMPProfile_t) );
 		SMPProfCount++;

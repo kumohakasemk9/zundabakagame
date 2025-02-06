@@ -16,6 +16,7 @@ main-emscripten.c: wasm functions
 
 #include "../inc/zundagame.h"
 #include <stdarg.h>
+#include <string.h>
 
 #include <arpa/inet.h>
 
@@ -26,6 +27,23 @@ extern const char* IMGPATHES[IMAGE_COUNT];
 extern int32_t CommandCursor;
 int32_t ConnectionSocket = -1;
 extern langid_t LangID;
+extern SMPProfile_t *SMPProfs;
+extern int32_t SMPProfCount;
+
+void setSMPProfile(char *hostname, char *port, char *username, char *password) {
+	if(SMPProfs == NULL) {
+		SMPProfs = malloc(sizeof(SMPProfile_t) );
+	}
+	strncpy(SMPProfs[0].host, hostname, HOSTNAME_SIZE);
+	SMPProfs[0].host[HOSTNAME_SIZE - 1] = 0; //for additional security
+	strncpy(SMPProfs[0].port, port, PORTNAME_SIZE);
+	SMPProfs[0].port[PORTNAME_SIZE - 1] = 0; //for additional security
+	strncpy(SMPProfs[0].usr, username, UNAME_SIZE);
+	SMPProfs[0].usr[UNAME_SIZE - 1] = 0; //for additional security
+	strncpy(SMPProfs[0].pwd, password, PASSWD_SIZE);
+	SMPProfs[0].pwd[PASSWD_SIZE - 1] = 0; //for additional security
+	SMPProfCount = 1;
+}
 
 int getImageCount() {
 	return IMAGE_COUNT;
@@ -62,44 +80,10 @@ uint32_t host2network_fconv_32(int32_t d) {
 	return htonl( (uint32_t)d);
 }
 
-//Open and connect tcp socket to hostname and port
-int32_t make_tcp_socket(char* hostname, char* port) {
-	//If already connected, this function will fail.
-	if(ConnectionSocket != -1) {
-		warn("make_tcp_socket(): already connected.\n");
-		return -1;
-	}
-	info("make_tcp_socket(): Not supported in WASM!\n");
+ssize_t recv_tcp_socket(uint8_t* b, size_t a) {
+	warn("This function should be never called\n");
 	return -1;
 }
-
-//Close current connection
-int32_t close_tcp_socket() {
-	if(ConnectionSocket == -1) {
-		warn("close_tcp_socket(): socket is not open!\n");
-		return -1;
-	}
-	return -1;
-}
-
-//Send bytes to connected server
-ssize_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
-	if(ConnectionSocket == -1) {
-		warn("send_tcp_socket(): socket is not open!\n");
-		return -1;
-	}
-	return -1;
-}
-
-//Receive bytes from connected server, returns read bytes
-ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
-	if(ConnectionSocket == -1) {
-		warn("recv_tcp_socket(): socket is not open!\n");
-		return -1;
-	}
-	return -1;
-}
-
 
 /*
 void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {

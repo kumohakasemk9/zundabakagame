@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <time.h>
+#include <ctype.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -22,6 +23,10 @@
 #define LIMIT_ADD_EVENT 512
 #define SIZE_EVENT_BUFFER 8192
 #define SIZE_NET_BUFFER 512
+#define HTTP_LINE_LIMIT 256
+#define PROTOCOL_HTTP 0
+#define PROTOCOL_WEBSOCKET 1
+#define PROTOCOL_RAW 2
 
 #include <inc/zunda-server.h>
 
@@ -43,6 +48,10 @@ typedef struct  {
 	int rdlength;
 	int timeouttimer;
 	uint8_t rdbuf[SIZE_NET_BUFFER];
+	int protocolid;
+	char httpupgrade[HTTP_LINE_LIMIT];
+	char httpfirstline[HTTP_LINE_LIMIT];
+	char httpwskey[HTTP_LINE_LIMIT];
 } cliinfo_t;
 
 int ServerSocket;
@@ -54,15 +63,12 @@ userinfo_t *UserInformations = NULL;
 int UserCount = 0;
 uint8_t ServerSalt[SALT_LENGTH];
 FILE *LogFile;
+int Timeout = 5000; //0 to disable timeout
 
 void SendJoinPacket(int);
 void SendLeavePacket(int);
 void INTHwnd(int);
-void IOHwnd(int);
-void NewClient();
-int InstallSignal(int, void (*)() );
-int MakeAsync(int);
-int IsAvailable(int);
+void AcceptNewClient();
 void ClientReceive(int);
 void AddEventCmd(uint8_t*, int, int);
 void AddEvent(uint8_t*, int, int);
@@ -75,6 +81,8 @@ void Log(int, const char*, ...);
 int GetEventPacketSize(uint8_t*, int);
 void SendUserLists(int);
 void recv_packet_handler(uint8_t*, size_t, int);
+void recv_http_handler(char*, int);
+void recv_websock_handler(uint8_t*, size_t, uint8_t, int, uint8_t*, int);
 ssize_t send_packet(void*, size_t, int);
 
 int main(int argc, char *argv[]) {
@@ -83,11 +91,16 @@ int main(int argc, char *argv[]) {
 		ServerSalt[i] = random() % 0x100;
 	}
 	for(int i = 0; i < MAX_CLIENTS; i++) { C[i].fd = -1; }
+
 	//Install signal
-	if(InstallSignal(SIGINT, INTHwnd) == -1 || InstallSignal(SIGIO, IOHwnd) == -1) {
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa) );
+	sa.sa_handler = INTHwnd;
+	if(sigaction(SIGINT, &sa, NULL) == -1) {
 		printf("Sigaction failed.\n");
 		return 1;
 	}
+
 	//Make socket, set options
 	ServerSocket = socket(AF_INET, SOCK_STREAM, 0);
 	if(ServerSocket == -1) {
@@ -96,11 +109,11 @@ int main(int argc, char *argv[]) {
 	}
 	int opt = 1;
 	setsockopt(ServerSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt) );
-	if(MakeAsync(ServerSocket) == -1) {
-		printf("Making socket async failed.\n");
-		close(ServerSocket);
+	if(fcntl(ServerSocket, F_SETFL, O_NONBLOCK) == -1) {
+		printf("Making non biock socket fail.\n");
 		return 1;
 	}
+
 	//Bind
 	int portnum = 25566;
 	if(argc >= 2) {
@@ -119,6 +132,7 @@ int main(int argc, char *argv[]) {
 		close(ServerSocket);
 		return 1;
 	}
+
 	//load user list
 	FILE *f_pwdfile = fopen("server_passwd", "r");
 	if(f_pwdfile == NULL) {
@@ -170,6 +184,7 @@ int main(int argc, char *argv[]) {
 		UserCount++;
 	}
 	fclose(f_pwdfile);
+
 	//Listen
 	if(listen(ServerSocket, 3) == -1) {
 		perror("listen");
@@ -177,6 +192,7 @@ int main(int argc, char *argv[]) {
 		free(UserInformations);
 		return 1;
 	}
+
 	//Open Log File for Appeding
 	LogFile = fopen("log.txt", "a");
 	if(LogFile == NULL) {
@@ -185,13 +201,14 @@ int main(int argc, char *argv[]) {
 		free(UserInformations);
 		return 1;
 	}
+
 	//Server loop
 	printf("Server started at *:%d\n", portnum);
 	while(ProgramExit == 0) {
-		int clients_noreading; //non connecting clients and non reading clients total
+		AcceptNewClient();
 		for(int i = 0; i < MAX_CLIENTS; i++) {
-			if(C[i].fd != -1 && C[i].inread == 0) {
-				clients_noreading++;
+			if(C[i].fd != -1) {
+				ClientReceive(i);
 				//Process close request
 				if(C[i].closereq == 1) {
 					Log(i, "Closing connection.\n");
@@ -199,19 +216,18 @@ int main(int argc, char *argv[]) {
 					C[i].fd = -1;
 				}
 				//Process timeout
-				if(C[i].timeouttimer + 30 < time(NULL) ) {
-					Log(i, "Timeout.\n");
-					close(C[i].fd);
-					C[i].fd = -1;
+				if(Timeout != 0) {
+					if(C[i].timeouttimer > Timeout) {
+						Log(i, "Timeout.\n");
+						close(C[i].fd);
+						C[i].fd = -1;
+					} else {
+						C[i].timeouttimer++;
+					}
 				}
-			} else if(C[i].fd == -1) {
-				clients_noreading++;
-			}
-			//If there's no reading clients (other thread not running), do GC
-			if(clients_noreading == MAX_CLIENTS) {
-				EventBufferGC();
 			}
 		}
+		EventBufferGC();
 		usleep(1);
 	}
 	//Finish
@@ -253,39 +269,6 @@ void Log(int cid, const char* ptn, ...) {
 	va_end(varg);
 }
 
-int InstallSignal(int s, void (*sh)() ) {
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa) );
-	sa.sa_handler = sh;
-	return sigaction(s, &sa, NULL);
-}
-
-void IOHwnd(int) {
-	if(IsAvailable(ServerSocket) ) {
-		NewClient();
-	}
-	for(int i = 0; i < MAX_CLIENTS; i++) {
-		if(C[i].fd != -1 && IsAvailable(C[i].fd) ) {
-			ClientReceive(i);
-		}
-	}
-}
-
-int MakeAsync(int fd) {
-	if(fcntl(fd, F_SETFL, O_ASYNC) == -1 || fcntl(fd, F_SETOWN, getpid() ) == -1) {
-		return -1;
-	}
-	return 0;
-}
-
-int IsAvailable(int fd) {
-	struct pollfd pfd = {
-		.fd = fd,
-		.events = POLLIN
-	};
-	return poll(&pfd, 1, 0);
-}
-
 void SendJoinPacket(int cid) {
 	uint8_t t[UNAME_SIZE + sizeof(ev_hello_t)];
 	if(!(0 <= cid && cid <= MAX_CLIENTS) ) {
@@ -315,12 +298,15 @@ void SendLeavePacket(int cid) {
 	AddEvent( (uint8_t*)&ev, sizeof(ev), SERVER_EVENT);
 }
 
-void NewClient() {
+void AcceptNewClient() {
 	//Accept new client
 	struct sockaddr_in adr;
 	socklen_t t = sizeof(adr);
 	int client = accept(ServerSocket, (struct sockaddr*)&adr, &t); 
 	if(client == -1) {
+		if(errno == EAGAIN || errno == EWOULDBLOCK) {
+			return; //No connection request
+		}
 		perror("accept");
 		return;
 	}
@@ -330,21 +316,18 @@ void NewClient() {
 	for(int i = 0; i < MAX_CLIENTS; i++) {
 		if(C[i].fd == -1) {
 			//init other variables and save client
+			memset(&C[i], 0, sizeof(cliinfo_t) );
 			C[i].uid = -1;
-			C[i].closereq = 0;
-			C[i].inread = 0;
-			C[i].rdlength = 0;
-			C[i].timeouttimer = time(NULL);
+			C[i].fd = -1;
 			C[i].ip = ip;
 			C[i].port = prt;
 			C[i].fd = client;
 			Log(i, "New connection.\n");
 			//LogInFile(i, "New connection from %s:%d.\n", inet_ntoa(ip), prt);
-			if(MakeAsync(client) == -1) {
+			if(fcntl(C[i].fd, F_SETFL, O_NONBLOCK) == -1) {
 				DisconnectWithReason(i, "Error.");
-				Log(i, "MakeAsync() failed.\n");
+				Log(i, "fcntl() failed.\n");
 			}
-			SendGreetingsPacket(i);
 			return;
 		}
 	}
@@ -359,19 +342,20 @@ void NewClient() {
 void ClientReceive(int cid) {
 	uint8_t b[SIZE_NET_BUFFER];
 	int r;
-	C[cid].inread = 1; //MUTEX
 	//Read incoming packet
 	r = recv(C[cid].fd, b, SIZE_NET_BUFFER, 0);
 	if(r == 0) {
+		Log(cid, "Client connection closed.\n");
 		C[cid].closereq = 1;
 		SendLeavePacket(cid);
-		C[cid].inread = 0;
 		return;
 	} else if(r == -1) {
+		if(errno == EAGAIN || errno == EWOULDBLOCK) {
+			return;
+		}
 		Log(cid, "read() failed: %s. Closing connection.\n", strerror(errno) );
 		C[cid].closereq = 1;
 		SendLeavePacket(cid);
-		C[cid].inread = 0;
 		return;
 	}
 	//Grantee packet size
@@ -380,47 +364,285 @@ void ClientReceive(int cid) {
 	memcpy(&tmpbuf[C[cid].rdlength], b, r);
 	size_t p = 0;
 	size_t totallen = C[cid].rdlength + r;
+	ssize_t rem = totallen;
 	while(p < totallen) {
-		size_t lensiz;
-		size_t reqsiz;
-		size_t rem = totallen - p;
-		//get packet size
-		if(tmpbuf[p] <= 0xfd) {
-			lensiz = 1;
-			reqsiz = tmpbuf[p];
-		} else if(tmpbuf[p] == 0xfe) {
-			lensiz = 3;
-			if(rem < lensiz) {
+		size_t msgsiz;
+		if(C[cid].protocolid == PROTOCOL_RAW || C[cid].protocolid == PROTOCOL_WEBSOCKET) {
+			//Websocket or raw
+			size_t lenpsiz, lenoff = 0;
+			size_t psiz = 0;
+			//get entire packet length
+			if(C[cid].protocolid == PROTOCOL_WEBSOCKET) {
+				lenoff = 1;
+				if(rem < 2) {
+					break; //at least 2 octets needed to know websocket message len
+				}
+				size_t t = (tmpbuf[p + 1]) & 0x7f;
+				if(t <= 125) {
+					lenpsiz = 1;
+					psiz = t;
+				} else if(t == 126) {
+					lenpsiz = 3;
+				} else {
+					lenpsiz = 9;
+				}
+			} else {
+				if(tmpbuf[p] <= 0xfd) {
+					lenpsiz = 1;
+					psiz = tmpbuf[p];
+				} else if(tmpbuf[p] == 0xfe) {
+					lenpsiz = 3;
+				} else {
+					Log(cid, "ClientReceive(): Bad size identifier 0xff on first byte of packet. Closing connection.\n");
+					C[cid].closereq = 1;
+					SendLeavePacket(cid);
+					return;
+				}
+			}
+			if(rem < lenpsiz + lenoff) {
+				break; //more data required to know websocket message len
+			}
+			//Get message length if message length bytes are not uint8_t
+			if(lenpsiz != 1) {
+				for(size_t i = 0; i < lenpsiz - 1; i++) {
+					psiz += tmpbuf[p + lenoff + i + 1] << ( (lenpsiz - 2 - i) * 8);
+				}
+			}
+			
+			//Check packet size
+			if(psiz > SIZE_NET_BUFFER) {
+				Log(cid, "ClientReceive(): Too long message (%lu).\n", psiz);
+				C[cid].closereq = 1;
+				SendLeavePacket(cid);
+				return;
+			}
+			size_t hdrsiz = lenpsiz + lenoff;
+			if(C[cid].protocolid == PROTOCOL_WEBSOCKET) {
+				hdrsiz += 4;
+			}
+			msgsiz = hdrsiz + psiz;
+			if(rem < msgsiz) {
 				break; //more data required
 			}
-			uint16_t *t = (uint16_t*)&tmpbuf[p + 1];
-			reqsiz = (size_t)ntohs(*t);
-		} else if(tmpbuf[p] == 0xff) {
-			Log(cid, "packet decoding: Bad size identifier 0xff on first byte of packet. Closing connection.\n");
-			C[cid].closereq = 1;
-			SendLeavePacket(cid);
-			C[cid].inread = 0;
-			return;
+			
+			//Process packet
+			if(C[cid].protocolid == PROTOCOL_WEBSOCKET) {
+				int m;
+				uint8_t *k;
+				if(tmpbuf[p + lenoff] & 0x80) {
+					m = 1;
+					k = &tmpbuf[p + hdrsiz - 4];
+				}
+				recv_websock_handler(&tmpbuf[p + hdrsiz], psiz, tmpbuf[p], m, k, cid);
+			} else {
+				recv_packet_handler(&tmpbuf[p + hdrsiz], psiz, cid);
+			}
+			msgsiz = hdrsiz + psiz;
+		} else {
+			//HTTP protocol
+			uint8_t* nline = memchr(&tmpbuf[p], '\n', rem);
+			if(nline == NULL) {
+				break; //If there's no newline, more data required
+			}
+
+			//Calculate line size
+			msgsiz = nline - &tmpbuf[p] + 1;
+
+			//Limit http message line size to 254
+			if(msgsiz >= HTTP_LINE_LIMIT) {
+				Log(cid, "HTTP message length overflow.\n");
+				C[cid].closereq = 1;
+				C[cid].inread = 0;
+				return;
+			}
+
+			//Pack it into null terminated string
+			char httpreq[HTTP_LINE_LIMIT];
+			size_t linesiz;
+			if(msgsiz >= 2) {
+				linesiz = msgsiz - 2;
+			} else {
+				linesiz = msgsiz - 1;
+			}
+			memcpy(httpreq, &tmpbuf[p], linesiz);
+			httpreq[linesiz] = 0;
+			recv_http_handler(httpreq, cid);
+			
 		}
-		if(rem < lensiz + reqsiz) {
-			break; //more data required
-		}
-		//Process packet
-		/*
-		Log(cid, "Incoming Packet (%d): ", reqsiz);
-		for(int i = 0; i < reqsiz; i++) {
-			printf("%02x ", tmpbuf[p + i + lensiz]);
-		}
-		printf("\n");
-		*/
-		recv_packet_handler(&tmpbuf[p + lensiz], reqsiz, cid);
-		p += lensiz + reqsiz;
+		p += msgsiz;
+		rem -= msgsiz;
+		if(C[cid].closereq == 1) { return; }
 	}
 	//Write back remaining
-	size_t rem = totallen - p;
+	if(rem > SIZE_NET_BUFFER) {
+		Log(cid, "Buffer overflow condition.\n");
+		C[cid].closereq = 1;
+		return;
+	}
 	memcpy(C[cid].rdbuf, &tmpbuf[p], rem);
 	C[cid].rdlength = rem;
-	C[cid].inread = 0; //MUTEX
+}
+
+void recv_http_handler(char* reqline, int cid) {
+	//Called when HTTP request received
+	//Empty line means end of http request
+	if(strlen(reqline) == 0) {
+		//Switch to native protocol if empty line came first.
+		if(strlen(C[cid].httpfirstline) == 0) {
+			Log(cid, "Switching to native protocol.\n");
+			C[cid].protocolid = PROTOCOL_RAW;
+			SendGreetingsPacket(cid);
+			
+		} else {
+			//Complete http request if there's non-empty http message.
+			char* httpresponse[SIZE_NET_BUFFER];
+			if(memcmp(C[cid].httpfirstline, "GET /", 5) == 0 && strlen(C[cid].httpwskey) != 0 && memcmp(C[cid].httpupgrade, "websocket", 9) == 0) {
+				//First line should starts with "GET /" and need field "Sec-WebSocket-Key" and "Upgrade: websocket"
+				Log(cid, "HTTP protocol change request received, switching to websocket.\n");
+				
+				//calculate websocket key
+				uint8_t sha1ret[20];
+				int outlen;
+				EVP_MD_CTX *evp = EVP_MD_CTX_new();
+				EVP_DigestInit_ex(evp, EVP_sha1(), NULL);
+				EVP_DigestUpdate(evp, C[cid].httpwskey, strlen(C[cid].httpwskey) );
+				EVP_DigestUpdate(evp, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", 36);
+				EVP_DigestFinal_ex(evp, sha1ret, &outlen);
+				EVP_MD_CTX_destroy(evp);
+				
+				//to base64
+				char wsskey[HTTP_LINE_LIMIT];
+				size_t rpos = 0;
+				size_t pb;
+				const char LUT[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+				for(pb = 0; pb < sizeof(sha1ret); pb++) {
+					uint8_t e, f;
+					if(pb % 3 == 0) {
+						e = (sha1ret[pb] >> 2) & 0x3f;
+					} else if(pb % 3 == 1) {
+						e = ( ( (sha1ret[pb - 1] & 0x3) << 4) + (sha1ret[pb] >> 4) ) & 0x3f;
+					} else if(pb % 3 == 2) {
+						e = ( ( (sha1ret[pb - 1] & 0xf) << 2) + (sha1ret[pb] >> 6) ) & 0x3f;
+						f = sha1ret[pb] & 0x3f;
+					}
+					wsskey[rpos] = LUT[e];
+					rpos++;
+					if(pb % 3 == 2) {
+						wsskey[rpos] = LUT[f];
+						rpos++;
+					}
+				}
+				if(pb % 3 != 0) {
+					if(pb % 3 == 1) {
+						wsskey[rpos] = LUT[( (sha1ret[pb - 1] & 0x3) << 4) & 0x3f];
+						wsskey[rpos + 1] = '=';
+						wsskey[rpos + 2] = '=';
+						rpos += 3;
+					} else {
+						wsskey[rpos] = LUT[( (sha1ret[pb - 1] & 0xf) << 2) & 0x3f];
+						wsskey[rpos + 1] = '=';
+						rpos += 2;
+					}
+				}
+				wsskey[rpos] = 0;
+				
+				//Send HTTP response and first websock msg
+				char httpresponse[SIZE_NET_BUFFER];
+				int r = snprintf(httpresponse, SIZE_NET_BUFFER, "HTTP/1.1 101 Switching Protocol\r\nUpgrade: websocket\r\nConnection: upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", wsskey);
+				if(r + 1 > SIZE_NET_BUFFER) {
+					Log(cid, "HTTP response buffer overflow.\n");
+					C[cid].closereq = 1;
+					return;
+				}
+				send(C[cid].fd, httpresponse, r, MSG_NOSIGNAL);
+				C[cid].protocolid = PROTOCOL_WEBSOCKET;
+				SendGreetingsPacket(cid);
+			} else {
+				Log(cid, "Incomplete or non protocol change request.\n");
+				C[cid].closereq = 1;
+			}
+		}
+		return;
+	}
+
+	//process http message
+	if(strlen(C[cid].httpfirstline) == 0) {
+		strcpy(C[cid].httpfirstline, reqline); //If first message, copy to httpfirstline
+		return;
+	}
+	
+	//Process http header
+	//Calculate offset of field name and value
+	char *val = strchr(reqline, ':');
+	//If there is no letter ':', disconnect because of bad http message
+	if(val == NULL) {
+		Log(cid, "Bad http message\n");
+		C[cid].closereq = 1;
+		return;
+	}
+	
+	const char *TARGETHDRS[] = {"sec-websocket-key", "upgrade"};
+	char *PDEST[] = {C[cid].httpwskey, C[cid].httpupgrade};
+	for(int i = 0; i < 2; i++) {
+		//Compare it (case-insensitive)
+		const char* L = TARGETHDRS[i];
+		const size_t Lsize = strlen(L);
+		size_t d = 0;
+		size_t f = 0;
+		while(L[d] && reqline[d]) {
+			if(L[d] == tolower(reqline[d]) ) {
+				f++;
+			} else {
+				break;
+			}
+			d++;
+		}
+		if(f != Lsize ) {
+			continue;
+		}
+		
+		//copy
+		size_t s = 0;
+		d = 0;
+		while(val[s + 1]) {
+			//Ignore space letters before field-value
+			if(val[s + 1] != ' ' || d != 0) {
+				if(i == 1) {
+					PDEST[i][d] = tolower(val[s + 1]); //i = 1 (upgrade field is case-insensitive)
+				} else {
+					PDEST[i][d] = val[s + 1];
+				}
+				d++;
+			}
+			s++;
+		}
+		PDEST[i][d] = 0; //Null terminate str
+		break;
+	}
+}
+
+void recv_websock_handler(uint8_t *b, size_t blen, uint8_t op, int mask, uint8_t *maskkey, int cid) {
+	//Called when websocket packet received.
+	uint8_t p[SIZE_NET_BUFFER];
+	if( (op & 0x80) == 0) {
+		Log(cid, "Websock packet fragmentation is not supported yet.\n");
+		C[cid].closereq = 1;
+		return;
+	}
+	if( (op & 0xf) != 0x2) {
+		Log(cid, "Other than binary frames won't be accepted!\n");
+		C[cid].closereq = 1;
+		return;
+	}
+	//unmask
+	if(mask) {
+		for(size_t i = 0; i < blen; i++) {
+			p[i] = b[i] ^ maskkey[i % 4];
+		}
+	} else {
+		memcpy(p, b, blen);
+	}
+	recv_packet_handler(p, blen, cid);
 }
 
 void recv_packet_handler(uint8_t *b, size_t blen, int cid) {
@@ -578,24 +800,44 @@ void GetEvent(int cid) {
 
 ssize_t send_packet(void *pkt, size_t plen, int cid) {
 	uint8_t b[SIZE_NET_BUFFER];
-	size_t sizlen;
-	if(plen <= 0xfd) {
-		sizlen = 1;
-		b[0] = (uint8_t)plen;
-	} else if(0xfe <= plen && plen <= 0xffff) {
-		sizlen = 3;
-		uint16_t *t = (uint16_t*)&b[1];
-		*t = htons(plen);
-	} else {
-		Log(cid, "send_packet(): too long packet.\n");
+	size_t hdrlen;
+	//Add header
+	if(C[cid].protocolid == PROTOCOL_RAW) {
+		if(plen <= 0xfd) {
+			hdrlen = 1;
+			b[0] = (uint8_t)plen;
+		} else if(0xfe <= plen && plen <= 0xffff) {
+			hdrlen = 3;
+			uint16_t *t = (uint16_t*)&b[1];
+			*t = htons(plen);
+		} else {
+			Log(cid, "send_packet(): too long packet.\n");
+			return -1;
+		}
+	} else if(C[cid].protocolid == PROTOCOL_WEBSOCKET) {
+		b[0] = 0x82;
+		if(plen <= 125) {
+			hdrlen = 2;
+			b[1] = (uint8_t)plen;
+		} else if(126 <= plen && plen <= 0xffff) {
+			b[1] = 126;
+			uint16_t *t = (uint16_t*)&b[2];
+			*t = htons(plen);
+			hdrlen = 4;
+		} else {
+			Log(cid, "send_packet(): too long packet.\n");
+			return -1;
+		}
+	}else {
+		Log(cid, "send_packet(): Bad protocol\n");
 		return -1;
 	}
-	if(plen + sizlen > SIZE_NET_BUFFER) {
+	if(plen + hdrlen > SIZE_NET_BUFFER) {
 		Log(cid, "send_packet(): buffer overflow.\n");
 		return -1;
-	}
-	memcpy(&b[sizlen], pkt, plen);
-	return send(C[cid].fd, b, plen + sizlen, MSG_NOSIGNAL);
+	} 
+	memcpy(&b[hdrlen], pkt, plen);
+	return send(C[cid].fd, b, plen + hdrlen, MSG_NOSIGNAL);
 }
 
 int GetEventPacketSize(uint8_t *d, int l) {
@@ -766,3 +1008,4 @@ void DisconnectWithReason(int cid, char* reason) {
 	C[cid].closereq = 1;
 	SendLeavePacket(cid);
 }
+

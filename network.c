@@ -241,14 +241,10 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 
 //Connect to specified address
 void connect_server() {
-	#ifdef __NOREMOTE
-		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
-		warn("connect_server(): This build's remote play is disabled.\n");
-		return;
-	#endif
 	//Check for parameter
 	if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
 		warn("connect_server(): Bad profile number: %d\n", SMPProfCount);
+		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
 		return;
 	}
 
@@ -280,6 +276,11 @@ void connect_server() {
 	}
 	showstatus( (char*)getlocalizedstring(20) ); //connected
 	SMPStatus = NETWORK_CONNECTED;
+	
+	//Switch to native protocol in non WASM build
+	#ifndef __WASM
+		send_tcp_socket("\n", 1);
+	#endif
 }
 
 //Close connection but do not announce.
