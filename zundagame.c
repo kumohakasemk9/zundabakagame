@@ -33,6 +33,7 @@ change Character constant information structure to each function getters
 #include <fcntl.h>
 #include <signal.h>
 #include <pthread.h>
+#include <poll.h>
 
 #include <netinet/tcp.h>
 #include <netinet/in.h>
@@ -384,6 +385,19 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 		}
 	}
 	return r;
+}
+
+//Check if socket output is available
+int32_t isconnected_tcp_socket() {
+	if(ConnectionSocket == -1) {
+		warn("isconnected(): socket is not open!\n");
+		return 0;
+	}
+	struct pollfd pfd = {
+		.fd = ConnectionSocket,
+		.events = POLLOUT
+	};
+	return poll(&pfd, 1, 0);
 }
 
 void warn(const char* c, ...) {

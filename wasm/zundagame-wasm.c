@@ -82,7 +82,12 @@ uint32_t host2network_fconv_32(int32_t d) {
 
 ssize_t recv_tcp_socket(uint8_t* b, size_t a) {
 	warn("This function should be never called\n");
-	return -1;
+	return 0;
+}
+
+int32_t isconnected_tcp_socket() {
+	warn("This function should be never called\n");
+	return 0;
 }
 
 /*

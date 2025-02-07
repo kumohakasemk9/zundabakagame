@@ -53,6 +53,8 @@ void cmd_cursor_forward();
 void cmd_putch(char);
 void modifyKeyFlags(keyflags_t, int32_t);
 void switch_debug_info();
+int32_t add_smp_profile(char*, char);
+void add_smp_cmd(char*);
 
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
 int32_t ChatTimeout = 0; //Douncounting timer, chat will shown it this is not 0
@@ -694,6 +696,9 @@ void execcmd() {
 	} else if(strcmp(CommandBuffer, "/getsmp") == 0) {
 		//get selected smp profile info
 		get_smp_cmd();
+	} else if(memcmp(CommandBuffer, "/addsmp ", 8) == 0) {
+		//Add SMP profile
+		add_smp_cmd(&CommandBuffer[8]);
 
 	} else if(strcmp(CommandBuffer, "/reset") == 0) {
 		//reset game
@@ -750,6 +755,13 @@ void execcmd() {
 		} else {
 			chatf("[local] %s", CommandBuffer);
 		}
+	}
+}
+
+void add_smp_cmd(char* p) {
+	//Add SMP profile
+	if(add_smp_profile(p, ' ') != 0) {
+			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 	}
 }
 
@@ -1019,65 +1031,69 @@ void read_creds() {
 	while(fgets(buf, BUFFER_SIZE, f) != NULL) {
 		buf[BUFFER_SIZE - 1] = 0; //For Additional security
 		lineno++;
-		char *t = buf;
-		int32_t err = 0;
-		SMPProfile_t t_rec;
-		for(int32_t i = 0; i < 4; i++) {
-			const size_t rec_size[] = {HOSTNAME_SIZE, PORTNAME_SIZE, UNAME_SIZE, PASSWD_SIZE};
-			char *rec_ptr[] = {t_rec.host, t_rec.port, t_rec.usr, t_rec.pwd};
-			//Find splitter letter
-			char *t2 = strchr(t, '\t');
-			//Last record will be finished by newline character
-			if(i == 3) {
-				t2 = strchr(t, '\n');
-			}
-			if(t2 == NULL) {
-				warn("read_creds(): credentials.txt:%d: No splitter letter, parsing skipped for the line.\n", lineno);
-				err = 1;
-				break;
-			}
-			//Measure distance to the letter
-			size_t reclen = (size_t)t2 - (size_t)t;
-			if(reclen >= rec_size[i]) {
-				warn("read_creds(): credentials.txt:%d: Record size overflow, persing skipped for the line.\n", lineno);
-				err = 1;
-				break;
-			}
-			if(reclen == 0) {
-				warn("read_creds(): credentials.txt:%d: Empty record detected, parsing skipped for this line.\n", lineno);
-				err = 1;
-				break;
-			}
-			//Copy string from t to the splitter letter into elem
-			memcpy(rec_ptr[i], t, reclen);
-			rec_ptr[i][reclen] = 0;
-			t = &t2[1]; //Set next record finding position right after the splitter letter
+		if(add_smp_profile(buf, '\t') == -1) {
+			warn("at credentials.txt line %d\n", lineno);
 		}
-		if(err) {
-			continue;
-		}
-		info("SMP Credential %d: Host: %s, Port: %s, User: %s\n", SMPProfCount, t_rec.host, t_rec.port, t_rec.usr);
-		//If no error occurs, allocate memory for new record and copy.
-		if(SMPProfs == NULL) {
-			SMPProfs = malloc(sizeof(SMPProfile_t) );
-			if(SMPProfs == NULL) {
-				warn("read_creds(): insufficient memory, malloc failure.\n");
-				fclose(f);
-				return;
-			}
-		} else {
-			SMPProfile_t *t = realloc(SMPProfs, sizeof(SMPProfile_t) * (size_t)(SMPProfCount + 1) );
-			if(t == NULL) {
-				warn("read_creds(): insufficient memory, realloc failure.\n");
-				fclose(f);
-				return;
-			}
-			SMPProfs = t;
-		}
-		memcpy(&SMPProfs[SMPProfCount], &t_rec, sizeof(SMPProfile_t) );
-		SMPProfCount++;
 	}
 	fclose(f);
+}
+
+int32_t add_smp_profile(char* line, char spliter) {
+	SMPProfile_t t_rec;
+	char *t = line;
+	for(int32_t i = 0; i < 4; i++) {
+		const size_t rec_size[] = {HOSTNAME_SIZE, PORTNAME_SIZE, UNAME_SIZE, PASSWD_SIZE};
+		char *rec_ptr[] = {t_rec.host, t_rec.port, t_rec.usr, t_rec.pwd};
+		//Find splitter letter
+		char *t2 = strchr(t, spliter);
+		//Last record will be finished by newline character
+		if(i == 3) {
+			t2 = strchr(t, '\n');
+			if(t2 == NULL) {
+				t2 = line + strlen(line);
+			}
+		}
+		if(t2 == NULL) {
+			warn("add_smp_profile(): No splitter letter.\n");
+			return -1;
+		}
+
+		//Measure distance to the letter
+		size_t reclen = (size_t)t2 - (size_t)t;
+		if(reclen >= rec_size[i]) {
+			warn("add_smp_profile(): Record size overflow.\n");
+			return -1;
+		}
+		if(reclen == 0) {
+			warn("add_smp_profile(): Empty field detected.\n");
+			return -1;
+		}
+
+		//Copy string from t to the splitter letter into elem
+		memcpy(rec_ptr[i], t, reclen);
+		rec_ptr[i][reclen] = 0;
+		t = &t2[1]; //Set next record finding position right after the splitter letter
+	}
+	info("SMP Credential append (ID%d): Host: %s, Port: %s, User: %s\n", SMPProfCount, t_rec.host, t_rec.port, t_rec.usr);
+	
+	//append to SMPProfs
+	if(SMPProfs == NULL) {
+		SMPProfs = malloc(sizeof(SMPProfile_t) );
+		if(SMPProfs == NULL) {
+			warn("add_smp_profile(): insufficient memory, malloc failure.\n");
+			return -1;
+		}
+	} else {
+		SMPProfile_t *t = realloc(SMPProfs, sizeof(SMPProfile_t) * (size_t)(SMPProfCount + 1) );
+		if(t == NULL) {
+			warn("add_smp_profile(): insufficient memory, realloc failure.\n");
+			return -1;
+		}
+		SMPProfs = t;
+	}
+	memcpy(&SMPProfs[SMPProfCount], &t_rec, sizeof(SMPProfile_t) );
+	SMPProfCount++;
+	return 0;
 }
 
 //Execute typed command and exit command mode

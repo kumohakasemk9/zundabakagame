@@ -40,6 +40,7 @@ size_t TRXBLength;
 extern int32_t NetworkTimeout;
 extern netdbgflags_t NetworkDebugFlag;
 int32_t TimeoutTimer;
+int32_t ConnectionTimeoutTimer;
 
 void close_connection_cmd() {
 	close_connection_silent();
@@ -52,6 +53,31 @@ void network_recv_task() {
 	if(SMPStatus == NETWORK_DISCONNECTED) {
 		return;
 	}
+
+	//If connect() is in progress
+	#ifndef __WASM
+		if(SMPStatus == NETWORK_CONNECTING) {
+
+			//Process connection timeout (5Sec)
+			if(ConnectionTimeoutTimer > 500) {
+				showstatus( (char*)getlocalizedstring(18) ); //can not connect
+				warn("network_recv_task(): Connection timed out.\n");
+				close_connection_silent();
+				return;
+			} else {
+				ConnectionTimeoutTimer++;
+			}
+			
+			//Check if connected
+			if(isconnected_tcp_socket() == 1) {
+				showstatus( (char*)getlocalizedstring(20) ); //connected
+				info("Connected to remote SMP server.\n");
+				SMPStatus = NETWORK_CONNECTED;
+				send_tcp_socket("\n", 1);
+			}
+			return;
+		}
+	#endif
 
 	//Receive into buffer
 	uint8_t b[NET_BUFFER_SIZE];
@@ -274,13 +300,7 @@ void connect_server() {
 		SMPStatus = NETWORK_DISCONNECTED;
 		return;
 	}
-	showstatus( (char*)getlocalizedstring(20) ); //connected
-	SMPStatus = NETWORK_CONNECTED;
-	
-	//Switch to native protocol in non WASM build
-	#ifndef __WASM
-		send_tcp_socket("\n", 1);
-	#endif
+	ConnectionTimeoutTimer = 0;
 }
 
 //Close connection but do not announce.

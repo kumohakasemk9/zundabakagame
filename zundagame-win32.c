@@ -37,26 +37,26 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hpinst, char* cmdline, int cmdshow
 	//Prepare hash object
 	int32_t hashretsize, t;
 	if(BCryptOpenAlgorithmProvider(&AlgHwnd, BCRYPT_SHA512_ALGORITHM, NULL, 0) != 0) {
-		printf("WinMain() : Can not generate hash provider.\n");
+		warn("WinMain() : Can not generate hash provider.\n");
 		return 1;
 	}
 	//Check hash return size, it should be 64 for sha512
 	BCryptGetProperty(AlgHwnd, BCRYPT_HASH_LENGTH, (PBYTE)&hashretsize, sizeof(DWORD), &t, 0);
 	if(hashretsize != SHA512_LENGTH) {
-		printf("WinMain(): Hash return size != %d\n", SHA512_LENGTH);
+		warn("WinMain(): Hash return size != %d\n", SHA512_LENGTH);
 		BCryptCloseAlgorithmProvider(AlgHwnd, 0);
 		return 1;
 	}
 	
 	//Init game
 	if(gameinit() == -1) {
-		printf("WinMain(): gameinit() failed\n");
+		warn("WinMain(): gameinit() failed\n");
 		free(HashObj);
 		BCryptCloseAlgorithmProvider(AlgHwnd, 0);
 		do_finalize();
 		return 1;
 	}
-	printf("gameinit(): OK\n");
+	info("gameinit(): OK\n");
 	// Register the window class.
 	const char CLASS_NAME[]  = "Sample Window Class";
 	WNDCLASS wc;
@@ -68,7 +68,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hpinst, char* cmdline, int cmdshow
 	// Create the window.
 	HWND h = CreateWindowA(CLASS_NAME, "ZUNDAGAME", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, WINDOW_WIDTH + 20, WINDOW_HEIGHT + 50, NULL, NULL, hinst, NULL);
 	if (h == NULL) {
-		printf("WinMain(): CreateWindowA() errored. Window creation fail.\n");
+		warn("WinMain(): CreateWindowA() errored. Window creation fail.\n");
 		free(HashObj);
 		BCryptCloseAlgorithmProvider(AlgHwnd, 0);
 		do_finalize();
@@ -233,24 +233,24 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 	
 	//Feed data
 	if(BCryptHashData(hashhwnd, uname, strlen(uname), 0) != 0) {
-		printf("compute_passhash(): can not feed uname\n");
+		warn("compute_passhash(): can not feed uname\n");
 		BCryptDestroyHash(hashhwnd);
 		return -1;
 	}
 	if(BCryptHashData(hashhwnd, password, strlen(password), 0) != 0) {
-		printf("compute_passhash(): can not hash password\n");
+		warn("compute_passhash(): can not hash password\n");
 		BCryptDestroyHash(hashhwnd);
 		return -1;
 	}
 	if(BCryptHashData(hashhwnd, salt, SALT_LENGTH, 0) != 0) {
-		printf("compute_passhash(): can not hash password\n");
+		warn("compute_passhash(): can not hash password\n");
 		BCryptDestroyHash(hashhwnd);
 		return -1;
 	}
 	
 	//extract sha512
 	if(BCryptFinishHash(hashhwnd, output, SHA512_LENGTH, 0) != 0) {
-		printf("compute_passhash(): can not compute hash\n");
+		warn("compute_passhash(): can not compute hash\n");
 		BCryptDestroyHash(hashhwnd);
 		return -1;
 	}
@@ -287,21 +287,21 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 //Open and connect tcp socket to hostname and port
 int32_t make_tcp_socket(char* hostname, char* port) {
 	if(Sock != INVALID_SOCKET) {
-		printf("make_tcp_socket(): Already connected.\n");
+		warn("make_tcp_socket(): Already connected.\n");
 		return -1;
 	}
 	
 	//Init Winsock
 	WSADATA wsadat;
 	if(WSAStartup(MAKEWORD(2, 2), &wsadat) != 0) {
-		printf("make_tcp_socket(): winsock init failed.\n");
+		warn("make_tcp_socket(): winsock init failed.\n");
 		return -1;
 	}
 	
 	//Make socket
 	Sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if(Sock == INVALID_SOCKET) {
-		printf("make_tcp_socket(): can not create socket.\n");
+		warn("make_tcp_socket(): can not create socket.\n");
 		WSACleanup();
 		return -1;
 	}
@@ -312,7 +312,7 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 		.tv_usec = 0
 	};
 	if(WSAConnectByNameA(Sock, hostname, port, 0, NULL, 0, NULL, &to, NULL) == FALSE) {
-		printf("make_tcp_socket(): can not connect to host.\n");
+		warn("make_tcp_socket(): can not connect to host.\n");
 		closesocket(Sock);
 		WSACleanup();
 		Sock = INVALID_SOCKET;
@@ -323,7 +323,7 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 //Close current connection
 int32_t close_tcp_socket() {
 	if(Sock == INVALID_SOCKET) {
-		printf("close_tcp_socket(): socket is not open!\n");
+		warn("close_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	closesocket(Sock);
@@ -333,12 +333,12 @@ int32_t close_tcp_socket() {
 //Send bytes to connected server
 ssize_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	if(Sock == INVALID_SOCKET) {
-		printf("send_tcp_socket(): socket is not open!\n");
+		warn("send_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	ssize_t r = send(Sock, ctx, ctxlen, 0);
 	if(r != ctxlen) {
-		printf("send_tcp_socket(): send failed. Closing current connection.\n");
+		warn("send_tcp_socket(): send failed. Closing current connection.\n");
 		//close_tcp_socket();
 		return -1;
 	}
@@ -347,7 +347,7 @@ ssize_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 //Receive bytes from connected server, returns read bytes, -1 if no data, -2 if error
 ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	if(Sock == INVALID_SOCKET) {
-		printf("recv_tcp_socket(): socket is not open!\n");
+		warn("recv_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	
@@ -367,11 +367,14 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	}
 	return r;
 }
+int32_t isconnected_tcp_socket() {
+	return 1; //This will return 1 always, using blocking connect() in windows version
+}
 void detect_syslang() {
 	LANGID l = GetUserDefaultUILanguage();
-	printf("Detected locale: %04x\n", l);
+	info("Detected locale: %04x\n", l);
 	if( (l & 0xff) == 0x11) {
-		printf("日本語が検出されました\n");
+		info("日本語が検出されました\n");
 		LangID = LANGID_JP;
 	}
 }
