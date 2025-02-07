@@ -38,7 +38,7 @@ int16_t network2host_fconv_16(uint16_t);
 int32_t network2host_fconv_32(uint32_t);
 uint16_t host2network_fconv_16(int16_t);
 uint32_t host2network_fconv_32(int32_t);
-WASMIMPORT int32_t compute_passhash(char*, char*, uint8_t*, uint8_t*);
+int32_t compute_passhash(char*, char*, uint8_t*, uint8_t*);
 void warn(const char*, ...);
 void info(const char*, ...);
 void fail(const char*, ...);

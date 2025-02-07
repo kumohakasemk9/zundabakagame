@@ -90,6 +90,11 @@ int32_t isconnected_tcp_socket() {
 	return 0;
 }
 
+int32_t compute_passhash(char* username, char* password, uint8_t* salt, uint8_t* output) {
+	warn("compute_passhash(): Not supported in wasm. We have no openssl, and JavaScript crypto module is not friendly for wasm import. :(\n");
+	return -1;
+}
+
 /*
 void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 	//Data type check

@@ -3,7 +3,6 @@ const importobj = {
 		make_tcp_socket : make_tcp_socket,
 		close_tcp_socket : close_tcp_socket,
 		send_tcp_socket : send_tcp_socket,
-		compute_passhash : compute_passhash,
 		console_put : console_put,
 		clear_screen : clear_screen,
 		chcolor : chcolor,
@@ -28,7 +27,7 @@ var G;
 var CV;
 var ZundaGame;
 var MemView;
-var PProgramExiting;
+var PRXBuffer;
 var IMGS;
 var CurrentFont = "monospace";
 var CurrentFontSize = "18pt";
@@ -37,6 +36,7 @@ var loadedimgcnt = 0;
 var SavedColor;
 var GTTime = 0, GTTimeCnt = 0, GTTimeAvg = 0;
 var DTime = 0, DTimeCnt = 0, DTimeAvg = 0;
+var WS = null;
 
 addEventListener("load", function() {
 	//Check window size
@@ -67,9 +67,10 @@ async function wasm_load_cb(ev) {
 	//Get WASM exported functions and memory
 	ZundaGame = wasm.instance.exports;
 	MemView = new DataView(ZundaGame.memory.buffer);
-	
-	l = navigator.language;
-	if(l.includes("ja") ) {
+	PRXBuffer = ZundaGame.getPtr_RXBuffer();
+
+	let la = navigator.language;
+	if(la.includes("ja") ) {
 		ZundaGame.set_language(1);
 	}
 	ZundaGame.gameinit();
@@ -77,15 +78,15 @@ async function wasm_load_cb(ev) {
 	//Load images
 	updateStatus("Loading images...");
 	IMGS = new Array();
-	l = new Array();
-	b = ZundaGame.getIMGPATHES();
+	let l = new Array();
+	const b = ZundaGame.getIMGPATHES();
 	IMAGE_COUNT = ZundaGame.getImageCount();
 	console.log(`${IMAGE_COUNT} images need to be loaded.`);
-	for(var i = 0; i < IMAGE_COUNT; i++) {
-		eptr = MemView.getUint32(b + (i * 4), true);
-		s = pointer_to_str(eptr);
+	for(let i = 0; i < IMAGE_COUNT; i++) {
+		const eptr = MemView.getUint32(b + (i * 4), true);
+		const s = pointer_to_str(eptr);
 		l.push(s);
-		img = new Image();
+		let img = new Image();
 		img.addEventListener("load", img_load_cb);
 		img.src = s;
 		IMGS.push(img);
@@ -114,9 +115,9 @@ function img_load_cb(evt) {
 
 function gametick() {
 	if(ZundaGame.isProgramExiting() == 0) {
-		tbefore = performance.now();
+		const tbefore = performance.now();
 		ZundaGame.gametick();
-		tafter = performance.now();
+		const tafter = performance.now();
 		GTTime += tafter - tbefore;
 		GTTimeCnt++;
 		if(GTTimeCnt >= 10) {
@@ -128,11 +129,11 @@ function gametick() {
 }
 
 function drawgame() {
-	p = document.getElementById('profiler');
+	const p = document.getElementById('profiler');
 	if(ZundaGame.isProgramExiting() == 0) {
-		tbefore = performance.now();
+		const tbefore = performance.now();
 		ZundaGame.game_paint();
-		tafter = performance.now();
+		const tafter = performance.now();
 		DTime += tafter - tbefore;
 		DTimeCnt++;
 		if(DTimeCnt >= 10) {
@@ -140,8 +141,8 @@ function drawgame() {
 			DTime = 0;
 			DTimeCnt = 0;
 		}
-		t = GTTimeAvg.toFixed(3);
-		t2 = DTimeAvg.toFixed(3);
+		const t = GTTimeAvg.toFixed(3);
+		const t2 = DTimeAvg.toFixed(3);
 		p.innerText = `running Tick: ${t} Draw: ${t2}`;
 	} else {
 		updateStatus("Error");
@@ -156,8 +157,8 @@ function updateStatus(s) {
 }
 
 function pointer_to_str(p) {
-	d = new Array();
-	i = 0;
+	let d = new Array();
+	let i = 0;
 	while(i < 1024) {
 		e = MemView.getUint8(p + i);
 		if(e != 0) {
@@ -167,13 +168,13 @@ function pointer_to_str(p) {
 		}
 		i++;
 	}
-	uidata = new Uint8Array(d);
+	const uidata = new Uint8Array(d);
 	return new TextDecoder().decode(uidata);
 }
 
 function setcolor(c) {
-	a = (c >> 24) & 0xff;
-	_c = '#' + ('000000' + (c & 0xffffff).toString(16) ).slice(-6);
+	const a = (c >> 24) & 0xff;
+	const _c = '#' + ('000000' + (c & 0xffffff).toString(16) ).slice(-6);
 	G.globalAlpha = a / 255;
 	G.fillStyle = _c;
 	G.strokeStyle = _c;
@@ -200,7 +201,7 @@ function mousewheel_cb(evt) {
 }
 
 function keydown_cb(evt) {
-	c = evt.key.codePointAt(0);
+	const c = evt.key.codePointAt(0);
 	if(ZundaGame.is_cmd_mode() ) {
 		if(evt.key == "Enter") {
 			ZundaGame.cmd_enter();
@@ -246,6 +247,27 @@ function keyup_cb(evt) {
 	}
 }
 
+function ws_msg_cb(evt) {
+	let binstr = "";
+	const data = new DataView(evt.data);
+	let len = data.byteLength;
+	for(let i = 0; i < len; i++) {
+		binstr += ("00" + data.getUint8(i).toString(16) ).slice(-2) + " ";
+		MemView.setUint8(PRXBuffer + i, data.getUint8(i) );
+	}
+	console.log(`WS recv (${len}): ${binstr}`);
+	ZundaGame.pkt_recv_handler(PRXBuffer, len);
+}
+
+function ws_open_cb(evt) {
+	console.log("Websocket connected.");
+	ZundaGame.connection_establish_handler();
+}
+
+function ws_close_cb(evt) {
+	console.log("Websocket closed.");
+	ZundaGame.connection_close_handler();
+} 
 
 /* zundgame.wasm imported functions */
 function clear_screen() {
@@ -313,7 +335,7 @@ function drawimage_scale(x, y, w, h, iid) {
 
 //double, double, char*
 function drawstring(x, y, pc) {
-	c = pointer_to_str(pc);
+	const c = pointer_to_str(pc);
 	G.fillText(c, x, y);
 }
 
@@ -333,8 +355,8 @@ function loadfont(s) {
 function draw_polygon(x, y, npts, ppts) {
 	G.beginPath();
 	G.moveTo(x, y);
-	_x = x;
-	_y = y;
+	let _x = x;
+	let _y = y;
 	for(var i = 0; i < npts; i++) {
 		_x = _x + MemView.getFloat64(ppts + (i * 16), true);
 		_y = _y + MemView.getFloat64(ppts + 8 + (i * 16), true);
@@ -350,7 +372,7 @@ function get_string_width(pc) {
 
 //() => int32_t
 function get_font_height() {
-	t = G.measureText(pointer_to_str("A") );
+	const t = G.measureText(pointer_to_str("A") );
 	return t.emHeightAscent + t.emHeightDescent;
 }
 
@@ -364,8 +386,9 @@ function get_image_size(iid, px, py) {
 	MemView.setFloat64(py, IMGS[iid].height, true);
 }
 
+//char*, int
 function console_put(a, l) {
-	s = "[WASM] " + pointer_to_str(a);
+	const s = "[WASM] " + pointer_to_str(a);
 	if(l == 0) {
 		console.log(s);
 	} else if(l == 1) {
@@ -375,18 +398,43 @@ function console_put(a, l) {
 	}
 }
 
+//char*, char* => int32_t
 function make_tcp_socket(peeraddr, port) {
-	
+	const s_addr = pointer_to_str(peeraddr);
+	const s_port = pointer_to_str(port);
+	const wsaddr = `ws://${s_addr}:${s_port}/`
+	console.log(`Connecting to ${wsaddr}`);
+	WS = new WebSocket(wsaddr);
+	WS.binaryType = "arraybuffer";
+	WS.addEventListener("open", ws_open_cb);
+	WS.addEventListener("message", ws_msg_cb);
+	WS.addEventListener("close", ws_close_cb);
+	return 0;
 }
 
+//char*, size_t => ssize_t
 function send_tcp_socket(data, len) {
-	
+	if(WS == null) {
+		console.warn("send_tcp_socket(): Websocket is not connected.");
+	} else {
+		let binstr = ""
+		let rdata = new Array();
+		for(let i = 0; i < len; i++) {
+			binstr += ("00" + MemView.getUint8(data + i).toString(16)).slice(-2) + " ";
+			rdata.push(MemView.getUint8(data + i) );
+		}
+		console.log(`WS send: ${len}: ${binstr}`);
+		WS.send(new Uint8Array(rdata) );
+	}
 }
 
+//() => int32_t
 function close_tcp_socket() {
-	
-}
-
-function compute_passhash(p1, p2, p3, p4) {
-	
+	console.log("WS close request");
+	if(WS != null) {
+		WS.close();
+		ws = null;
+		return 0;
+	}
+	return -1;
 }

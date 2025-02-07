@@ -22,6 +22,8 @@ network.c: process network packets
 void process_smp_events(uint8_t*, size_t, int32_t);
 void net_server_send_cmd(server_command_t);
 void pkt_recv_handler(uint8_t*, size_t);
+void connection_establish_handler();
+void connection_close_handler();
 
 extern int32_t CurrentPlayableCharacterID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
@@ -42,6 +44,14 @@ extern netdbgflags_t NetworkDebugFlag;
 int32_t TimeoutTimer;
 int32_t ConnectionTimeoutTimer;
 
+//WASM can not pass JS uint8 data to C by parameters, internal buffer needed
+#ifdef __WASM
+	uint8_t WASMRXBuffer[NET_BUFFER_SIZE];
+	uint8_t *getPtr_RXBuffer() {
+		return WASMRXBuffer;
+	}
+#endif
+
 void close_connection_cmd() {
 	close_connection_silent();
 	showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
@@ -55,37 +65,33 @@ void network_recv_task() {
 	}
 
 	//If connect() is in progress
-	#ifndef __WASM
 		if(SMPStatus == NETWORK_CONNECTING) {
 
-			//Process connection timeout (5Sec)
-			if(ConnectionTimeoutTimer > 500) {
-				showstatus( (char*)getlocalizedstring(18) ); //can not connect
-				warn("network_recv_task(): Connection timed out.\n");
-				close_connection_silent();
-				return;
-			} else {
-				ConnectionTimeoutTimer++;
-			}
-			
-			//Check if connected
-			if(isconnected_tcp_socket() == 1) {
-				showstatus( (char*)getlocalizedstring(20) ); //connected
-				info("Connected to remote SMP server.\n");
-				SMPStatus = NETWORK_CONNECTED;
-				send_tcp_socket("\n", 1);
-			}
+		//Process connection timeout (5Sec)
+		if(ConnectionTimeoutTimer > 500) {
+			showstatus( (char*)getlocalizedstring(18) ); //can not connect
+			warn("network_recv_task(): Connection timed out.\n");
+			close_connection_silent();
 			return;
+		} else {
+			ConnectionTimeoutTimer++;
 		}
-	#endif
+		
+		#ifndef __WASM		
+		//Check if connected
+		if(isconnected_tcp_socket() == 1) {
+			connection_establish_handler();
+		}
+		#endif
+		return;
+	}
 
 	//Receive into buffer
 	uint8_t b[NET_BUFFER_SIZE];
 	ssize_t r = recv_tcp_socket(b, NET_BUFFER_SIZE);
 	if(r == 0) { //If recv returns 0, disconnected
 		warn("network_recv_task(): disconnected from server.\n");
-		showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
-		close_connection_silent();
+		connection_close_handler();
 		return;
 	} else if(r == -1) { //no data
 		//EWOULDBLOCK or EAGAIN ... no data
@@ -93,14 +99,12 @@ void network_recv_task() {
 		TimeoutTimer++;
 		if(NetworkTimeout != 0 && TimeoutTimer >= NetworkTimeout) {
 			warn("network_recv_task(): Timed out, no packet longer than timeout.\n");
-			showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
-			close_connection_silent();
+			connection_close_handler();
 		}
 		return;
 	} else if(r == -2) { //recv error
 		warn("network_recv_task(): recv failed\n");
-		showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
-		close_connection_silent();
+		connection_close_handler();
 		return;
 	}
 	TimeoutTimer = 0;
@@ -175,8 +179,27 @@ void network_recv_task() {
 	TRXBLength = remain;
 }
 
+void connection_close_handler() {
+	showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
+	close_connection_silent();
+}
+
+void connection_establish_handler() {
+	showstatus( (char*)getlocalizedstring(20) ); //connected
+	info("Connected to remote SMP server.\n");
+	SMPStatus = NETWORK_CONNECTED;
+	#ifndef __WASM
+	send_tcp_socket("\n", 1);
+	#endif
+}
+
 //Packet receiver handler
 void pkt_recv_handler(uint8_t *pkt, size_t plen) {
+	/*info("pkt receive(%lu): ", plen);
+	for(size_t i = 0; i < plen; i++) {
+		info("%02x ", pkt[i]);
+	}
+	info("\n");*/
 	//Handle packet
 	if(pkt[0] == NP_RESP_DISCONNECT) {
 		//Disconnect packet
@@ -185,7 +208,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		reason[plen - 1] = 0;
 		info("pkt_recv_handler(): Disconnect request: %s\n", reason);
 		//Request to show chat message 
-		chatf("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
+		showstatus("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
 		close_connection_silent();
 	} else if(pkt[0] == NP_GREETINGS) {
 		//greetings response
@@ -243,7 +266,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 			return;
 		}
 		SMPStatus = NETWORK_LOGGEDIN;
-		warn("pkt_recv_handler(): Login successful response.\n");
+		info("pkt_recv_handler(): Login successful response.\n");
 	} else if(pkt[0] == NP_EXCHANGE_EVENTS) {
 		//Exchange event response
 		if(plen >= NET_BUFFER_SIZE) {
@@ -332,7 +355,7 @@ void net_server_send_cmd(server_command_t cmd) {
 			warn("net_server_send_command(): NP_LOGIN_WITH_PASSWORD: Bad SMPSelectedProf number!!\n");
 			return;
 		}
-		warn("net_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: Attempeting to login to SMP server as %s\n", SMPProfs[SelectedSMPProf].usr);
+		info("net_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: Attempeting to login to SMP server as %s\n", SMPProfs[SelectedSMPProf].usr);
 		//Make login key (SHA512 of username+password+salt)
 		uint8_t ph[SHA512_LENGTH];
 		if(compute_passhash(SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].pwd, SMPsalt, ph) != 0)  {
@@ -345,34 +368,41 @@ void net_server_send_cmd(server_command_t cmd) {
 		warn("net_server_send_command(): Bad command.\n");
 		return;
 	}
+	#ifdef __WASM
+		//WASM version should send message without size header, websocket will care for it
+		if(send_tcp_socket(cmdbuf, ctxlen) != ctxlen) {
+			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			close_connection_silent();
+		}
+	#else
+		//Check for size and make size header, assemble packet.
+		size_t hdrlen;
+		uint8_t buf[NET_BUFFER_SIZE];
+		if(is_range( (int32_t)ctxlen, 0, 0xfd) ) {
+			buf[0] = (uint8_t)ctxlen;
+			hdrlen = 1;
+		} else if(is_range( (int32_t)ctxlen, 0xfe, 0xffff) ) {
+			uint16_t *p = (uint16_t*)&cmdbuf[1];
+			buf[0] = 0xfe;
+			*p = (uint16_t)network2host_fconv_16( (uint16_t)ctxlen);
+			hdrlen = 3;
+		} else {
+			warn("net_server_send_cmd(): incompatible packet size, not sending packet.\n");
+			return;
+		}
+		size_t totallen = ctxlen + hdrlen;
+		if(totallen > NET_BUFFER_SIZE) {
+			warn("net_server_send_command(): buffer overflow, not sending packet.\n");
+			return;
+		}
+		memcpy(&buf[hdrlen], cmdbuf, ctxlen);
 
-	//Check for size and make size header, assemble packet.
-	size_t hdrlen;
-	uint8_t buf[NET_BUFFER_SIZE];
-	if(is_range( (int32_t)ctxlen, 0, 0xfd) ) {
-		buf[0] = (uint8_t)ctxlen;
-		hdrlen = 1;
-	} else if(is_range( (int32_t)ctxlen, 0xfe, 0xffff) ) {
-		uint16_t *p = (uint16_t*)&cmdbuf[1];
-		buf[0] = 0xfe;
-		*p = (uint16_t)network2host_fconv_16( (uint16_t)ctxlen);
-		hdrlen = 3;
-	} else {
-		warn("net_server_send_cmd(): incompatible packet size, not sending packet.\n");
-		return;
-	}
-	size_t totallen = ctxlen + hdrlen;
-	if(totallen > NET_BUFFER_SIZE) {
-		warn("net_server_send_command(): buffer overflow, not sending packet.\n");
-		return;
-	}
-	memcpy(&buf[hdrlen], cmdbuf, ctxlen);
-
-	//Send
-	if(send_tcp_socket(buf, totallen) != totallen) {
-		showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-		close_connection_silent();
-	}
+		//Send
+		if(send_tcp_socket(buf, totallen) != totallen) {
+			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			close_connection_silent();
+		}
+	#endif
 }
 
 //Process SMP packet
