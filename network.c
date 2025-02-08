@@ -40,7 +40,6 @@ extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
 uint8_t TempRXBuffer[NET_BUFFER_SIZE];
 size_t TRXBLength;
 extern int32_t NetworkTimeout;
-extern netdbgflags_t NetworkDebugFlag;
 int32_t TimeoutTimer;
 int32_t ConnectionTimeoutTimer;
 
@@ -109,17 +108,6 @@ void network_recv_task() {
 	}
 	TimeoutTimer = 0;
 
-	/*
-	//Dump received data
-	if( (NetworkDebugFlag & NET_DEBUG_RAW) != 0) {
-		printf("RX: ");
-		for(size_t i = 0; i < r; i++) {
-			printf("%02x ", b[i]);
-		}
-		printf("\n");
-	}
-	*/
-
 	//Process data
 	//Length 0-FD    XX
 	//Length FE-FFFF FE XX XX
@@ -158,16 +146,6 @@ void network_recv_task() {
 		if(remain < reqsize) {
 			break; //Not enough packet received
 		} else {
-			//show received packet
-			if( (NetworkDebugFlag & NET_DEBUG_PACKET) != 0) {
-				/*
-				printf("PACKET (%d): ", reqsize);
-				for(size_t i = 0; i < reqsize; i++) {
-					printf("%02x ", tmpbuf[p + i]);
-				}
-				printf("\n");
-				*/
-			}
 			pkt_recv_handler(&tmpbuf[p + lenhdrsize], reqsize - lenhdrsize);
 		}
 		p += reqsize;
@@ -195,11 +173,6 @@ void connection_establish_handler() {
 
 //Packet receiver handler
 void pkt_recv_handler(uint8_t *pkt, size_t plen) {
-	/*info("pkt receive(%lu): ", plen);
-	for(size_t i = 0; i < plen; i++) {
-		info("%02x ", pkt[i]);
-	}
-	info("\n");*/
 	//Handle packet
 	if(pkt[0] == NP_RESP_DISCONNECT) {
 		//Disconnect packet
@@ -230,13 +203,13 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		SMPcid = (int32_t)p->cid;
 		memcpy(SMPsalt, p->salt, SALT_LENGTH);
 		info("pkt_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
-		//printf("net_recv_handler(): Salt: ");
-		//for(int32_t i = 0; i < SALT_LENGTH; i++) {
-		//	printf("%02x", p->salt[i]);
-		//}
-		//printf("\n");
-		net_server_send_cmd(NP_LOGIN_WITH_PASSWORD); //Send credentials
-	} else if(pkt[0] == NP_LOGIN_WITH_PASSWORD) {
+		//Send credentials
+		#ifndef __WASM
+			net_server_send_cmd(NP_LOGIN_WITH_HASH);
+		#else
+			net_server_send_cmd(NP_LOGIN_WITH_PASSWORD); 
+		#endif
+	} else if(pkt[0] == NP_RESP_LOGON) {
 		//Login response: returns current userlist
 		size_t p = 1;
 		int32_t c = 0;
@@ -341,6 +314,7 @@ void net_server_send_cmd(server_command_t cmd) {
 	//Combine with command
 	cmdbuf[0] = (uint8_t)cmd;
 	if(cmd == NP_EXCHANGE_EVENTS) {
+		//NP_EXCHANGE_EVENT: put buffered event to server and get remote events
 		if(TXSMPEventLen + 1 >= NET_BUFFER_SIZE) {
 			warn("net_server_send_cmd(): ADD_EVENT: Packet buffer overflow.\n");
 			close_connection_silent();
@@ -350,20 +324,44 @@ void net_server_send_cmd(server_command_t cmd) {
 		memcpy(&cmdbuf[1], TXSMPEventBuffer, TXSMPEventLen);
 		ctxlen = TXSMPEventLen + 1;
 		TXSMPEventLen = 0;
-	} else if(cmd == NP_LOGIN_WITH_PASSWORD) {
+	} else if(cmd == NP_LOGIN_WITH_HASH || NP_LOGIN_WITH_PASSWORD) {
+		//NP_LOGIN_WITH_HASH: login with sha512 of username + password + salt
+		//NP_LOGIN_WITH_PASSWORD: login with plaintext username + password + salt
 		if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
-			warn("net_server_send_command(): NP_LOGIN_WITH_PASSWORD: Bad SMPSelectedProf number!!\n");
+			warn("net_server_send_command(): NP_LOGIN_WITH_*: Bad SMPSelectedProf number!!\n");
 			return;
 		}
-		info("net_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: Attempeting to login to SMP server as %s\n", SMPProfs[SelectedSMPProf].usr);
-		//Make login key (SHA512 of username+password+salt)
-		uint8_t ph[SHA512_LENGTH];
-		if(compute_passhash(SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].pwd, SMPsalt, ph) != 0)  {
-			warn("np_server_send_cmd(): NP_LOGIN_WITH_PASSWORD: calculating hash failed.\n");
-			return;
+		char *usr = SMPProfs[SelectedSMPProf].usr;
+		info("net_server_send_cmd(): NP_LOGIN_WITH_*: Attempeting to login to SMP server as %s\n", usr);
+		size_t keylen = 1;
+		char *pwd = SMPProfs[SelectedSMPProf].pwd;
+		if(cmd == NP_LOGIN_WITH_HASH) {
+			//Make login key (SHA512 of username+password+salt)
+			uint8_t ph[SHA512_LENGTH];
+			if(compute_passhash(usr, pwd, SMPsalt, ph) != 0)  {
+				warn("np_server_send_cmd(): NP_LOGIN_WITH_HASH: calculating hash failed.\n");
+				return;
+			}
+			memcpy(&cmdbuf[1], ph, SHA512_LENGTH); //combine command and hash
+			keylen += SHA512_LENGTH;
+		} else {
+			//Plaintext login
+			size_t ulen = strlen(usr);
+			size_t plen = strlen(pwd);
+			size_t totallen = ulen + plen + sizeof(SMPsalt);
+			if(totallen + 1 >= NET_BUFFER_SIZE) {
+				warn("net_server_send_cmd(): LOGIN_WITH_PASSWORD: Packet buffer overflow.\n");
+				close_connection_silent();
+				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+				return;
+			}
+			//concat username + password + salt
+			memcpy(&cmdbuf[1], usr, ulen);
+			memcpy(&cmdbuf[1 + ulen], pwd, plen);
+			memcpy(&cmdbuf[1 + ulen + plen], SMPsalt, sizeof(SMPsalt) );
+			keylen += totallen;
 		}
-		memcpy(&cmdbuf[1], ph, SHA512_LENGTH); //combine command and hash
-		ctxlen = SHA512_LENGTH + 1;
+		ctxlen = keylen;
 	} else {
 		warn("net_server_send_command(): Bad command.\n");
 		return;

@@ -73,7 +73,7 @@ void ClientReceive(int);
 void AddEventCmd(uint8_t*, int, int);
 void AddEvent(uint8_t*, int, int);
 void GetEvent(int);
-void LoginWithPassword(uint8_t*, int, int);
+void Login(uint8_t*, int, int, server_command_t);
 void DisconnectWithReason(int, char*);
 void SendGreetingsPacket(int);
 void EventBufferGC();
@@ -358,6 +358,8 @@ void ClientReceive(int cid) {
 		SendLeavePacket(cid);
 		return;
 	}
+	C[cid].timeouttimer = 0;
+
 	//Grantee packet size
 	uint8_t tmpbuf[SIZE_NET_BUFFER * 2];
 	memcpy(tmpbuf, C[cid].rdbuf, C[cid].rdlength);
@@ -654,8 +656,11 @@ void recv_packet_handler(uint8_t *b, size_t blen, int cid) {
 			}
 			GetEvent(cid);
 		break;
+		case NP_LOGIN_WITH_HASH:
+			Login(&b[1], blen - 1, cid, NP_LOGIN_WITH_HASH);
+		break;
 		case NP_LOGIN_WITH_PASSWORD:
-			LoginWithPassword(&b[1], blen - 1, cid);
+			Login(&b[1], blen - 1, cid, NP_LOGIN_WITH_PASSWORD);
 		break;
 		default:
 			Log(cid, "Unknown command (%d): ", blen);
@@ -910,54 +915,63 @@ void EventBufferGC() {
 	}
 }
 
-void LoginWithPassword(uint8_t* dat, int dlen, int cid) {
+void Login(uint8_t* dat, int dlen, int cid, server_command_t method) {
 	char* pwdpos;
-	if(dlen != SHA512_LENGTH) {
-		Log(cid, "LoginWithPassword: Wrong packet length.\n");
+	if(method == NP_LOGIN_WITH_HASH && dlen != SHA512_LENGTH) {
+		Log(cid, "LoginWithHash(): Wrong packet length.\n");
 		DisconnectWithReason(cid, "Bad command.");
 		return;
 	}
 	if(C[cid].uid != -1) {
-		Log(cid, "LoginWithPassword: Already logged in.\n");
+		Log(cid, "LoginWithHash(): Already logged in.\n");
 		DisconnectWithReason(cid, "Bad command.");
 		return;
 	}
-/*
-	Log(cid, "Attemped to log in with key: ");
-	for(int i = 0; i < dlen; i++) {
-		printf("%02x ", dat[i]);
-	}
-	printf("\n");
-*/
+
 	//Find matching credentials
 	for(int i = 0; i < UserCount; i++) {
-		//Make password hash
 		char *uname = UserInformations[i].usr;
 		char *password = UserInformations[i].pwd;
-		uint8_t loginkey[SHA512_LENGTH];
-		EVP_MD_CTX *evp = EVP_MD_CTX_new();
-		EVP_DigestInit_ex(evp, EVP_sha512(), NULL);
-		if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
-			EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
-			EVP_DigestUpdate(evp, ServerSalt, SALT_LENGTH) != 1) {
-			printf("LoginWithPassword: Feeding data to SHA512 generator failed.\n");
+		uint8_t loginkey[SIZE_NET_BUFFER];
+		size_t loginkeylen = 0;
+		if(method == NP_LOGIN_WITH_HASH) {
+			//Make password sha512 (username + password + salt)
+			EVP_MD_CTX *evp = EVP_MD_CTX_new();
+			EVP_DigestInit_ex(evp, EVP_sha512(), NULL);
+			if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
+				EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
+				EVP_DigestUpdate(evp, ServerSalt, SALT_LENGTH) != 1) {
+				printf("Login(): Feeding data to SHA512 generator failed.\n");
+			} else {
+				if(EVP_DigestFinal_ex(evp, loginkey, NULL) != 1) {
+					printf("Login(): SHA512 get digest failed.\n");
+				} else {
+					loginkeylen = SHA512_LENGTH;
+				}
+			}
+			EVP_MD_CTX_free(evp);
 		} else {
-			if(EVP_DigestFinal_ex(evp, loginkey, NULL) != 1) {
-				printf("LoginWithPassword: SHA512 get digest failed.\n");
+			//concat username + password + salt
+			size_t unamelen = strlen(uname);
+			size_t passlen = strlen(password);
+			if(unamelen + passlen + SALT_LENGTH <= sizeof(loginkey) ) {
+				memcpy(loginkey, uname, unamelen);
+				memcpy(&loginkey[unamelen], password, passlen);
+				memcpy(&loginkey[unamelen + passlen], ServerSalt, SALT_LENGTH);
+			} else {
+				printf("Login(): loginkey buffer overflow\n");
 			}
 		}
-		EVP_MD_CTX_free(evp);
-		
-		if(memcmp(loginkey, dat, SHA512_LENGTH ) == 0) {
-			Log(cid, "LoginWithPassword: Logged in as user %s(ID=%d)\n", UserInformations[i].usr, i);
+		if(memcmp(loginkey, dat, loginkeylen ) == 0) {
 			//Duplicate login check, BUG: can't re login as same user
 			for(int j = 0; j < MAX_CLIENTS; j++) {
 				if(C[j].fd != -1 && C[j].uid == i) {
-					Log(cid, "LoginWithPassword: User already logged in.\n");
+					Log(cid, "Login(): User already logged in.\n");
 					DisconnectWithReason(cid, "Duplicate login.");
 					return;
 				}
 			}
+			Log(cid, "Login(): Logged in as user %s(ID=%d)\n", UserInformations[i].usr, i);
 			C[cid].uid = i;
 			SendUserLists(cid);
 			SendJoinPacket(cid);
@@ -972,7 +986,7 @@ void LoginWithPassword(uint8_t* dat, int dlen, int cid) {
 void SendUserLists(int cid) {
 	uint8_t sendbuf[SIZE_NET_BUFFER];
 	int w_ptr = 1;
-	sendbuf[0] = NP_LOGIN_WITH_PASSWORD;
+	sendbuf[0] = NP_RESP_LOGON;
 	for(int i = 0; i < MAX_CLIENTS; i++) {
 		if(C[i].fd == -1 || !(0 <= C[i].uid && C[i].uid <= UserCount) ) { continue; }
 		char *un = UserInformations[C[i].uid].usr;

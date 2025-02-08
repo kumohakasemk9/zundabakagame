@@ -25,7 +25,9 @@ typedef enum {
 	NP_EXCHANGE_EVENTS = 0,
 	NP_LOGIN_WITH_PASSWORD = 1,
 	NP_RESP_DISCONNECT = 2,
-	NP_GREETINGS = 3
+	NP_GREETINGS = 3,
+	NP_RESP_LOGON = 4,
+	NP_LOGIN_WITH_HASH = 5 
 } server_command_t;
 
 //EventType

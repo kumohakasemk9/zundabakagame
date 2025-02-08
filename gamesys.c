@@ -100,7 +100,6 @@ double DifATKGain = 1.00; //Attack damage gain
 double GameTickTime; //Game tick running time (avg)
 int32_t DebugStatType = 0; //Shows information if nonzero 0: No debug, 1: System profiler, 2: Input test
 int32_t NetworkTimeout = 10; //If there's period that has no packet longer than this value, assumed as disconnected. 0: disable timeout
-netdbgflags_t NetworkDebugFlag = 0; //0x1: Show packet hexdump, 0x2: Show received data hexdump
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
