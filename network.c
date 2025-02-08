@@ -43,14 +43,6 @@ extern int32_t NetworkTimeout;
 int32_t TimeoutTimer;
 int32_t ConnectionTimeoutTimer;
 
-//WASM can not pass JS uint8 data to C by parameters, internal buffer needed
-#ifdef __WASM
-	uint8_t WASMRXBuffer[NET_BUFFER_SIZE];
-	uint8_t *getPtr_RXBuffer() {
-		return WASMRXBuffer;
-	}
-#endif
-
 void close_connection_cmd() {
 	close_connection_silent();
 	showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
@@ -204,11 +196,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		memcpy(SMPsalt, p->salt, SALT_LENGTH);
 		info("pkt_recv_handler(): Server greeter received. CID=%d.\n", SMPcid);
 		//Send credentials
-		#ifndef __WASM
-			net_server_send_cmd(NP_LOGIN_WITH_HASH);
-		#else
-			net_server_send_cmd(NP_LOGIN_WITH_PASSWORD); 
-		#endif
+		net_server_send_cmd(NP_LOGIN_WITH_HASH);
 	} else if(pkt[0] == NP_RESP_LOGON) {
 		//Login response: returns current userlist
 		size_t p = 1;
@@ -324,44 +312,23 @@ void net_server_send_cmd(server_command_t cmd) {
 		memcpy(&cmdbuf[1], TXSMPEventBuffer, TXSMPEventLen);
 		ctxlen = TXSMPEventLen + 1;
 		TXSMPEventLen = 0;
-	} else if(cmd == NP_LOGIN_WITH_HASH || NP_LOGIN_WITH_PASSWORD) {
+	} else if(cmd == NP_LOGIN_WITH_HASH) {
 		//NP_LOGIN_WITH_HASH: login with sha512 of username + password + salt
-		//NP_LOGIN_WITH_PASSWORD: login with plaintext username + password + salt
 		if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
-			warn("net_server_send_command(): NP_LOGIN_WITH_*: Bad SMPSelectedProf number!!\n");
+			warn("net_server_send_command(): NP_LOGIN_WITH_HASH: Bad SMPSelectedProf number!!\n");
 			return;
 		}
 		char *usr = SMPProfs[SelectedSMPProf].usr;
-		info("net_server_send_cmd(): NP_LOGIN_WITH_*: Attempeting to login to SMP server as %s\n", usr);
-		size_t keylen = 1;
+		info("net_server_send_cmd(): NP_LOGIN_WITH_HASH: Attempeting to login to SMP server as %s\n", usr);
 		char *pwd = SMPProfs[SelectedSMPProf].pwd;
-		if(cmd == NP_LOGIN_WITH_HASH) {
-			//Make login key (SHA512 of username+password+salt)
-			uint8_t ph[SHA512_LENGTH];
-			if(compute_passhash(usr, pwd, SMPsalt, ph) != 0)  {
-				warn("np_server_send_cmd(): NP_LOGIN_WITH_HASH: calculating hash failed.\n");
-				return;
-			}
-			memcpy(&cmdbuf[1], ph, SHA512_LENGTH); //combine command and hash
-			keylen += SHA512_LENGTH;
-		} else {
-			//Plaintext login
-			size_t ulen = strlen(usr);
-			size_t plen = strlen(pwd);
-			size_t totallen = ulen + plen + sizeof(SMPsalt);
-			if(totallen + 1 >= NET_BUFFER_SIZE) {
-				warn("net_server_send_cmd(): LOGIN_WITH_PASSWORD: Packet buffer overflow.\n");
-				close_connection_silent();
-				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-				return;
-			}
-			//concat username + password + salt
-			memcpy(&cmdbuf[1], usr, ulen);
-			memcpy(&cmdbuf[1 + ulen], pwd, plen);
-			memcpy(&cmdbuf[1 + ulen + plen], SMPsalt, sizeof(SMPsalt) );
-			keylen += totallen;
+		//Make login key (SHA512 of username+password+salt)
+		uint8_t ph[SHA512_LENGTH];
+		if(compute_passhash(usr, pwd, SMPsalt, ph) != 0)  {
+			warn("np_server_send_cmd(): NP_LOGIN_WITH_HASH: calculating hash failed.\n");
+			return;
 		}
-		ctxlen = keylen;
+		memcpy(&cmdbuf[1], ph, SHA512_LENGTH); //combine command and hash
+		ctxlen = SHA512_LENGTH + 1;
 	} else {
 		warn("net_server_send_command(): Bad command.\n");
 		return;

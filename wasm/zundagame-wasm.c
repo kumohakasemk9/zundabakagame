@@ -29,6 +29,11 @@ int32_t ConnectionSocket = -1;
 extern langid_t LangID;
 extern SMPProfile_t *SMPProfs;
 extern int32_t SMPProfCount;
+uint8_t WASMRXBuffer[NET_BUFFER_SIZE]; //WASM can not reference Javascript Memory, need to pass data to WASM allocated memory
+
+uint8_t *getPtr_RXBuffer() {
+	return WASMRXBuffer;
+}
 
 void setSMPProfile(char *hostname, char *port, char *username, char *password) {
 	if(SMPProfs == NULL) {

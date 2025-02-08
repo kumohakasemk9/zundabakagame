@@ -73,7 +73,7 @@ void ClientReceive(int);
 void AddEventCmd(uint8_t*, int, int);
 void AddEvent(uint8_t*, int, int);
 void GetEvent(int);
-void Login(uint8_t*, int, int, server_command_t);
+void LoginWithHash(uint8_t*, int, int);
 void DisconnectWithReason(int, char*);
 void SendGreetingsPacket(int);
 void EventBufferGC();
@@ -657,10 +657,7 @@ void recv_packet_handler(uint8_t *b, size_t blen, int cid) {
 			GetEvent(cid);
 		break;
 		case NP_LOGIN_WITH_HASH:
-			Login(&b[1], blen - 1, cid, NP_LOGIN_WITH_HASH);
-		break;
-		case NP_LOGIN_WITH_PASSWORD:
-			Login(&b[1], blen - 1, cid, NP_LOGIN_WITH_PASSWORD);
+			LoginWithHash(&b[1], blen - 1, cid);
 		break;
 		default:
 			Log(cid, "Unknown command (%d): ", blen);
@@ -915,9 +912,9 @@ void EventBufferGC() {
 	}
 }
 
-void Login(uint8_t* dat, int dlen, int cid, server_command_t method) {
+void LoginWithHash(uint8_t* dat, int dlen, int cid) {
 	char* pwdpos;
-	if(method == NP_LOGIN_WITH_HASH && dlen != SHA512_LENGTH) {
+	if(dlen != SHA512_LENGTH) {
 		Log(cid, "LoginWithHash(): Wrong packet length.\n");
 		DisconnectWithReason(cid, "Bad command.");
 		return;
@@ -932,37 +929,26 @@ void Login(uint8_t* dat, int dlen, int cid, server_command_t method) {
 	for(int i = 0; i < UserCount; i++) {
 		char *uname = UserInformations[i].usr;
 		char *password = UserInformations[i].pwd;
-		uint8_t loginkey[SIZE_NET_BUFFER];
+		uint8_t loginkey[SHA512_LENGTH];
 		size_t loginkeylen = 0;
-		if(method == NP_LOGIN_WITH_HASH) {
-			//Make password sha512 (username + password + salt)
-			EVP_MD_CTX *evp = EVP_MD_CTX_new();
-			EVP_DigestInit_ex(evp, EVP_sha512(), NULL);
-			if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
-				EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
-				EVP_DigestUpdate(evp, ServerSalt, SALT_LENGTH) != 1) {
-				printf("Login(): Feeding data to SHA512 generator failed.\n");
-			} else {
-				if(EVP_DigestFinal_ex(evp, loginkey, NULL) != 1) {
-					printf("Login(): SHA512 get digest failed.\n");
-				} else {
-					loginkeylen = SHA512_LENGTH;
-				}
-			}
-			EVP_MD_CTX_free(evp);
+		//Make password sha512 (username + password + salt)
+		EVP_MD_CTX *evp = EVP_MD_CTX_new();
+		EVP_DigestInit_ex(evp, EVP_sha512(), NULL);
+		if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
+			EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
+			EVP_DigestUpdate(evp, ServerSalt, SALT_LENGTH) != 1) {
+			printf("Login(): Feeding data to SHA512 generator failed.\n");
+			DisconnectWithReason(cid, "Try again.");
+			return;
 		} else {
-			//concat username + password + salt
-			size_t unamelen = strlen(uname);
-			size_t passlen = strlen(password);
-			if(unamelen + passlen + SALT_LENGTH <= sizeof(loginkey) ) {
-				memcpy(loginkey, uname, unamelen);
-				memcpy(&loginkey[unamelen], password, passlen);
-				memcpy(&loginkey[unamelen + passlen], ServerSalt, SALT_LENGTH);
-			} else {
-				printf("Login(): loginkey buffer overflow\n");
+			if(EVP_DigestFinal_ex(evp, loginkey, NULL) != 1) {
+				printf("Login(): SHA512 get digest failed.\n");
+				DisconnectWithReason(cid, "Try again.");
+				return;
 			}
 		}
-		if(memcmp(loginkey, dat, loginkeylen ) == 0) {
+		EVP_MD_CTX_free(evp);
+		if(memcmp(loginkey, dat, SHA512_LENGTH ) == 0) {
 			//Duplicate login check, BUG: can't re login as same user
 			for(int j = 0; j < MAX_CLIENTS; j++) {
 				if(C[j].fd != -1 && C[j].uid == i) {
