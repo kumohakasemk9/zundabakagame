@@ -632,8 +632,7 @@ void recv_websock_handler(uint8_t *b, size_t blen, uint8_t op, int mask, uint8_t
 		return;
 	}
 	if( (op & 0xf) != 0x2) {
-		Log(cid, "Other than binary frames won't be accepted!\n");
-		C[cid].closereq = 1;
+		Log(cid, "Other than binary frames will be ignored!\n");
 		return;
 	}
 	//unmask

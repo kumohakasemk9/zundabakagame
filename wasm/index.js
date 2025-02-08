@@ -1,5 +1,6 @@
 const importobj = {
 	env : {
+		wasm_login_to_smp : wasm_login_to_smp,
 		make_tcp_socket : make_tcp_socket,
 		close_tcp_socket : close_tcp_socket,
 		send_tcp_socket : send_tcp_socket,
@@ -248,15 +249,16 @@ function keyup_cb(evt) {
 }
 
 function ws_msg_cb(evt) {
-	let binstr = "";
+	//let binstr = "";
 	const data = new DataView(evt.data);
 	let len = data.byteLength;
 	for(let i = 0; i < len; i++) {
-		binstr += ("00" + data.getUint8(i).toString(16) ).slice(-2) + " ";
+		//binstr += ("00" + data.getUint8(i).toString(16) ).slice(-2) + " ";
 		MemView.setUint8(PRXBuffer + i, data.getUint8(i) );
 	}
-	console.log(`WS recv (${len}): ${binstr}`);
+	//console.log(`WS recv (${len}): ${binstr}`);
 	ZundaGame.pkt_recv_handler(PRXBuffer, len);
+	return false;
 }
 
 function ws_open_cb(evt) {
@@ -268,6 +270,24 @@ function ws_close_cb(evt) {
 	console.log("Websocket closed.");
 	ZundaGame.connection_close_handler();
 } 
+
+function ws_error_cb(evt) {
+	console.warn("Websocket error: " + evt);
+}
+
+function sha512_cb(digest) {
+	console.log("sha512 hash callback");
+	if(WS == null) {
+		console.warn("Websocket not connected, this function will return.");
+		return;
+	}
+	let v = new DataView(digest);
+	let senddata = [1];
+	for(let i = 0; i < v.byteLength; i++) {
+		senddata.push(v.getUint8(i) );
+	}
+	WS.send(new Uint8Array(senddata) );
+}
 
 /* zundgame.wasm imported functions */
 function clear_screen() {
@@ -409,6 +429,7 @@ function make_tcp_socket(peeraddr, port) {
 	WS.addEventListener("open", ws_open_cb);
 	WS.addEventListener("message", ws_msg_cb);
 	WS.addEventListener("close", ws_close_cb);
+	WS.addEventListener("error", ws_error_cb);
 	return 0;
 }
 
@@ -417,15 +438,16 @@ function send_tcp_socket(data, len) {
 	if(WS == null) {
 		console.warn("send_tcp_socket(): Websocket is not connected.");
 	} else {
-		let binstr = ""
+		//let binstr = "";
 		let rdata = new Array();
 		for(let i = 0; i < len; i++) {
-			binstr += ("00" + MemView.getUint8(data + i).toString(16)).slice(-2) + " ";
+			//binstr += ("00" + MemView.getUint8(data + i).toString(16)).slice(-2) + " ";
 			rdata.push(MemView.getUint8(data + i) );
 		}
-		console.log(`WS send: ${len}: ${binstr}`);
+		//console.log(`WS send: ${len}: ${binstr}`);
 		WS.send(new Uint8Array(rdata) );
 	}
+	return len;
 }
 
 //() => int32_t
@@ -437,4 +459,19 @@ function close_tcp_socket() {
 		return 0;
 	}
 	return -1;
+}
+
+//char*, char* uint8_t*
+function wasm_login_to_smp(usr, pwd, salt) {
+	const ptrs = [usr, pwd, salt];
+	const maxlens = [20, 16, 16];
+	let rkba = new Array();
+	for(let i = 0; i < 3; i++) {
+		for(let j = 0; j < maxlens[i]; j++) {
+			e = MemView.getUint8(ptrs[i] + j);
+			if(e == 0 && i != 2) {break;}
+			rkba.push(e);
+		}
+	}
+	crypto.subtle.digest("SHA-512", new Uint8Array(rkba) ).then(sha512_cb);
 }

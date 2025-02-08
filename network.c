@@ -43,12 +43,17 @@ extern int32_t NetworkTimeout;
 int32_t TimeoutTimer;
 int32_t ConnectionTimeoutTimer;
 
+#ifdef __WASM
+	extern void wasm_login_to_smp(char*, char*, uint8_t*);
+#endif
+
 void close_connection_cmd() {
+	info("Disconnect requested from user.\n");
 	close_connection_silent();
 	showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
 }
 
-//Called every 10 ms, do network task.
+//Called every 10 ms, do network task. not called in wasm ver.
 void network_recv_task() {
 	//If not connected, return
 	if(SMPStatus == NETWORK_DISCONNECTED) {
@@ -67,13 +72,11 @@ void network_recv_task() {
 		} else {
 			ConnectionTimeoutTimer++;
 		}
-		
-		#ifndef __WASM		
+				
 		//Check if connected
 		if(isconnected_tcp_socket() == 1) {
 			connection_establish_handler();
 		}
-		#endif
 		return;
 	}
 
@@ -150,6 +153,7 @@ void network_recv_task() {
 }
 
 void connection_close_handler() {
+	info("connection_close_handler() called.\n");
 	showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
 	close_connection_silent();
 }
@@ -322,6 +326,11 @@ void net_server_send_cmd(server_command_t cmd) {
 		info("net_server_send_cmd(): NP_LOGIN_WITH_HASH: Attempeting to login to SMP server as %s\n", usr);
 		char *pwd = SMPProfs[SelectedSMPProf].pwd;
 		//Make login key (SHA512 of username+password+salt)
+		#ifdef __WASM
+			//In WASM version, browser will make login key and send it
+			wasm_login_to_smp(usr, pwd, SMPsalt);
+			return;
+		#endif
 		uint8_t ph[SHA512_LENGTH];
 		if(compute_passhash(usr, pwd, SMPsalt, ph) != 0)  {
 			warn("np_server_send_cmd(): NP_LOGIN_WITH_HASH: calculating hash failed.\n");
@@ -335,10 +344,7 @@ void net_server_send_cmd(server_command_t cmd) {
 	}
 	#ifdef __WASM
 		//WASM version should send message without size header, websocket will care for it
-		if(send_tcp_socket(cmdbuf, ctxlen) != ctxlen) {
-			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-			close_connection_silent();
-		}
+		send_tcp_socket(cmdbuf, ctxlen);
 	#else
 		//Check for size and make size header, assemble packet.
 		size_t hdrlen;
