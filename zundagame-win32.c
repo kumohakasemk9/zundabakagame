@@ -380,11 +380,9 @@ void detect_syslang() {
 }
 void warn(const char* c, ...) {
 	va_list varg;
-	printf("\x1b[33m");
 	va_start(varg, c);
 	vfprintf(stderr, c, varg);
 	va_end(varg);
-	printf("\x1b[0m");
 }
 void info(const char* c, ...) {
 	va_list varg;
@@ -399,7 +397,5 @@ void fail(const char* c, ...) {
 	va_end(varg);
 }
 void vfail(const char*c , va_list varg) {
-	printf("\x1b[31m");
 	vfprintf(stderr, c, varg);
-	printf("\x1b[0m");
 }
