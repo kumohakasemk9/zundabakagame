@@ -84,8 +84,35 @@ void recv_packet_handler(uint8_t*, size_t, int);
 void recv_http_handler(char*, int);
 void recv_websock_handler(uint8_t*, size_t, uint8_t, int, uint8_t*, int);
 ssize_t send_packet(void*, size_t, int);
+ssize_t send_websocket_packet(void*, size_t, uint8_t, int);
 
 int main(int argc, char *argv[]) {
+	int portnum = 25566;
+	char *passwdfile = "server_passwd";
+	//Process parameters
+	for(int i = 1; i < argc; i++) {
+		if(strcmp(argv[i], "--port") == 0) {
+			if(i + 1 < argc) {
+				int t = atoi(argv[i + 1]);
+				if(1 <= t && t <= 65535) {
+					portnum = t;
+				} else {
+					printf("Bad port number.\n");
+				}
+			} else {
+				printf("You need to specify port number!!\n");
+				return 1;
+			}
+		} else if(strcmp(argv[i], "--passfile") == 0) {
+			if(i + 1 < argc) {
+				passwdfile = argv[i + 1];
+			} else {
+				printf("You need to specify password file!!\n");
+				return 1;
+			}
+		}
+	}
+
 	//Generate salt for user credential cipher
 	for(int i = 0; i < SALT_LENGTH; i++) {
 		ServerSalt[i] = random() % 0x100;
@@ -115,13 +142,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	//Bind
-	int portnum = 25566;
-	if(argc >= 2) {
-		int t = atoi(argv[1]);
-		if(1 <= t && t <= 65535) {
-			portnum = t;
-		}
-	}
 	struct sockaddr_in adr = {
 		.sin_family = AF_INET,
 		.sin_port = htons(portnum),
@@ -134,9 +154,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	//load user list
-	FILE *f_pwdfile = fopen("server_passwd", "r");
+	FILE *f_pwdfile = fopen(passwdfile, "r");
 	if(f_pwdfile == NULL) {
-		printf("Can not load server_passwd.\n");
+		printf("Can not load %s.\n", passwdfile);
+		close(ServerSocket);
 		return 1;
 	}
 	while(1) {
@@ -167,6 +188,18 @@ int main(int argc, char *argv[]) {
 			fclose(f_pwdfile);
 			free(UserInformations);
 			return 1;
+		}
+		//duplication check
+		int c = 0;
+		for(int i = 0; i < UserCount; i++) {
+			if(memcmp(UserInformations[i].usr, b, usernamelen) == 0) {
+				c = 1;
+				break;
+			}
+		}
+		if(c) {
+			printf("Skipping entry. Duplication.\n");
+			continue;
 		}
 		//Append data to list
 		if(UserCount == 0) {
@@ -212,15 +245,16 @@ int main(int argc, char *argv[]) {
 				//Process close request
 				if(C[i].closereq == 1) {
 					Log(i, "Closing connection.\n");
+					if(C[i].protocolid = PROTOCOL_WEBSOCKET) {
+						send_websocket_packet("", 0, 8, i);
+					}
 					close(C[i].fd);
 					C[i].fd = -1;
 				}
 				//Process timeout
 				if(Timeout != 0) {
 					if(C[i].timeouttimer > Timeout) {
-						Log(i, "Timeout.\n");
-						close(C[i].fd);
-						C[i].fd = -1;
+						DisconnectWithReason(i, "Server timeout.");
 					} else {
 						C[i].timeouttimer++;
 					}
@@ -628,13 +662,19 @@ void recv_websock_handler(uint8_t *b, size_t blen, uint8_t op, int mask, uint8_t
 	uint8_t p[SIZE_NET_BUFFER];
 	if( (op & 0x80) == 0) {
 		Log(cid, "Websock packet fragmentation is not supported yet.\n");
+		DisconnectWithReason(cid, "Bad websocket packet.");
+		return;
+	}
+	if( (op & 0xf) == 0x8) {
+		//close packet (0x?8)
 		C[cid].closereq = 1;
+		Log(cid, "Websocket close packet.\n");
 		return;
+	} else if( (op & 0xf) == 0x9) {
+		//ping packet (0x?9)
+		send_websocket_packet("", 0, 0xa, cid);
 	}
-	if( (op & 0xf) != 0x2) {
-		Log(cid, "Other than binary frames will be ignored!\n");
-		return;
-	}
+
 	//unmask
 	if(mask) {
 		for(size_t i = 0; i < blen; i++) {
@@ -816,19 +856,7 @@ ssize_t send_packet(void *pkt, size_t plen, int cid) {
 			return -1;
 		}
 	} else if(C[cid].protocolid == PROTOCOL_WEBSOCKET) {
-		b[0] = 0x82;
-		if(plen <= 125) {
-			hdrlen = 2;
-			b[1] = (uint8_t)plen;
-		} else if(126 <= plen && plen <= 0xffff) {
-			b[1] = 126;
-			uint16_t *t = (uint16_t*)&b[2];
-			*t = htons(plen);
-			hdrlen = 4;
-		} else {
-			Log(cid, "send_packet(): too long packet.\n");
-			return -1;
-		}
+		return send_websocket_packet(pkt, plen, 2, cid);
 	}else {
 		Log(cid, "send_packet(): Bad protocol\n");
 		return -1;
@@ -839,6 +867,31 @@ ssize_t send_packet(void *pkt, size_t plen, int cid) {
 	} 
 	memcpy(&b[hdrlen], pkt, plen);
 	return send(C[cid].fd, b, plen + hdrlen, MSG_NOSIGNAL);
+}
+
+ssize_t send_websocket_packet(void *pkt, size_t plen, uint8_t op, int cid) {
+	uint8_t b[SIZE_NET_BUFFER];
+	size_t hdrlen;
+	b[0] = 0x80 + op;
+	if(plen <= 125) {
+		hdrlen = 2;
+		b[1] = (uint8_t)plen;
+	} else if(126 <= plen && plen <= 0xffff) {
+		hdrlen = 4;
+		b[1] = 126;
+		uint16_t *t = (uint16_t*)&b[2];
+		*t = htons(plen);
+	} else {
+		Log(cid, "send_websock_packet(): too long packet.\n");
+		return -1;
+	}
+	if(plen + hdrlen > SIZE_NET_BUFFER) {
+		Log(cid, "send_websock_packet(): buffer overflow.\n");
+		return -1;
+	} 
+	memcpy(&b[hdrlen], pkt, plen);
+	return send(C[cid].fd, b, plen + hdrlen, MSG_NOSIGNAL);
+
 }
 
 int GetEventPacketSize(uint8_t *d, int l) {

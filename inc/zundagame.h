@@ -93,7 +93,7 @@ void process_smp();
 void stack_packet(event_type_t, ...);
 void connect_server();
 void close_connection_cmd();
-void close_connection_silent();
+void close_connection(char*);
 int32_t lookup_smp_player_from_cid(int32_t);
 
 //aiproc.c

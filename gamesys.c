@@ -1012,7 +1012,8 @@ void do_finalize() {
 		
 		//Close Network Connection
 		if(SMPStatus != NETWORK_DISCONNECTED) {
-			close_connection_silent();
+			close_tcp_socket();
+			SMPStatus = NETWORK_DISCONNECTED;
 		}
 		uninit_graphics();
 	#endif

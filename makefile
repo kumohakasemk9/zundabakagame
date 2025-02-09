@@ -34,6 +34,10 @@ ifeq ($(TARGET),WASM)
 	OUTNAME=wasm/zundagame.wasm
 endif
 
+ifeq ($(DEBUG), 1)
+	CFLAGS += -g3
+endif
+
 all: $(OBJS)
 	$(CC) $^ $(LDFLAGS) -o $(OUTNAME)
 

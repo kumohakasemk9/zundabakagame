@@ -46,7 +46,7 @@ zunda-defs.h: definitions
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
 #define ITEM_COUNT 5 //Max item id
-#define MAX_STRINGS 24 // Max string count
+#define MAX_STRINGS 25 // Max string count
 #define MAX_TID 24 //max type id
 #define SKILL_COUNT 3 //Skill Count
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
@@ -88,6 +88,7 @@ zunda-defs.h: definitions
 #define TEXT_BAD_COMMAND_PARAM 1 //Bad command parameter
 #define TEXT_UNAVAILABLE 10 //Command or item unavailable
 #define TEXT_SMP_ERROR 21 //Disconnected because error in SMP routine
+#define TEXT_SMP_TIMEOUT 24 //Timed out
 
 //Language ID
 typedef enum {

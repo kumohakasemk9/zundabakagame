@@ -42,6 +42,10 @@ size_t TRXBLength;
 extern int32_t NetworkTimeout;
 int32_t TimeoutTimer;
 int32_t ConnectionTimeoutTimer;
+extern int32_t DifEnemyBaseCount[4];
+extern int32_t DifEnemyBaseDist;
+extern double DifATKGain;
+int32_t DisconnectReasonProvided = 0;
 
 #ifdef __WASM
 	extern void wasm_login_to_smp(char*, char*, uint8_t*);
@@ -49,8 +53,7 @@ int32_t ConnectionTimeoutTimer;
 
 void close_connection_cmd() {
 	info("Disconnect requested from user.\n");
-	close_connection_silent();
-	showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
+	close_connection(NULL);
 }
 
 //Called every 10 ms, do network task. not called in wasm ver.
@@ -65,9 +68,8 @@ void network_recv_task() {
 
 		//Process connection timeout (5Sec)
 		if(ConnectionTimeoutTimer > 500) {
-			showstatus( (char*)getlocalizedstring(18) ); //can not connect
 			warn("network_recv_task(): Connection timed out.\n");
-			close_connection_silent();
+			close_connection((char*)getlocalizedstring(TEXT_SMP_TIMEOUT) );
 			return;
 		} else {
 			ConnectionTimeoutTimer++;
@@ -85,7 +87,7 @@ void network_recv_task() {
 	ssize_t r = recv_tcp_socket(b, NET_BUFFER_SIZE);
 	if(r == 0) { //If recv returns 0, disconnected
 		warn("network_recv_task(): disconnected from server.\n");
-		connection_close_handler();
+		close_connection(NULL);
 		return;
 	} else if(r == -1) { //no data
 		//EWOULDBLOCK or EAGAIN ... no data
@@ -93,12 +95,12 @@ void network_recv_task() {
 		TimeoutTimer++;
 		if(NetworkTimeout != 0 && TimeoutTimer >= NetworkTimeout) {
 			warn("network_recv_task(): Timed out, no packet longer than timeout.\n");
-			connection_close_handler();
+			close_connection((char*)getlocalizedstring(TEXT_SMP_TIMEOUT) );
 		}
 		return;
 	} else if(r == -2) { //recv error
 		warn("network_recv_task(): recv failed\n");
-		connection_close_handler();
+		close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR) );
 		return;
 	}
 	TimeoutTimer = 0;
@@ -134,8 +136,7 @@ void network_recv_task() {
 		//Check buffer overflow
 		if(reqsize > NET_BUFFER_SIZE) {
 			warn("network_recv_task(): data length exceeds buffer size. closing connection.\n");
-			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-			close_connection_silent();
+			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 			return;
 		}
 		if(remain < reqsize) {
@@ -153,9 +154,10 @@ void network_recv_task() {
 }
 
 void connection_close_handler() {
-	info("connection_close_handler() called.\n");
-	showstatus( (char*)getlocalizedstring(TEXT_DISCONNECTED) );
-	close_connection_silent();
+	if(SMPStatus != NETWORK_DISCONNECTED) {
+		info("connection_close_handler() called.\n");
+		close_connection(NULL);
+	}
 }
 
 void connection_establish_handler() {
@@ -176,23 +178,19 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		memcpy(reason, &pkt[1], plen - 1);
 		reason[plen - 1] = 0;
 		info("pkt_recv_handler(): Disconnect request: %s\n", reason);
-		//Request to show chat message 
-		showstatus("%s %s", getlocalizedstring(TEXT_DISCONNECTED), reason);
-		close_connection_silent();
+		close_connection(reason);
 	} else if(pkt[0] == NP_GREETINGS) {
 		//greetings response
 		//Security update: avoid sending credentials for multiple times
 		if(SMPcid != -1) {
 			warn("pkt_recv_handler(): Duplicate greetings packet.\n");
-			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-			close_connection_silent();
+			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 			return;
 		}
 		//Data length check
 		if(plen != sizeof(np_greeter_t) ) {
 			warn("pkt_recv_handler(): Too short greetings packet.\n");
-			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-			close_connection_silent();
+			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 			return;
 		}
 		np_greeter_t *p = (np_greeter_t*)pkt;
@@ -212,8 +210,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 			//Length check
 			if(p + csiz > plen) {
 				warn("pkt_recv_handler(): Bad login response\n");
-				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-				close_connection_silent();
+				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 				return;
 			}
 			//Fill client information
@@ -226,8 +223,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		}
 		if(c >= MAX_CLIENTS) {
 			warn("pkt_recv_handler(): Bad login response\n");
-			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-			close_connection_silent();
+			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 			return;
 		}
 		SMPStatus = NETWORK_LOGGEDIN;
@@ -236,15 +232,13 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		//Exchange event response
 		if(plen >= NET_BUFFER_SIZE) {
 			warn("pkt_recv_handler(): GetEvent: Buffer overflow.\n");
-			close_connection_silent();
-			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 		}
 		memcpy(RXSMPEventBuffer, &pkt[1], plen - 1);
 		RXSMPEventLen = plen - 1;
 		//printf("pkt_recv_handler(): GetEvent: RXSMPEventlen: %d\n", RXSMPEventLen);
 	} else {
-		close_connection_silent();
-		showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+		close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 		warn("pkt_recv_handler(): Unknown Packet (%ld): ", plen);
 		for(size_t i = 0; i < plen; i++) {
 			warn("%02x ", pkt[i]);
@@ -277,6 +271,8 @@ void connect_server() {
 	TRXBLength = 0;
 	SMPcid = -1;
 	TimeoutTimer = 0;
+	ConnectionTimeoutTimer = 0;
+	DisconnectReasonProvided = 0;
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		SMPPlayerInfo[i].cid = -1;
 	}
@@ -288,12 +284,19 @@ void connect_server() {
 		SMPStatus = NETWORK_DISCONNECTED;
 		return;
 	}
-	ConnectionTimeoutTimer = 0;
 }
 
 //Close connection but do not announce.
-void close_connection_silent() {
+void close_connection(char* reason) {
 	if(SMPStatus != NETWORK_DISCONNECTED) {
+		if(DisconnectReasonProvided == 0) {
+			if(reason != NULL) {
+				showstatus("%s %s", (char*)getlocalizedstring(TEXT_DISCONNECTED), reason);
+			} else {
+				showstatus((char*)getlocalizedstring(TEXT_DISCONNECTED));
+			}
+			DisconnectReasonProvided = 1;
+		}
 		close_tcp_socket();
 		SMPStatus = NETWORK_DISCONNECTED;
 	}
@@ -309,8 +312,7 @@ void net_server_send_cmd(server_command_t cmd) {
 		//NP_EXCHANGE_EVENT: put buffered event to server and get remote events
 		if(TXSMPEventLen + 1 >= NET_BUFFER_SIZE) {
 			warn("net_server_send_cmd(): ADD_EVENT: Packet buffer overflow.\n");
-			close_connection_silent();
-			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 			return;
 		}
 		memcpy(&cmdbuf[1], TXSMPEventBuffer, TXSMPEventLen);
@@ -370,8 +372,7 @@ void net_server_send_cmd(server_command_t cmd) {
 
 		//Send
 		if(send_tcp_socket(buf, totallen) != totallen) {
-			showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-			close_connection_silent();
+			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 		}
 	#endif
 }
@@ -399,8 +400,7 @@ void process_smp() {
 			//Parse event record header
 			if(rem < sizeof(event_hdr_t) ) {
 				warn("process_smp(): header read failed, rem:%ld, ptr: %ld\n", rem, ptr);
-				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-				close_connection_silent();
+				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 				return;
 			}
 			hdr = (event_hdr_t*)&RXSMPEventBuffer[ptr];
@@ -410,8 +410,7 @@ void process_smp() {
 			uint8_t* evhead = &RXSMPEventBuffer[ptr + (int32_t)sizeof(event_hdr_t)];
 			if(rem < reclen) {
 				warn("process_smp(): Too short event record. rem: %ld, ptr: %ld\n", rem, ptr);
-				showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
-				close_connection_silent();
+				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 				return;
 			}
 			process_smp_events(evhead, evlen, cid);
@@ -491,7 +490,12 @@ void stack_packet(event_type_t etype, ...) {
 		ev_reset_t ev = {
 			.evtype = etype,
 			.level_seed = host2network_fconv_32(rand() ),
-			.level_difficulty = 0
+			.basedistance = host2network_fconv_16(DifEnemyBaseDist),
+			.basecount0 = DifEnemyBaseCount[0],
+			.basecount1 = DifEnemyBaseCount[1],
+			.basecount2 = DifEnemyBaseCount[2],
+			.basecount3 = DifEnemyBaseCount[3],
+			.atkgain = DifATKGain
 		};
 		pktlen = sizeof(ev_reset_t);
 		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
@@ -514,8 +518,7 @@ void stack_packet(event_type_t etype, ...) {
 	va_end(varg);
 	if(TXSMPEventLen + pktlen >= NET_BUFFER_SIZE) {
 		warn("net_stack_packet(): TX SMP buffer overflow.\n");
-		close_connection_silent();
-		showstatus( (char*)getlocalizedstring(TEXT_SMP_ERROR) );
+		close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 	} else {
 		TXSMPEventLen += pktlen;
 	}
@@ -639,12 +642,19 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 			}
 			evp += sizeof(ev_chat_t) + cpktlen;
 		} else if(evbuf[evp] == EV_RESET) {
+			//Reset request
 			if(remaining < sizeof(ev_reset_t) ) {
 				warn("process_smp_events(): Too short EV_RESET packet, decoder will terminate.\n");
 				return;
 			}
 			ev_reset_t *ev = (ev_reset_t*)&evbuf[evp];
 			uint32_t _seed = (uint32_t)network2host_fconv_32(ev->level_seed);
+			DifEnemyBaseDist = (int32_t)network2host_fconv_16(ev->basedistance);
+			DifATKGain = ev->atkgain;
+			DifEnemyBaseCount[0] = ev->basecount0;
+			DifEnemyBaseCount[1] = ev->basecount1;
+			DifEnemyBaseCount[2] = ev->basecount2;
+			DifEnemyBaseCount[3] = ev->basecount3;
 			srand(_seed);
 			info("process_smp_events(): Round reset request from cid%d (Seed=%d)\n", cid, _seed);
 			reset_game();

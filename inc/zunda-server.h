@@ -92,7 +92,12 @@ typedef struct {
 typedef struct {
 	uint8_t evtype; //EV_RESET
 	uint32_t level_seed; //Seed for rand()
-	uint32_t level_difficulty; //Round difficulty
+	unsigned int basecount0 : 2; //enemy base counts
+	unsigned int basecount1 : 2;
+	unsigned int basecount2 : 2;
+	unsigned int basecount3 : 2;
+	uint16_t basedistance; //how close each enemy bases in one cluster
+	float atkgain; //attack damage gain of playable
 } PACKED ev_reset_t;
 
 //Remote user connect event (usually issued from server)

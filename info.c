@@ -40,9 +40,10 @@ const char* JP_STRINGS[MAX_STRINGS] = {
 	"接続できませんでした",
 	"サーバーから切断しました",
 	"サーバーとの接続を確立しました",
-	"エラーのためサーバーから切断します。",
+	"SMPエラー",
 	"がゲームに参加しました",
-	"がゲームから切断しました"
+	"がゲームから切断しました",
+	"応答なし"
 };
 
 const char *EN_STRINGS[MAX_STRINGS] = {
@@ -67,9 +68,10 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"Server connection failed.",
 	"Disconnected from server.",
 	"Connection established.",
-	"Disconnected from server, errored.",
+	"SMP error.",
 	"joined in the game.",
-	"left from the game."
+	"left from the game.",
+	"Timed out"
 };
 
 //TID names LUT
