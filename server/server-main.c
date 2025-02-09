@@ -34,6 +34,8 @@
 typedef struct {
 	char usr[UNAME_SIZE];
 	char pwd[PASSWD_SIZE];
+	int op;
+	int ban;
 } userinfo_t;
 
 //Client information struct
@@ -167,8 +169,14 @@ int main(int argc, char *argv[]) {
 		}
 		b[8191] = 0; //for additional security
 		if(strlen(b) == 0) { continue; }
+		for(int i = 0; i < 4; i++) {
+			char *t = strchr(b, ':');
+			if(t == NULL) {
+
+			}
+		}
 		char *pwdpos = strchr(b, ':');
-		char *endpos = strchr(b, '\n');
+		char *endpos = strchr(b, ':');
 		if(pwdpos == NULL || endpos == NULL) {
 			printf("server_passwd: format error.\n");
 			fclose(f_pwdfile);
