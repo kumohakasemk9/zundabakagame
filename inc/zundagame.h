@@ -46,7 +46,7 @@ void vfail(const char*, va_list);
 
 //gamesys.c
 void gametick();
-int32_t gameinit();
+int32_t gameinit(char*);
 void do_finalize();
 void keypress_handler(char, specialkey_t);
 void mousemotion_handler(int, int);

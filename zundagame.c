@@ -118,12 +118,17 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 } 
 
 int main(int argc, char *argv[]) {
+	char *fn = "credentials.txt";
+	if(argc > 1) {
+		fn = argv[1];
+	}
+
 	//Set timer
 	pthread_t pth1;
 	pthread_create(&pth1, NULL, thread_cb, NULL);
 
 	//Init game
-	if(gameinit() == -1) {
+	if(gameinit(fn) == -1) {
 		fail("main(): gameinit() failed\n");
 		do_finalize();
 		return 1;

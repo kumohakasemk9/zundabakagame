@@ -403,6 +403,11 @@ void draw_info() {
 	//Show current Energy level
 	chcolor(ttxtclr, 1);
 	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 32, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
+	//Show "connected" string if connected with smp server
+	if(SMPStatus != NETWORK_DISCONNECTED) {
+		chcolor(COLOR_TEXTCMD, 1);
+		drawstring(STATUS_XOFF + 70, IHOTBAR_YOFF, "remote");
+	}
 }
 
 void draw_lolhotbar(double offsx, double offsy) {

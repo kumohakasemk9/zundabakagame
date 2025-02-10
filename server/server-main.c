@@ -35,7 +35,8 @@ typedef struct {
 	char usr[UNAME_SIZE];
 	char pwd[PASSWD_SIZE];
 	int op;
-	int ban;
+	time_t ban;
+	char banreason[BAN_REASON_SIZE];
 } userinfo_t;
 
 //Client information struct
@@ -87,6 +88,10 @@ void recv_http_handler(char*, int);
 void recv_websock_handler(uint8_t*, size_t, uint8_t, int, uint8_t*, int);
 ssize_t send_packet(void*, size_t, int);
 ssize_t send_websocket_packet(void*, size_t, uint8_t, int);
+void ExecServerCommand(char* ,int);
+int GetUserOpLevel(int);
+int AddUser(char*);
+int GetUIDByName(char*);
 
 int main(int argc, char *argv[]) {
 	int portnum = 25566;
@@ -156,75 +161,34 @@ int main(int argc, char *argv[]) {
 	}
 
 	//load user list
+	//username:password:banreason:banexpiretime:oplevel:
 	FILE *f_pwdfile = fopen(passwdfile, "r");
 	if(f_pwdfile == NULL) {
 		printf("Can not load %s.\n", passwdfile);
 		close(ServerSocket);
 		return 1;
 	}
+	int line = 1;
 	while(1) {
 		char b[8192];
 		if(fgets(b, sizeof(b) - 1, f_pwdfile) == NULL) {
 			break;
 		}
+		line++;
 		b[8191] = 0; //for additional security
 		if(strlen(b) == 0) { continue; }
-		for(int i = 0; i < 4; i++) {
-			char *t = strchr(b, ':');
-			if(t == NULL) {
-
-			}
+		if(AddUser(b) != 0) {
+			printf("at line %d\n", line);
 		}
-		char *pwdpos = strchr(b, ':');
-		char *endpos = strchr(b, ':');
-		if(pwdpos == NULL || endpos == NULL) {
-			printf("server_passwd: format error.\n");
-			fclose(f_pwdfile);
-			free(UserInformations);
-			return 1;
-		}
-		int usernamelen = pwdpos - b;
-		if(usernamelen >= UNAME_SIZE) {
-			printf("server_passwd: Too long username.\n");
-			fclose(f_pwdfile);
-			free(UserInformations);
-			return 1;
-		}
-		int passwdlen = endpos - pwdpos - 1;
-		if(passwdlen >= PASSWD_SIZE) {
-			printf("server_passwd: Too long password.\n");
-			fclose(f_pwdfile);
-			free(UserInformations);
-			return 1;
-		}
-		//duplication check
-		int c = 0;
-		for(int i = 0; i < UserCount; i++) {
-			if(memcmp(UserInformations[i].usr, b, usernamelen) == 0) {
-				c = 1;
-				break;
-			}
-		}
-		if(c) {
-			printf("Skipping entry. Duplication.\n");
-			continue;
-		}
-		//Append data to list
-		if(UserCount == 0) {
-			//First loop
-			UserInformations = malloc(sizeof(userinfo_t) );
-		} else {
-			UserInformations = realloc(UserInformations, sizeof(userinfo_t) * (UserCount + 1) );
-		}
-		//Store username
-		memcpy(UserInformations[UserCount].usr, b, usernamelen);
-		UserInformations[UserCount].usr[usernamelen] = 0;
-		//Store password
-		memcpy(UserInformations[UserCount].pwd, &pwdpos[1], passwdlen);
-		UserInformations[UserCount].pwd[passwdlen] = 0;
-		UserCount++;
+		line++;
 	}
 	fclose(f_pwdfile);
+	
+	if(UserCount == 0) {
+		printf("Could not read users db.\n");
+		close(ServerSocket);
+		return 1;
+	}
 
 	//Listen
 	if(listen(ServerSocket, 3) == -1) {
@@ -283,8 +247,97 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
+int AddUser(char* line) {
+	char *offs[5];
+	size_t lens[5];
+	const size_t SIZELIMS[] = {UNAME_SIZE, PASSWD_SIZE, BAN_REASON_SIZE, 32, 16};
+	size_t o = 0;
+	for(int i = 0; i < 5; i++) {
+		char *t = strchr(&line[o], ':');
+		if(t == NULL) {
+			printf("AddUser(): format error.\n");
+			return -1;
+		}
+		size_t l = t - &line[o];
+		lens[i] = l;
+		offs[i] = &line[o];
+		if(l >= SIZELIMS[i]) {
+			printf("AddUser(): Too long column\n");
+			return -1;
+		}
+		o += l + 1;
+	}
+
+	//Duplication check
+	char t_uname[UNAME_SIZE];
+	memcpy(t_uname, offs[0], lens[0]);
+	t_uname[lens[0] ] = 0;
+	if(GetUIDByName(t_uname) != -1) {
+		printf("Duplicate user detect.\n");
+		return -2;
+	}
+
+	//Append data to list
+	int aid = -1;
+	if(UserInformations == NULL) {
+		UserInformations = malloc(sizeof(userinfo_t) );
+		if(UserInformations == NULL) {
+			printf("malloc failed.\n");
+			return -3;
+		}
+		aid = 0;
+		UserCount++;
+	} else {
+		//If usr field starts with null char, it can be overwritten
+		for(int i = 0; i < UserCount; i++) {
+			if(UserInformations[i].usr[0] == 0) {
+				aid = i;
+				break;
+			}
+		}
+		//If every user fields are filled, create new.
+		if(aid == -1) {
+			userinfo_t *t = realloc(UserInformations, sizeof(userinfo_t) * (UserCount + 1) );
+			if(t == NULL) {
+				printf("realloc failed.\n");
+				return -3;
+			}
+			UserInformations = t;
+			aid = UserCount;
+			UserCount++;
+		}
+	}
+	//Store username, password, banreason
+	char *outs[] = {UserInformations[aid].usr, UserInformations[aid].pwd, UserInformations[aid].banreason};
+	for(int i = 0; i < 3; i++) {
+		memcpy(outs[i], offs[i], lens[i]);
+		outs[i][lens[i] ] = 0;
+	}
+	//Store op, ban
+	UserInformations[aid].op = 0;
+	UserInformations[aid].ban = 0;
+	int *outs2[] = {(int*)&UserInformations[aid].ban, &UserInformations[aid].op};
+	for(int i = 0; i < 2; i++) {
+		char t[32];
+		memcpy(t, offs[i + 3], lens[i + 3]);
+		t[lens[i + 3] ] = 0;
+		*outs2[i] = atoi(t);
+	}
+	printf("User add: %s, op=%d, banexpire=%d\n", UserInformations[aid].usr, UserInformations[aid].op, UserInformations[aid].ban);
+	return 0;
+}
+
 void INTHwnd(int) {
 	ProgramExit = 1;
+}
+
+int GetUIDByName(char* n) {
+	for(int i = 0; i < UserCount; i++) {
+		if(memcmp(UserInformations[i].usr, n, strlen(n) ) == 0) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 void Log(int cid, const char* ptn, ...) {
@@ -333,6 +386,10 @@ void SendJoinPacket(int cid) {
 }
 
 void SendLeavePacket(int cid) {
+	//Do not execute for non logged in user
+	if(C[cid].uid == -1) {
+		return;
+	}
 	ev_bye_t ev = {
 		.evtype = EV_BYE,
 		.cid = cid
@@ -746,17 +803,15 @@ void AddEventCmd(uint8_t* d, int dlen, int cid) {
 }
 
 void AddEvent(uint8_t* d, int dlen, int cid) {
-	int evcp = 0;
-	event_hdr_t hdr = {
-		.cid = (int8_t)cid,
-		.evlen = dlen
-	};
-	int addlen = dlen + sizeof(hdr);
-	if(EBptr + addlen >= SIZE_EVENT_BUFFER) {
+	//Check entire event size
+	if(EBptr + dlen + sizeof(event_hdr_t) >= SIZE_EVENT_BUFFER) {
 		Log(cid, "AddEvent: EventBuffer overflow.\n");
 		return;
 	}
+	int evcp = 0;
+	int pdlen = 0;
 	while(evcp < dlen) {
+		//Get event length
 		int evlen;
 		uint8_t *evhead = &d[evcp];
 		evlen = GetEventPacketSize(evhead, dlen);
@@ -767,20 +822,106 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 			}
 			return;
 		}
+		
+		//Process events
+		int copyev = 1;
 		if(evhead[0] == EV_CHAT) {
 			int chatlen = evlen - sizeof(ev_chat_t);
 			char chatbuf[NET_CHAT_LIMIT];
 			memcpy(chatbuf, evhead + sizeof(ev_chat_t), chatlen);
 			chatbuf[chatlen] = 0;
-			Log(cid, "chat: %s\n", chatbuf);
+			if(chatbuf[0] == '?') {
+				Log(cid, "servercommand: %s\n", chatbuf);
+				ExecServerCommand(chatbuf, cid);
+				copyev = 0; //Do not copy server command chat
+			} else {
+				Log(cid, "chat: %s\n", chatbuf);
+			}
 		} else if(evhead[0] == EV_RESET) {
 			Log(cid, "AddEvent(): round reset request\n");
+			if(GetUserOpLevel(cid) < 1) {
+				copyev = 0;
+				Log(cid, "AddEvent(): Round reset request denied, bad op level.\n");
+			}
+		} else if(evhead[0] == EV_HELLO || evhead[0] == EV_BYE) {
+			if(cid != -1) {
+				copyev = 0; //EV_HELLO and EV_BYE event can not be issued from client
+			}
+		}
+		if(copyev == 1) {
+			memcpy(&EventBuffer[EBptr + sizeof(event_hdr_t) + pdlen], evhead, evlen);
+			pdlen += evlen;
 		}
 		evcp += dlen;
 	}
+
+	//Append Event header
+	event_hdr_t hdr = {
+		.cid = (int8_t)cid,
+		.evlen = pdlen
+	};
 	memcpy(&EventBuffer[EBptr], &hdr, sizeof(hdr) );
-	memcpy(&EventBuffer[EBptr + sizeof(hdr)], d, dlen);
-	EBptr += addlen;
+	EBptr += sizeof(hdr) + pdlen;
+}
+
+void ExecServerCommand(char* cmd, int cid) {
+	//Op level 1: reset, 2: ban welcome, 3: adduser deluser 4: stop
+	if(strcmp("?stop", cmd) == 0) {
+		//stop command
+		if(GetUserOpLevel(cid) >= 4) { 
+			ProgramExit = 1;
+			Log(cid, "Server stop request\n");
+		} else {
+			Log(cid, "Bad op level\n");
+		}
+
+	} else if(memcmp("?adduser ", cmd, 9) == 0) {
+		//adduser command
+		if(GetUserOpLevel(cid) >= 3) {
+			AddUser(&cmd[9]);
+		} else {
+			Log(cid, "Bad op level\n");
+		}
+
+	} else if(memcmp("?deluser ", cmd, 9) == 0) {
+		//Delete user command
+		int uid = GetUIDByName(&cmd[9]);
+		if(GetUserOpLevel(cid) >= 3) {
+			if(uid != -1) {
+				Log(cid, "User %s will be removed.\n", UserInformations[uid].usr);
+				UserInformations[uid].usr[0] = 0;
+			} else {
+				Log(cid, "Specified user not found.\n");
+			}
+		} else {
+			Log(cid, "Bad op level.\n");
+		}
+	
+	} else if(memcmp("?ban ", cmd, 5) == 0) {
+		//Ban command
+		int uid = GetUIDByName(&cmd[5]);
+		if(GetUserOpLevel(cid) >= 2) {
+			if(uid != -1) {
+				Log(cid, "User %s will be banned.\n", UserInformations[uid].usr);
+				UserInformations[uid].usr[0] = 0;
+			} else {
+				Log(cid, "Specified user not found.\n");
+			}
+		} else {
+			Log(cid, "Bad op level.\n");
+		}
+
+	} else {
+		Log(cid, "Bad command.\n");
+	}
+}
+
+int GetUserOpLevel(int cid) {
+	int t = C[cid].uid;
+	if(0 <= t && t <= UserCount - 1) {
+		return UserInformations[t].op;
+	}
+	return 0;
 }
 
 void GetEvent(int cid) {
@@ -804,24 +945,14 @@ void GetEvent(int cid) {
 			int tl = GetEventPacketSize(evhead, evlen);
 			if(tl != -1) {
 				evlen = tl;
-				//Ignore EV_HELLO and EV_BYE events if their event owner is not server.
-				if(evhead[0] == EV_BYE || evhead[0] == EV_HELLO) {
-					if(ecid != SERVER_EVENT) {
-						copyevent = 0;
-					}
-				//EV_RESET should be issued by super user (uid0)
-				} else if(evhead[0] == EV_RESET) {
-					if(0 <= ecid && ecid <= MAX_CLIENTS && C[ecid].uid != 0) {
-						copyevent = 0;
-					}
-				//For other events, don't loopback except EV_CHAT
-				} else if(evhead[0] != EV_CHAT) {
+				//Don't loopback except EV_CHAT and EV_RESET
+				 if(evhead[0] != EV_CHAT && evhead[0] != EV_RESET) {
 					if(ecid == cid) {
 						copyevent = 0;
 					}
 				}
 			} else {
-				copyevent = 1;
+				copyevent = 0;
 			}
 			if(copyevent) {
 				memcpy(&tb[w_ptr + sizeof(event_hdr_t) + w_evclen], evhead, evlen);
@@ -980,7 +1111,7 @@ void LoginWithHash(uint8_t* dat, int dlen, int cid) {
 		return;
 	}
 	if(C[cid].uid != -1) {
-		Log(cid, "LoginWithHash(): Already logged in.\n");
+	Log(cid, "LoginWithHash(): Already logged in.\n");
 		DisconnectWithReason(cid, "Bad command.");
 		return;
 	}

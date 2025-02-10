@@ -49,7 +49,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hpinst, char* cmdline, int cmdshow
 	}
 	
 	//Init game
-	if(gameinit() == -1) {
+	if(gameinit("credentials.txt") == -1) {
 		warn("WinMain(): gameinit() failed\n");
 		free(HashObj);
 		BCryptCloseAlgorithmProvider(AlgHwnd, 0);

@@ -31,7 +31,7 @@ zunda-defs.h: definitions
 #define IMAGE_COUNT 35 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define MAX_ZINDEX 3 //Max z-index
-#define COLOR_TEXTBG 0x60ffffff //Text background color (30% opaque white)
+#define COLOR_TEXTBG 0x60000000 //Text background color (30% opaque black)
 #define COLOR_TEXTCMD 0xff00ff00 //Command and Chat text color (Green)
 #define COLOR_TEXTCHAT 0xffffffff //Chat text color
 #define COLOR_TEXTERROR 0xffff0000 //Error text color: RED

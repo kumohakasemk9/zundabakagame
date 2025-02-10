@@ -958,7 +958,7 @@ void showstatus(const char* ctx, ...) {
 	StatusShowTimer = ERROR_SHOW_TIMEOUT;
 }
 
-int32_t gameinit() {
+int32_t gameinit(char* fn) {
 	//Gameinit function, load assets and more. Called when program starts.
 	info("Welcome to zundagame. Initializing: %s\n", VERSION_STRING);
 	info("%s\n", CONSOLE_CREDIT_STRING);
@@ -978,7 +978,7 @@ int32_t gameinit() {
 	info("sizeof(ev_changeplayablespeed_t): %ld\n", sizeof(ev_changeplayablespeed_t) );
 	
 	#ifndef __WASM
-		read_creds(); //read smp profiles
+		read_creds(fn); //read smp profiles
 		if(init_graphics() == -1) { //Graphics init
 			fail("init_graphics() failed.\n");
 			return -1;
@@ -1020,11 +1020,11 @@ void do_finalize() {
 }
 
 //Read SMP Credentials from file
-void read_creds() {
-	FILE* f = fopen("credentials.txt", "r");
+void read_creds(char *fn) {
+	FILE* f = fopen(fn, "r");
 	char buf[BUFFER_SIZE];
 	if(f == NULL) {
-		warn("Can not open credentials.txt: %s\n", strerror(errno) );
+		warn("Can not open %s: %s\n", fn, strerror(errno) );
 		return;
 	}
 	int lineno = 0;
@@ -1032,7 +1032,7 @@ void read_creds() {
 		buf[BUFFER_SIZE - 1] = 0; //For Additional security
 		lineno++;
 		if(add_smp_profile(buf, '\t') == -1) {
-			warn("at credentials.txt line %d\n", lineno);
+			warn("at %s line %d\n", fn, lineno);
 		}
 	}
 	fclose(f);

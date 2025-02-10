@@ -16,6 +16,7 @@ zunda-server.h: server client common definitions (like commands)
 #define MAX_CLIENTS 20 //maximum count of clients
 #define UNAME_SIZE 20 //max username length (includes zero)
 #define PASSWD_SIZE 16 //max password length (includes zero)
+#define BAN_REASON_SIZE 128 //mak ban reason length (includes zero)
 #define SALT_LENGTH 16 //Server salt length
 #define NET_CHAT_LIMIT 512 //Network chat length limit (includes zero)
 #define SHA512_LENGTH 64 //SHA512 is 512 bits long (64 bytes)
