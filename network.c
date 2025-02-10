@@ -547,7 +547,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 						Gobjs[p_objid].sx = sx;
 						Gobjs[p_objid].sy = sy;
 					} else {
-						warn("process_smp_events(): CHANGE_PLAYABLE_SPEED: Character of CID%d is not generated yet.\n", p_objid);
+						warn("process_smp_events(): CHANGE_PLAYABLE_SPEED: Character of CID%d is not generated yet.\n", cid);
 					}
 				} else {
 					//Not registed in client list.
