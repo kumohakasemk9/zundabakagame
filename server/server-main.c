@@ -224,8 +224,9 @@ int main(int argc, char *argv[]) {
 					C[i].fd = -1;
 				}
 				//Process timeout
-				if(Timeout != 0) {
+				if(Timeout != 0 && C[i].fd != -1) {
 					if(C[i].timeouttimer > Timeout) {
+						Log(i, "Timed out.\n");
 						DisconnectWithReason(i, "Server timeout.");
 					} else {
 						C[i].timeouttimer++;
@@ -1195,7 +1196,11 @@ void DisconnectWithReason(int cid, char* reason) {
 		memcpy(&sendbuf[1], "OVERFLOW", 8);
 		rlen = 8;
 	}
-	send_packet(sendbuf, rlen + 1, cid);
+	if(C[cid].protocolid != PROTOCOL_HTTP) {
+		send_packet(sendbuf, rlen + 1, cid);
+	} else {
+		Log(cid, "DisconnectWithReason: Disconnected without sending packet, protocol not decided.\n");
+	}
 	C[cid].closereq = 1;
 	SendLeavePacket(cid);
 }

@@ -19,6 +19,7 @@ add lol style death/kill anouncement
 add getCurrentPlayableCharacterId()
 Make me ahri
 change Character constant information structure to each function getters
+Delete SMP added character when disconnect from server.
 */
 
 #include "inc/zundagame.h"
