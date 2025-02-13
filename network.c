@@ -428,16 +428,16 @@ void stack_packet(event_type_t etype, ...) {
 	uint8_t *poff = &TXSMPEventBuffer[TXSMPEventLen];
 	va_start(varg, etype);
 	//Assemble event packet and stock
-	if(etype == EV_CHANGE_PLAYABLE_SPEED) {	
-		//Playable speed change event
-		float tx = (float)va_arg(varg, double);
-		float ty = (float)va_arg(varg, double);
-		ev_changeplayablespeed_t ev = {
+	if(etype == EV_PLAYABLE_LOCATION) {	
+		//Playable coordinate notify event
+		int16_t tx = (uint16_t)va_arg(varg, double);
+		int16_t ty = (uint16_t)va_arg(varg, double);
+		ev_playablelocation_t ev = {
 			.evtype = (uint8_t)etype,
-			.sx = tx,
-			.sy = ty
+			.x = host2network_fconv_16(tx),
+			.y = host2network_fconv_16(ty)
 		};
-		pktlen = sizeof(ev_changeplayablespeed_t);
+		pktlen = sizeof(ev_playablelocation_t);
 		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
 			memcpy(poff, &ev, pktlen);
 		}
@@ -473,6 +473,7 @@ void stack_packet(event_type_t etype, ...) {
 		size_t chatplen = sizeof(ctx);
 		ev_chat_t ev = {
 			.evtype = etype,
+			.dstcid = 0,
 			.clen = host2network_fconv_16( (int16_t)chatplen)
 		};
 		if(is_range( (int32_t)chatplen, 0, NET_CHAT_LIMIT - 1) ) {
@@ -490,12 +491,12 @@ void stack_packet(event_type_t etype, ...) {
 		ev_reset_t ev = {
 			.evtype = etype,
 			.level_seed = host2network_fconv_32(rand() ),
-			.basedistance = host2network_fconv_16(DifEnemyBaseDist),
+			.basedistance = host2network_fconv_16( (int16_t)DifEnemyBaseDist),
 			.basecount0 = DifEnemyBaseCount[0],
 			.basecount1 = DifEnemyBaseCount[1],
 			.basecount2 = DifEnemyBaseCount[2],
 			.basecount3 = DifEnemyBaseCount[3],
-			.atkgain = DifATKGain
+			.atkgain = (float)DifATKGain
 		};
 		pktlen = sizeof(ev_reset_t);
 		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
@@ -510,6 +511,16 @@ void stack_packet(event_type_t etype, ...) {
 		pktlen = sizeof(ev_changeplayableid_t);
 		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
 			memcpy(poff, &ev, sizeof(ev_changeplayableid_t) );
+		}
+	} else if(etype == EV_CHANGE_ATKGAIN) {
+		//atkgain change event
+		ev_changeatkgain_t ev = {
+			.evtype = etype,
+			.atkgain = (float)DifATKGain
+		};
+		pktlen = sizeof(ev_changeatkgain_t);
+		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
+			memcpy(poff, &ev, pktlen);
 		}
 	} else {
 		warn("net_stack_packet(): unknown packet type.\n");
@@ -530,33 +541,33 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 	size_t evp = 0;
 	while(evp < evlen) {
 		ssize_t remaining = (ssize_t)evlen - (ssize_t)evp;
-		if(evbuf[evp] == EV_CHANGE_PLAYABLE_SPEED) {
-			if(remaining < sizeof(ev_changeplayablespeed_t) ) {
-				warn("process_smp_events(): Too short EV_CHANGE_PLAYABLE_SPEED packet, decoder will terminate.\n");
+		if(evbuf[evp] == EV_PLAYABLE_LOCATION) {
+			if(remaining < sizeof(ev_playablelocation_t) ) {
+				warn("process_smp_events(): Too short EV_PLAYABLE_LOCATION packet, decoder will terminate.\n");
 				return;
 			}
-			ev_changeplayablespeed_t *ev = (ev_changeplayablespeed_t*)&evbuf[evp];
-			double sx = (double)ev->sx;
-			double sy = (double)ev->sy;
+			ev_playablelocation_t *ev = (ev_playablelocation_t*)&evbuf[evp];
+			double tx = (double)network2host_fconv_16(ev->x);
+			double ty = (double)network2host_fconv_16(ev->y);
 			//Security check
-			if(is_range_number(sx, -10, 10) && is_range_number(sy, -10, 10)) {
+			if(is_range_number(tx, 0, MAP_WIDTH) && is_range_number(ty, 0, MAP_HEIGHT)) {
 				int32_t i = lookup_smp_player_from_cid(cid);
 				if(is_range(i, 0, MAX_CLIENTS - 1) ) {
 					int32_t p_objid = SMPPlayerInfo[i].playable_objid;
 					if(is_range(p_objid, 0, MAX_OBJECT_COUNT - 1) ) {
-						Gobjs[p_objid].sx = sx;
-						Gobjs[p_objid].sy = sy;
+						Gobjs[p_objid].x = tx;
+						Gobjs[p_objid].y = ty;
 					} else {
-						warn("process_smp_events(): CHANGE_PLAYABLE_SPEED: Character of CID%d is not generated yet.\n", cid);
+						warn("process_smp_events(): EV_PLAYABLE_LOCATION: Character of CID%d is not generated yet.\n", cid);
 					}
 				} else {
 					//Not registed in client list.
-					warn("process_smp_events(): CHANGE_PLAYABLE_SPEED: CID%d is not registered yet.\n", cid);
+					warn("process_smp_events(): EV_PLAYABLE_LOCATION: CID%d is not registered yet.\n", cid);
 				}
 			} else {
-				warn("process_smp_events(): CHANGE_PLAYABLE_SPEED: packet check failed.\n");
+				warn("process_smp_events(): CHANGE_PLAYABLE_LOCATION: packet check failed.\n");
 			}
-			evp += sizeof(ev_changeplayablespeed_t);
+			evp += sizeof(ev_playablelocation_t);
 		} else if(evbuf[evp] == EV_PLACE_ITEM) {
 			if(remaining < sizeof(ev_placeitem_t) ) {
 				warn("process_smp_events(): Too short EV_PLACE_ITEM packet, decoder will terminate.\n");
@@ -691,6 +702,18 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 						strcpy(SMPPlayerInfo[i].usr, funame);
 						break;
 					}
+				}
+			} else if(evbuf[evp] == EV_CHANGE_ATKGAIN) {
+				//Change AtkGain Parameter request
+				if(remaining < sizeof(ev_changeatkgain_t) ) {
+					warn("process_smp_events(): Too short EV_CHANGE_ATKGAIN packet, decoder will terminate.\n");
+					return;
+				}
+				ev_changeatkgain_t *ev = (ev_changeatkgain_t*)&evbuf[evp];
+				if(is_range_number(ev->atkgain, MIN_ATKGAIN, MAX_ATKGAIN) ) {
+					DifATKGain = ev->atkgain;
+				} else {
+					warn("process_smp_events(): EV_CHANGE_ATKGAIN wrong parameter!");
 				}
 			} else {
 				warn("process_smp_events(): EV_JOIN: security check failed.\n");

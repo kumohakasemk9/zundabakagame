@@ -486,7 +486,6 @@ void proc_playable_op() {
 	lookup_playable(CurrentPlayableCharacterID, &plinf);
 	//Move Playable character
 	double tx = 0, ty = 0;
-	static double prevtx = 0, prevty = 0;
 	if(CharacterMove && GameState == GAMESTATE_PLAYING) {
 		//If CharacterMove == 1, and PALYING state, playable character will follow mouse
 		//Set player move speed
@@ -502,13 +501,8 @@ void proc_playable_op() {
 	}
 	Gobjs[PlayingCharacterID].sx = tx;
 	Gobjs[PlayingCharacterID].sy = ty;
-	if(prevtx != tx || prevty != ty) {
-		//Speed changed
-		if(SMPStatus == NETWORK_LOGGEDIN) {
-			stack_packet(EV_CHANGE_PLAYABLE_SPEED, tx, ty);
-		}
-		prevtx = tx;
-		prevty = ty;
+	if(SMPStatus == NETWORK_LOGGEDIN) {
+		stack_packet(EV_PLAYABLE_LOCATION, Gobjs[PlayingCharacterID].x, Gobjs[PlayingCharacterID].y);
 	}
 	//Set camera location to display playable character in the center of display.
 	CameraX = (int32_t)constrain_number(Gobjs[PlayingCharacterID].x - (WINDOW_WIDTH / 2.0), 0, MAP_WIDTH - WINDOW_WIDTH);
@@ -817,11 +811,14 @@ void ebdist_cmd() {
 void atkgain_cmd() {
 	//DifATKGain set command (atkgain)
 	double i = (double)atof(&CommandBuffer[9]);
-	if(!is_range_number(i, 0.5, 5.0) ) {
+	if(!is_range_number(i, MIN_ATKGAIN, MAX_ATKGAIN) ) {
 		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		return;
 	}
 	DifATKGain = i;
+	if(SMPStatus == NETWORK_LOGGEDIN) {
+		stack_packet(EV_CHANGE_ATKGAIN);
+	}
 }
 
 void smp_cmd() {
@@ -970,12 +967,12 @@ int32_t gameinit(char* fn) {
 	info("sizeof(userlist_hdr_t): %ld\n", sizeof(userlist_hdr_t) );
 	info("sizeof(ev_placeitem_t): %ld\n", sizeof(ev_placeitem_t) );
 	info("sizeof(ev_useskill_t): %ld\n", sizeof(ev_useskill_t) );
-	info("sizeof(ev_changeplayablespeed_t): %ld\n", sizeof(ev_changeplayablespeed_t) );
+	info("sizeof(ev_playablelocation_t): %ld\n", sizeof(ev_playablelocation_t) );
 	info("sizeof(ev_chat_t): %ld\n", sizeof(ev_chat_t) );
 	info("sizeof(ev_reset_t): %ld\n", sizeof(ev_reset_t) );
 	info("sizeof(ev_hello_t): %ld\n", sizeof(ev_hello_t) );
 	info("sizeof(ev_bye_t): %ld\n", sizeof(ev_bye_t) );
-	info("sizeof(ev_changeplayablespeed_t): %ld\n", sizeof(ev_changeplayablespeed_t) );
+	info("sizeof(ev_changeatkgain_t): %ld\n", sizeof(ev_changeatkgain_t) );
 	
 	#ifndef __WASM
 		read_creds(fn); //read smp profiles

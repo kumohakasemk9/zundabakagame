@@ -32,14 +32,15 @@ typedef enum {
 
 //EventType
 typedef enum {
-	EV_CHANGE_PLAYABLE_SPEED = 0,
+	EV_PLAYABLE_LOCATION = 0,
 	EV_PLACE_ITEM = 1,
 	EV_USE_SKILL = 2,
 	EV_CHAT = 3,
 	EV_RESET = 4,
 	EV_HELLO = 5,
 	EV_BYE = 6,
-	EV_CHANGE_PLAYABLE_ID = 7
+	EV_CHANGE_PLAYABLE_ID = 7,
+	EV_CHANGE_ATKGAIN = 8
 } event_type_t;
 
 //Event header
@@ -78,14 +79,15 @@ typedef struct {
 
 //Player move event
 typedef struct {
-	uint8_t evtype; //EV_CHANGE_PLAYABLE_SPEED
-	float sx; //SpeedX
-	float sy; //SppedY
-} PACKED ev_changeplayablespeed_t;
+	uint8_t evtype; //EV_PLAYABLE_LOCATION
+	uint16_t x; //SpeedX
+	uint16_t y; //SppedY
+} PACKED ev_playablelocation_t;
 
 //Chat event
 typedef struct {
 	uint8_t evtype; //EV_CHAT
+	int8_t dstcid; //Destination cid (-1 if public message)
 	uint16_t clen; //Chat length (does not include null char)
 } PACKED ev_chat_t;
 
@@ -119,3 +121,9 @@ typedef struct {
 	uint8_t evtype; //EV_CHANGE_PLAYABLE_ID
 	uint8_t pid; //playable character id
 } PACKED ev_changeplayableid_t;
+
+//Change atkgain event packet
+typedef struct {
+	uint8_t evtype; //EV_CHANGE_ATKGAIN
+	float atkgain;
+} PACKED ev_changeatkgain_t;

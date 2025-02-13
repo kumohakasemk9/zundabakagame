@@ -12,7 +12,7 @@
 #makefile: build script
 
 CC=gcc
-COMCFLAGS=-Wall -Wconversion -Wextra
+COMCFLAGS=-Wall -Wconversion -Wextra -g3
 PKGCONF=pkg-config cairo pangocairo openssl
 CFLAGS=$(COMCFLAGS) `$(PKGCONF) --cflags` -I/usr/X11R6/include -I/usr/X11R6/include/X11
 LDFLAGS=`$(PKGCONF) --libs` -lX11 -lm -L/usr/X11R6/lib -L/usr/X11R6/lib/X11
@@ -32,10 +32,6 @@ ifeq ($(TARGET),WASM)
 	CFLAGS=$(COMCFLAGS) -D__WASM
 	LDFLAGS=--no-entry -s "EXPORTED_FUNCTIONS=['_gameinit', '_gametick', '_select_next_item', '_select_prev_item', '_use_item', '_switch_character_move', '_game_paint', '_isProgramExiting', '_is_cmd_mode', '_getIMGPATHES', '_getImageCount', '_modifyKeyFlags', '_cmd_putch', '_cmd_enter', '_cmd_cancel', '_cmd_cursor_back', '_cmd_cursor_forward', '_cmd_backspace', '_start_command_mode', '_mousemotion_handler', '_set_language', '_pkt_recv_handler', '_connection_establish_handler', '_connection_close_handler', '_getPtr_RXBuffer']" -s ERROR_ON_UNDEFINED_SYMBOLS=0
 	OUTNAME=wasm/zundagame.wasm
-endif
-
-ifeq ($(DEBUG), 1)
-	CFLAGS += -g3
 endif
 
 all: $(OBJS)

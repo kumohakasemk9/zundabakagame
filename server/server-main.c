@@ -70,6 +70,7 @@ int Timeout = 5000; //0 to disable timeout
 
 void SendJoinPacket(int);
 void SendLeavePacket(int);
+void SendPrivateChat(int, int, char*);
 void INTHwnd(int);
 void AcceptNewClient();
 void ClientReceive(int);
@@ -81,7 +82,7 @@ void DisconnectWithReason(int, char*);
 void SendGreetingsPacket(int);
 void EventBufferGC();
 void Log(int, const char*, ...);
-int GetEventPacketSize(uint8_t*, int);
+ssize_t GetEventPacketSize(uint8_t*, int);
 void SendUserLists(int);
 void recv_packet_handler(uint8_t*, size_t, int);
 void recv_http_handler(char*, int);
@@ -243,7 +244,9 @@ int main(int argc, char *argv[]) {
 	close(ServerSocket);
 	free(UserInformations);
 	for(int i = 0; i < MAX_CLIENTS; i++) {
-		if(C[i].fd != -1) { close(C[i].fd); }
+		if(C[i].fd != -1) {
+			DisconnectWithReason(i, "Server closed.");
+		}
 	}
 	return 0;
 }
@@ -361,8 +364,37 @@ void Log(int cid, const char* ptn, ...) {
 	va_list varg;
 	va_start(varg, ptn);
 	vprintf(ptn, varg);
+	va_end(varg);
+	va_start(varg, ptn);
 	vfprintf(LogFile, ptn, varg);
 	va_end(varg);
+}
+
+void SendPrivateChat(int cid, int destcid, char* chat) {
+	if(!(-1 <= cid && cid <= MAX_CLIENTS) ) {
+		printf("SendPrivateChat(): invalid cid passed.\n");
+		return;
+	}
+	if(!(0 <= destcid && destcid <= MAX_CLIENTS) ) {
+		printf("SendPrivateChat(): invalid destcid passed.\n");
+		return;
+	}
+	uint8_t t[SIZE_NET_BUFFER];
+	size_t cl = strlen(chat);
+	ev_chat_t hdr = {
+		.evtype = EV_CHAT,
+		.clen = htons(cl)
+	};
+	size_t evsiz = cl + sizeof(hdr) + 2;
+	if(evsiz >= SIZE_NET_BUFFER) {
+		printf("SendPrivateChat(): EV_CHAT packet overflow.\n");
+		return;
+	}
+	memcpy(t, &hdr, sizeof(hdr) );
+	t[3] = destcid;
+	t[4] = 0;
+	memcpy(&t[sizeof(hdr) + 2], chat, cl);
+	AddEvent(t, evsiz, cid);
 }
 
 void SendJoinPacket(int cid) {
@@ -813,10 +845,10 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 	int pdlen = 0;
 	while(evcp < dlen) {
 		//Get event length
-		int evlen;
+		ssize_t evlen;
 		uint8_t *evhead = &d[evcp];
 		evlen = GetEventPacketSize(evhead, dlen);
-		if(dlen == -1) {
+		if(evlen == -1) {
 			Log(cid, "AddEvent: Bad packet. Disconnecting client.\n");
 			if(cid != -1) {
 				DisconnectWithReason(cid, "Bad event packet.");
@@ -827,10 +859,25 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 		//Process events
 		int copyev = 1;
 		if(evhead[0] == EV_CHAT) {
-			int chatlen = evlen - sizeof(ev_chat_t);
+			ev_chat_t *hdr = (ev_chat_t*)&evhead[0];
+			size_t chatlen = (size_t)ntohs(hdr->clen);
+			int whispercid = hdr->dstcid;
 			char chatbuf[NET_CHAT_LIMIT];
-			memcpy(chatbuf, evhead + sizeof(ev_chat_t), chatlen);
-			chatbuf[chatlen] = 0;
+			uint8_t* chathead = &evhead[sizeof(ev_chat_t)];
+			if(dlen < chatlen || chatlen >= NET_CHAT_LIMIT) {
+				Log(cid, "Chat overflow or too short chat packet.\n");
+				DisconnectWithReason(cid, "Bad packet.");
+				return;
+			}
+			//is private msg?
+			if(whispercid != -1) {
+				memcpy(chatbuf, &chathead[2], chatlen - 2);
+				chatbuf[chatlen - 2] = 0;
+				Log(cid, "Whisper to cid %d\n", hdr, whispercid);
+			} else {
+				memcpy(chatbuf, chathead, chatlen);
+				chatbuf[chatlen] = 0;
+			}
 			if(chatbuf[0] == '?') {
 				Log(cid, "servercommand: %s\n", chatbuf);
 				ExecServerCommand(chatbuf, cid);
@@ -869,10 +916,11 @@ void ExecServerCommand(char* cmd, int cid) {
 	//Op level 1: reset, 2: ban welcome, 3: adduser deluser 4: stop
 	if(strcmp("?stop", cmd) == 0) {
 		//stop command
-		if(GetUserOpLevel(cid) >= 4) { 
-			ProgramExit = 1;
+		if(GetUserOpLevel(cid) >= 4) {
 			Log(cid, "Server stop request\n");
+			ProgramExit = 1;
 		} else {
+			SendPrivateChat(SERVER_EVENT, cid, "Insufficient permission.");
 			Log(cid, "Bad op level\n");
 		}
 
@@ -881,6 +929,7 @@ void ExecServerCommand(char* cmd, int cid) {
 		if(GetUserOpLevel(cid) >= 3) {
 			AddUser(&cmd[9]);
 		} else {
+			SendPrivateChat(SERVER_EVENT, cid, "Insufficient permission.");
 			Log(cid, "Bad op level\n");
 		}
 
@@ -892,6 +941,7 @@ void ExecServerCommand(char* cmd, int cid) {
 				Log(cid, "User %s will be removed.\n", UserInformations[uid].usr);
 				UserInformations[uid].usr[0] = 0;
 			} else {
+				SendPrivateChat(SERVER_EVENT, cid, "Insufficient permission.");
 				Log(cid, "Specified user not found.\n");
 			}
 		} else {
@@ -905,14 +955,17 @@ void ExecServerCommand(char* cmd, int cid) {
 			if(uid != -1) {
 				Log(cid, "User %s will be banned.\n", UserInformations[uid].usr);
 				UserInformations[uid].usr[0] = 0;
+				//todo
 			} else {
 				Log(cid, "Specified user not found.\n");
 			}
 		} else {
+			SendPrivateChat(SERVER_EVENT, cid, "Insufficient permission.");
 			Log(cid, "Bad op level.\n");
 		}
 
 	} else {
+		SendPrivateChat(SERVER_EVENT, cid, "Bad server command");
 		Log(cid, "Bad command.\n");
 	}
 }
@@ -952,6 +1005,13 @@ void GetEvent(int cid) {
 						copyevent = 0;
 					}
 				}
+				//Process secret chat (char 0 = destination cid, char1 = 0)
+				/*if(evhead[0] == EV_CHAT) {
+					ev_chat_t *hdr = (ev_chat_t*)evhead;
+					if(!(cid == hdr->dstcid || cid == ecid) ) {
+						copyevent = 0;
+					}
+				}*/
 			} else {
 				copyevent = 0;
 			}
@@ -1034,12 +1094,12 @@ ssize_t send_websocket_packet(void *pkt, size_t plen, uint8_t op, int cid) {
 
 }
 
-int GetEventPacketSize(uint8_t *d, int l) {
-	int r = -1;
+ssize_t GetEventPacketSize(uint8_t *d, int l) {
+	ssize_t r = -1;
 	if(l < 1) { return -1; } //If data size is not enough to distinguish data type, return -1
 	//Get data len according to struct type
-	if(d[0] == EV_CHANGE_PLAYABLE_SPEED) {
-		r = sizeof(ev_changeplayablespeed_t);
+	if(d[0] == EV_PLAYABLE_LOCATION) {
+		r = sizeof(ev_playablelocation_t);
 	} else if (d[0] == EV_PLACE_ITEM) {
 		r = sizeof(ev_placeitem_t);
 	} else if (d[0] == EV_USE_SKILL) {
@@ -1129,12 +1189,12 @@ void LoginWithHash(uint8_t* dat, int dlen, int cid) {
 		if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
 			EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
 			EVP_DigestUpdate(evp, ServerSalt, SALT_LENGTH) != 1) {
-			printf("Login(): Feeding data to SHA512 generator failed.\n");
+			printf("LoginWithHash(): Feeding data to SHA512 generator failed.\n");
 			DisconnectWithReason(cid, "Try again.");
 			return;
 		} else {
 			if(EVP_DigestFinal_ex(evp, loginkey, NULL) != 1) {
-				printf("Login(): SHA512 get digest failed.\n");
+				printf("LoginWithHash(): SHA512 get digest failed.\n");
 				DisconnectWithReason(cid, "Try again.");
 				return;
 			}
@@ -1144,12 +1204,12 @@ void LoginWithHash(uint8_t* dat, int dlen, int cid) {
 			//Duplicate login check, BUG: can't re login as same user
 			for(int j = 0; j < MAX_CLIENTS; j++) {
 				if(C[j].fd != -1 && C[j].uid == i) {
-					Log(cid, "Login(): User already logged in.\n");
+					Log(cid, "User already logged in.\n");
 					DisconnectWithReason(cid, "Duplicate login.");
 					return;
 				}
 			}
-			Log(cid, "Login(): Logged in as user %s(ID=%d)\n", UserInformations[i].usr, i);
+			Log(cid, "Logged in as user %s(ID=%d)\n", UserInformations[i].usr, i);
 			C[cid].uid = i;
 			SendUserLists(cid);
 			SendJoinPacket(cid);

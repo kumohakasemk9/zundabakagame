@@ -23,7 +23,8 @@ zunda-defs.h: definitions
 							  "https://ko-fi.com/kumohakase\n" \
 							  "https://www.patreon.com/kumohakasemk8\n"
 
-#define MAX_DIFFICULTY 5 //Max difficulty
+#define MAX_ATKGAIN 5.0 //Maxmium AtkGain
+#define MIN_ATKGAIN 0.5 //Minimum AtkGain
 #define WINDOW_WIDTH 800 //Game width
 #define WINDOW_HEIGHT 600 //Game height
 #define MAP_WIDTH 5000 //map max width

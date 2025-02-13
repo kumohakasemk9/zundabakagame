@@ -364,7 +364,7 @@ ssize_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 	}
 	ssize_t r = send(ConnectionSocket, ctx, ctxlen, MSG_NOSIGNAL);
 	if(r < 0) {
-		warn("send_tcp_socket(): send failed: %s\n", strerror(errno) );
+		warn("send_tcp_socket(): send failed: %d\n", errno);
 		return -1;
 	} else if(r != ctxlen) {
 		warn("send_tcp_socket(): send failed. incomplete data send.\n");
@@ -386,7 +386,7 @@ ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
 			return -1;
 		} else {
-			warn("recv_tcp_socket(): recv() failed: %s\n", strerror(errno) );
+			warn("recv_tcp_socket(): recv() failed: %d\n", errno);
 			return -2;
 		}
 	}
