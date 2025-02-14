@@ -527,6 +527,14 @@ void stack_packet(event_type_t etype, ...) {
 		pktlen = 0;
 	}
 	va_end(varg);
+	//Test Packet
+	//const uint8_t TESTPACKET[] = "\x03\xff\x00\x05Hello";
+	//if(TXSMPEventLen + pktlen + sizeof(TESTPACKET) < NET_BUFFER_SIZE) {
+	//	memcpy(poff + pktlen, TESTPACKET, sizeof(TESTPACKET) );
+	//	pktlen += sizeof(TESTPACKET);
+	//} else {
+	//	warn("Injecting test packet failed!\n");
+	//}
 	if(TXSMPEventLen + pktlen >= NET_BUFFER_SIZE) {
 		warn("net_stack_packet(): TX SMP buffer overflow.\n");
 		close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));

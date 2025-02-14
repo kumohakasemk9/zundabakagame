@@ -900,7 +900,7 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 			memcpy(&EventBuffer[EBptr + sizeof(event_hdr_t) + pdlen], evhead, evlen);
 			pdlen += evlen;
 		}
-		evcp += dlen;
+		evcp += evlen;
 	}
 
 	//Append Event header
