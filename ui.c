@@ -255,25 +255,23 @@ void draw_shapes(int32_t idx, double x, double y) {
 		chcolor(0x70ffa000, 1);
 	} else if(tid == TID_EXPLOSION) {
 		chcolor(0x70ff0000, 1);
-	} else if(tid == TID_KUMO9_X24_PCANNON) {
-		d = Gobjs[idx].timeout;
-		chcolor(COLOR_KUMO9_X24_PCANNON, 1);
 	}
 	if(d != 0) {
 		//Draw circle
 		fillcircle(x, y, d);
 	}
-	if(tid == TID_ENEMYZUNDALASER || tid == TID_KUMO9_X24_LASER || (tid == TID_KUMO9_X24_PCANNON && Gobjs[idx].timeout < 20) ) {
+	if(tid == TID_ENEMYZUNDALASER || tid == TID_KUMO9_X24_LASER || tid == TID_KUMO9_X24_PCANNON) {
 		//Draw laser obj
 		uint32_t lasercolour = 0xc07f00ff;
 		double laserwidth = 5;
 		if(tid == TID_ENEMYZUNDALASER) {
-			//Apply EnemyZundaColourLaser if TID is TID_ENEMYZUNDALASER
+			//TID_ENEMYZUNDALASER: green, width: 20
 			lasercolour = 0xa000ff00;
 			laserwidth = 20;
 		} else if(tid == TID_KUMO9_X24_PCANNON) {
+			//TID_KUMO9_X24_PCANNON: white, width gets thinner if time ticks.
 			lasercolour = COLOR_KUMO9_X24_PCANNON;
-			laserwidth = 30;
+			laserwidth = scale_number(Gobjs[idx].timeout, 20, 30);
 		}
 		if(is_range(Gobjs[idx].aiming_target, 0, MAX_OBJECT_COUNT - 1)) {
 			chcolor(lasercolour, 1);

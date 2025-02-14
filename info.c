@@ -272,7 +272,7 @@ const int32_t NUMINFO[MAX_TID][9] = {
 	{27,  3000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  4}, //20 researchment facility
 	{29,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //21 power plant
 	{-1,     0,  TEAMID_ALLY, 2,    5,               UNITTYPE_BULLET, 600,  500,  0}, //22 Kumo9-x24-robot-laser
-	{-1,     0,  TEAMID_ALLY, 2, 1000,               UNITTYPE_BULLET,   0,  300,  0}  //23 Kumo9-x24-robot-pcanon
+	{-1,     0,  TEAMID_ALLY, 2,   50,               UNITTYPE_BULLET,   0,   20,  0}  //23 Kumo9-x24-robot-pcanon
 };
 
 //MaxSpeeds, damage

@@ -256,17 +256,18 @@ void procai() {
 			
 		} else if(tid == TID_KUMO9_X24_PCANNON) {
 			if(is_range(Gobjs[i].parentid, 0, MAX_OBJECT_COUNT - 1) && Gobjs[Gobjs[i].parentid].tid == TID_KUMO9_X24_ROBOT) {
-				//Parent is ok
+				//if Parent is ok
 				Gobjs[i].x = Gobjs[Gobjs[i].parentid].x;
 				Gobjs[i].y = Gobjs[Gobjs[i].parentid].y;
-				//burst damage if cannon hits
-				if(Gobjs[i].timeout == 20) {
-					if(is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) && Gobjs[Gobjs[i].aiming_target].tid != TID_NULL) {
-						damage_object(Gobjs[i].aiming_target, i);
-						//Make explosion (diam 600) on target
+				if(is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) && Gobjs[Gobjs[i].aiming_target].tid != TID_NULL) {
+					//If target object is not dead
+					if(Gobjs[i].timeout == 1) {
+						//Make explosion (diam 600) on target before pcannon disappears
 						int32_t r = add_character(TID_EXPLOSION, Gobjs[Gobjs[i].aiming_target].x, Gobjs[Gobjs[i].aiming_target].y, i);
-						Gobjs[r].hitdiameter = 600;
+						Gobjs[r].hitdiameter = 1200;
+						Gobjs[r].damage = 5;
 					}
+					damage_object(Gobjs[i].aiming_target, i);
 				}
 			} else {
 				//Parent dead
