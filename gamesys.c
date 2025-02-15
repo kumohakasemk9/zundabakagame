@@ -801,7 +801,7 @@ void ebcount_cmd() {
 void ebdist_cmd() {
 	//DifEnemyBaseDist set command (distance)
 	int32_t i = (int32_t)strtol(&CommandBuffer[8], NULL, 10);
-	if(!is_range(i, 100, 500) ) {
+	if(!is_range(i, MIN_EBDIST, MAX_EBDIST) ) {
 		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		return;
 	}

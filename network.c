@@ -19,7 +19,7 @@ network.c: process network packets
 #include <stdarg.h>
 #include <errno.h>
 
-void process_smp_events(uint8_t*, size_t, int32_t);
+int32_t process_smp_events(uint8_t*, size_t, int32_t);
 void net_server_send_cmd(server_command_t);
 void pkt_recv_handler(uint8_t*, size_t);
 void connection_establish_handler();
@@ -50,6 +50,11 @@ int32_t DisconnectReasonProvided = 0;
 #ifdef __WASM
 	extern void wasm_login_to_smp(char*, char*, uint8_t*);
 #endif
+int32_t evh_playable_location(void*, size_t, int);
+int32_t evh_place_item(void*, size_t, int);
+int32_t evh_use_skill(void*, size_t, int);
+int32_t evh_chat(void*, size_t, size_t, int);
+int32_t evh_reset(void*, size_t, int);
 
 void close_connection_cmd() {
 	info("Disconnect requested from user.\n");
@@ -404,7 +409,7 @@ void process_smp() {
 				return;
 			}
 			hdr = (event_hdr_t*)&RXSMPEventBuffer[ptr];
-			int32_t cid = hdr->cid;
+			int32_t cid = (int32_t)hdr->cid;
 			size_t evlen = (size_t)network2host_fconv_16(hdr->evlen);
 			size_t reclen = evlen + sizeof(event_hdr_t);
 			uint8_t* evhead = &RXSMPEventBuffer[ptr + (int32_t)sizeof(event_hdr_t)];
@@ -413,7 +418,10 @@ void process_smp() {
 				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 				return;
 			}
-			process_smp_events(evhead, evlen, cid);
+			if(process_smp_events(evhead, evlen, cid) == -1) {
+				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+				return;
+			}
 			ptr += (uint32_t)reclen;
 		}
 		RXSMPEventLen = 0;
@@ -544,7 +552,7 @@ void stack_packet(event_type_t etype, ...) {
 }
 
 //Process smp events (evbuf: content, evlen: length, cid: event owner id)
-void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
+int32_t process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 	//Decode packet
 	size_t evp = 0;
 	while(evp < evlen) {
@@ -552,149 +560,72 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 		if(evbuf[evp] == EV_PLAYABLE_LOCATION) {
 			if(remaining < sizeof(ev_playablelocation_t) ) {
 				warn("process_smp_events(): Too short EV_PLAYABLE_LOCATION packet, decoder will terminate.\n");
-				return;
+				return -1;
 			}
-			ev_playablelocation_t *ev = (ev_playablelocation_t*)&evbuf[evp];
-			double tx = (double)network2host_fconv_16(ev->x);
-			double ty = (double)network2host_fconv_16(ev->y);
-			//Security check
-			if(is_range_number(tx, 0, MAP_WIDTH) && is_range_number(ty, 0, MAP_HEIGHT)) {
-				int32_t i = lookup_smp_player_from_cid(cid);
-				if(is_range(i, 0, MAX_CLIENTS - 1) ) {
-					int32_t p_objid = SMPPlayerInfo[i].playable_objid;
-					if(is_range(p_objid, 0, MAX_OBJECT_COUNT - 1) ) {
-						Gobjs[p_objid].x = tx;
-						Gobjs[p_objid].y = ty;
-					} else {
-						warn("process_smp_events(): EV_PLAYABLE_LOCATION: Character of CID%d is not generated yet.\n", cid);
-					}
-				} else {
-					//Not registed in client list.
-					warn("process_smp_events(): EV_PLAYABLE_LOCATION: CID%d is not registered yet.\n", cid);
-				}
-			} else {
-				warn("process_smp_events(): CHANGE_PLAYABLE_LOCATION: packet check failed.\n");
+			if(evh_playable_location(evbuf, evp, cid) == -1) {
+				return -1;
 			}
 			evp += sizeof(ev_playablelocation_t);
+
 		} else if(evbuf[evp] == EV_PLACE_ITEM) {
 			if(remaining < sizeof(ev_placeitem_t) ) {
 				warn("process_smp_events(): Too short EV_PLACE_ITEM packet, decoder will terminate.\n");
-				return;
+				return -1;
 			}
-			//ItemPlace
-			ev_placeitem_t *ev = (ev_placeitem_t*)&evbuf[evp];
-			obj_type_t tid = (obj_type_t)ev->tid;
-			double x = (double)network2host_fconv_16(ev->x);
-			double y = (double)network2host_fconv_16(ev->y);
-			//Security check
-			if(is_range_number(x, 0, MAP_WIDTH) && is_range_number(y, 0, MAP_HEIGHT) && is_range(tid, 0, MAX_TID - 1) ) {
-				//Place object and set client id
-				int32_t i = lookup_smp_player_from_cid(cid);
-				if(is_range(i, 0, MAX_CLIENTS - 1) ) {
-					int32_t p_objid = SMPPlayerInfo[i].playable_objid;
-					if(is_range(p_objid, 0, MAX_OBJECT_COUNT - 1) ) {
-						info("process_smp_events(): PLACE_ITEM: cid=%d, tid=%d, x=%f, y=%f\n", cid, tid, x, y);
-						add_character(tid, x, y, i);
-					} else {
-						warn("process_smp_events(): PLACE_ITEM ignored, CID%d does not have playable character.\n", cid);
-					}
-				} else {
-					warn("process_smp_events(): CID%d is not in client list yet!\n", cid);
-				}
-			} else {
-				warn("process_smp_events(): PLACE_ITEM: packet check failed.\n");
+			if(evh_place_item(evbuf, evp, cid) == -1) {
+				return -1;
 			}
 			evp += sizeof(ev_placeitem_t);
+
 		} else if(evbuf[evp] == EV_USE_SKILL) {
 			if(remaining < sizeof(ev_useskill_t) ) {
 				warn("process_smp_events(): Too short EV_USE_SKILL packet, decoder will terminate.\n");
-				return;
+				return -1;
 			}
-			//UseSkill
-			ev_useskill_t *ev = (ev_useskill_t*)&evbuf[evp];
-			uint8_t skillid = ev->skillid;
-			//Security check
-			if(is_range(skillid, 0, SKILL_COUNT - 1) ) {
-				int32_t i = lookup_smp_player_from_cid(cid);
-				if(is_range(i, 0, MAX_CLIENTS - 1) ) {
-					int32_t pid = SMPPlayerInfo[i].playable_objid;
-					if(is_range(pid, 0, MAX_OBJECT_COUNT - 1) ) {
-						PlayableInfo_t p;
-						lookup_playable(pid, &p);
-						use_skill(i, skillid, p);
-					} else {
-						//g_print("process_smp_events(): USESKILL: User cid%d has invalid playable_objid.\n", cid);
-					}
-				} else {
-					warn("process_smp_events(): USESKILL: cid%d is not in client list yet.\n", cid);
-				}
-			} else {
-				warn("process_smp_events(): USESKILL: packet check failed.\n");
+			if(evh_use_skill(evbuf, evp, cid) == -1) {
+				return -1;
 			}
 			evp += sizeof(ev_useskill_t);
+
 		} else if(evbuf[evp] == EV_CHAT) {
 			if(remaining < sizeof(ev_chat_t) ) {
 				warn("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
-				return;
+				return -1;
 			}
-			//Chat on other client
-			ev_chat_t *ev = (ev_chat_t*)&evbuf[evp];
-			char ctx[BUFFER_SIZE];
-			ssize_t cpktlen = (ssize_t)network2host_fconv_16(ev->clen);
-			char* netchat = (char*)&evbuf[evp + (int32_t)sizeof(ev_chat_t)];
-			if((ssize_t)remaining < (ssize_t)sizeof(ev_chat_t) + cpktlen) {
-				warn("process_smp_events(): Too short EV_CHAT packet, decoder will terminate.\n");
-				return;
-			}
-			//Security check
-			if(is_range( (int32_t)cpktlen, 0, NET_CHAT_LIMIT - 1) ) {
-				memcpy(ctx, netchat, (size_t)cpktlen);
-				ctx[cpktlen] = 0; //Terminate string with NUL
-				int32_t cidinf = lookup_smp_player_from_cid(cid);
-				if(cidinf == -1) {
-					chatf("[SMP-CID%d] %s", cid, ctx);
-				} else {
-					chatf("<%s> %s", SMPPlayerInfo[cid].usr, ctx);
-				}
-			} else {
-				warn("procss_smp_events(): CHAT: packet too large.\n");
+			ev_chat_t *e = (ev_chat_t*)&evbuf[evp];
+			size_t cpktlen = (size_t)network2host_fconv_16(e->clen);
+			if(evh_chat(evbuf, evp, cpktlen, cid) == -1) {
+				return -1;
 			}
 			evp += sizeof(ev_chat_t) + cpktlen;
+			
 		} else if(evbuf[evp] == EV_RESET) {
-			//Reset request
 			if(remaining < sizeof(ev_reset_t) ) {
 				warn("process_smp_events(): Too short EV_RESET packet, decoder will terminate.\n");
-				return;
+				return -1;
 			}
-			ev_reset_t *ev = (ev_reset_t*)&evbuf[evp];
-			uint32_t _seed = (uint32_t)network2host_fconv_32(ev->level_seed);
-			DifEnemyBaseDist = (int32_t)network2host_fconv_16(ev->basedistance);
-			DifATKGain = ev->atkgain;
-			DifEnemyBaseCount[0] = ev->basecount0;
-			DifEnemyBaseCount[1] = ev->basecount1;
-			DifEnemyBaseCount[2] = ev->basecount2;
-			DifEnemyBaseCount[3] = ev->basecount3;
-			srand(_seed);
-			info("process_smp_events(): Round reset request from cid%d (Seed=%d)\n", cid, _seed);
-			reset_game();
+			if(evh_reset(evbuf, evp, cid) == -1) {
+				return -1;
+			}
 			evp += sizeof(ev_reset_t);
+
 		} else if(evbuf[evp] == EV_HELLO) {
 			//Another client connect event
 			if(remaining < sizeof(ev_hello_t) ) {
 				warn("process_smp_events(): Too short EV_HELLO packet, decoder will terminate.\n");
-				return;
+				return -1;
 			}
 			ev_hello_t *ev = (ev_hello_t*)&evbuf[evp];
 			int32_t fcid = (int32_t)ev->cid;
 			size_t funame_len = (size_t)ev->uname_len;
 			if(remaining < (size_t)sizeof(ev_hello_t) + funame_len) {
 				warn("process_smp_events(): Too short EV_HELLO packet, decoder will terminate.\n");
-				return;
+				return -1;
 			}
 			char funame[UNAME_SIZE];
 			if(funame_len >= UNAME_SIZE) {
 				warn("process_smp_events(): EV_HELLO packet username too large.\n");
-				return;
+				return -1;
 			}
 			memcpy(funame, &evbuf[evp + (int32_t)sizeof(ev_hello_t)], funame_len);
 			funame[funame_len] = 0;
@@ -715,11 +646,12 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				//Change AtkGain Parameter request
 				if(remaining < sizeof(ev_changeatkgain_t) ) {
 					warn("process_smp_events(): Too short EV_CHANGE_ATKGAIN packet, decoder will terminate.\n");
-					return;
+					return -1;
 				}
 				ev_changeatkgain_t *ev = (ev_changeatkgain_t*)&evbuf[evp];
 				if(is_range_number(ev->atkgain, MIN_ATKGAIN, MAX_ATKGAIN) ) {
 					DifATKGain = ev->atkgain;
+					info("process_smp_events(): EV_CHANGE_ATKGAIN %d\n", ev->atkgain);
 				} else {
 					warn("process_smp_events(): EV_CHANGE_ATKGAIN wrong parameter!");
 				}
@@ -731,7 +663,7 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 			//Another client disconnect event
 			if(remaining < sizeof(ev_bye_t) ) {
 				warn("process_smp_events(): Too short EV_BYE packet, decoder will terminate.\n");
-				return;
+				return -1;
 			}
 			ev_bye_t *ev = (ev_bye_t*)&evbuf[evp];
 			int32_t fcid = (int32_t)ev->cid;
@@ -755,13 +687,14 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				}
 			} else {
 				warn("process_smp_events(): EV_BYE: security check failed.\n");
+				return -1;
 			}
 			evp += sizeof(ev_bye_t);
 		} else if(evbuf[evp] == EV_CHANGE_PLAYABLE_ID) {
 			//Another client playable id change
 			if(remaining < sizeof(ev_changeplayableid_t) ) {
 				warn("process_smp_events(): Too short EV_CHANGE_PLAYABLE_ID packet, decoder will terminate.\n");
-				return;
+				return -1;
 			}
 			ev_changeplayableid_t *ev = (ev_changeplayableid_t*)&evbuf[evp];
 			//Param check
@@ -779,11 +712,13 @@ void process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 			evp += sizeof(ev_changeplayableid_t);
 		} else {
 			warn("process_smp_events(): Unknown event type, decorder terminated.\n");
-			break;
+			return -1;
 		}
 	}
+	return 0;
 }
 
+//Lookup smp client information id from client id
 int32_t lookup_smp_player_from_cid(int32_t cid) {
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		if(SMPPlayerInfo[i].cid == cid) {
@@ -791,4 +726,148 @@ int32_t lookup_smp_player_from_cid(int32_t cid) {
 		}
 	}
 	return -1;
+}
+
+//EV_PLAYABLE_LOCATION packet handler
+int32_t evh_playable_location(void* eventbuffer, size_t eventoff, int32_t cid) {
+	ev_playablelocation_t *ev = (ev_playablelocation_t*)&eventbuffer[eventoff];
+	double tx = (double)network2host_fconv_16(ev->x);
+	double ty = (double)network2host_fconv_16(ev->y);
+	//Parameter check
+	if(!is_range_number(tx, 0, MAP_WIDTH) || !is_range_number(ty, 0, MAP_HEIGHT) ) {
+		warn("evh_playable_location(): Bad packet.\n");
+		return -1;
+	}
+
+	//Obtain client information
+	int32_t i = lookup_smp_player_from_cid(cid);
+	if(i == -1) {
+		warn("evh_playable_location(): CID%d is not registered yet.\n", cid);
+		return 0;
+	}
+
+	//If they have valid playable character, change its coordinate.
+	int32_t p_objid = SMPPlayerInfo[i].playable_objid;
+	if(is_range(p_objid, 0, MAX_OBJECT_COUNT - 1) ) {
+		Gobjs[p_objid].x = tx;
+		Gobjs[p_objid].y = ty;
+	} else {
+		warn("evh_playable_location: Character of CID%d is not generated yet.\n", cid);
+	}
+	return 0;
+}
+
+//EV_PLACE_ITEM packet handler
+int32_t evh_place_item(void* eventbuffer, size_t eventoff, int cid) {
+	ev_placeitem_t *ev = (ev_placeitem_t*)&eventbuffer[eventoff];
+	obj_type_t tid = (obj_type_t)ev->tid;
+	double x = (double)network2host_fconv_16(ev->x);
+	double y = (double)network2host_fconv_16(ev->y);
+	
+	//Parameter check
+	if(!is_range_number(x, 0, MAP_WIDTH) || !is_range_number(y, 0, MAP_HEIGHT) || !is_range(tid, 0, MAX_TID - 1) ) {
+		warn("evh_place_item(): packet check failed.\n");
+		return -1;
+	}
+
+	//Get sender client's playable character object id
+	int32_t i = lookup_smp_player_from_cid(cid);
+	if(i == -1) {
+		warn("evh_place_item(): CID%d is not in client list yet!\n", cid);
+		return 0;
+	}
+	int32_t p_objid = SMPPlayerInfo[i].playable_objid;
+	if(!is_range(p_objid, 0, MAX_OBJECT_COUNT - 1) ) {
+		warn("evh_place_item(): packet ignored, CID%d does not have playable character.\n", cid);
+		return 0;
+	}
+
+	//Add character
+	info("process_smp_events(): PLACE_ITEM: cid=%d, tid=%d, x=%f, y=%f\n", cid, tid, x, y);
+	add_character(tid, x, y, i);
+	return 0;
+}
+
+//EV_USE_SKILL packet handler
+int32_t evh_use_skill(void* eventbuffer, size_t eventoff, int32_t cid) {
+	ev_useskill_t *ev = (ev_useskill_t*)&eventbuffer[eventoff];
+	uint8_t skillid = ev->skillid;
+
+	//Parameter check
+	if(!is_range(skillid, 0, SKILL_COUNT - 1) ) {
+		warn("evh_use_skill(): packet check failed.\n");
+		return -1;
+	}
+	
+	//Get playable character objid of the sender client
+	int32_t i = lookup_smp_player_from_cid(cid);
+	if(i == -1) {
+		warn("evh_use_skill(): cid%d is not in client list yet.\n", cid);
+		return 0;
+	}
+	int32_t pid = SMPPlayerInfo[i].playable_objid;
+	if(!is_range(pid, 0, MAX_OBJECT_COUNT - 1) ) {
+		warn("evh_use_skill(): User cid%d has invalid playable_objid.\n", cid);
+		return 0;
+	}
+
+	//Use skill as remote player
+	PlayableInfo_t p;
+	lookup_playable(pid, &p);
+	use_skill(i, skillid, p);
+	return 0;
+}
+
+//EV_CHAT packet handler
+int32_t evh_chat(void* evbuffer, size_t eventoff, size_t clen, int32_t cid) {
+	ev_chat_t *ev = (ev_chat_t*)&evbuffer[eventoff];
+	char* netchat = (char*)&evbuffer[eventoff + sizeof(ev_chat_t)];
+	int32_t dstcid = ev->dstcid;
+
+	//Parameter check
+	if(clen >= NET_CHAT_LIMIT) {
+		warn("evh_chat(): Too long chat packet\n");
+		return -1;
+	}
+	if(!is_range(dstcid, -1, MAX_CLIENTS) ) {
+		warn("evh_chat(): Bad dstcid!\n");
+		return -1;
+	}
+
+	//Show chat
+	char ctx[NET_CHAT_LIMIT];
+	memcpy(ctx, netchat, clen);
+	ctx[clen] = 0; //Terminate string with NUL
+	int32_t cidinf = lookup_smp_player_from_cid(cid);
+	if(cidinf == -1) {
+		chatf("[SMP-CID%d] %s", cid, ctx);
+	} else {
+		chatf("<%s> %s", SMPPlayerInfo[cid].usr, ctx);
+	}
+	return 0;
+}
+
+//EV_RESET handler
+int32_t evh_reset(void* eventbuffer, size_t eventoffset, int32_t cid) {
+	ev_reset_t *ev = (ev_reset_t*)&eventbuffer[eventoffset];
+	uint32_t _seed = (uint32_t)network2host_fconv_32(ev->level_seed);
+	int32_t basedistance = (int32_t)network2host_fconv_16(ev->basedistance);
+	float atkgain = ev->atkgain;
+
+	//Check paraneter
+	if(!is_range(basedistance, MIN_EBDIST, MAX_EBDIST) || !is_range(atkgain, MIN_ATKGAIN, MAX_ATKGAIN) ) {
+		warn("evh_reset(): bad packet!\n");
+		return -1;
+	} 
+
+	DifEnemyBaseDist = basedistance;
+	DifATKGain = atkgain;
+	DifEnemyBaseCount[0] = ev->basecount0;
+	DifEnemyBaseCount[1] = ev->basecount1;
+	DifEnemyBaseCount[2] = ev->basecount2;
+	DifEnemyBaseCount[3] = ev->basecount3;
+	srand(_seed);
+	info("evh_reset_handler(): Round reset request from cid%d (Seed=%d, ebcount=%d %d %d %d, ebdist=%d, atkgain=%f)\n", cid, _seed, ev->basecount0, ev->basecount1, ev->basecount2, ev->basecount3, basedistance, atkgain);
+	reset_game();
+	return 0;
 }

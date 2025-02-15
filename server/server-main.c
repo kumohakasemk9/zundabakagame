@@ -383,17 +383,16 @@ void SendPrivateChat(int cid, int destcid, char* chat) {
 	size_t cl = strlen(chat);
 	ev_chat_t hdr = {
 		.evtype = EV_CHAT,
+		.dstcid = destcid,
 		.clen = htons(cl)
 	};
-	size_t evsiz = cl + sizeof(hdr) + 2;
+	size_t evsiz = cl + sizeof(hdr);
 	if(evsiz >= SIZE_NET_BUFFER) {
 		printf("SendPrivateChat(): EV_CHAT packet overflow.\n");
 		return;
 	}
 	memcpy(t, &hdr, sizeof(hdr) );
-	t[3] = destcid;
-	t[4] = 0;
-	memcpy(&t[sizeof(hdr) + 2], chat, cl);
+	memcpy(&t[sizeof(hdr)], chat, cl);
 	AddEvent(t, evsiz, cid);
 }
 

@@ -25,6 +25,8 @@ zunda-defs.h: definitions
 
 #define MAX_ATKGAIN 5.0 //Maxmium AtkGain
 #define MIN_ATKGAIN 0.5 //Minimum AtkGain
+#define MIN_EBDIST 100 //Minimum ebdist
+#define MAX_EBDIST 500 //Maximum ebdist
 #define WINDOW_WIDTH 800 //Game width
 #define WINDOW_HEIGHT 600 //Game height
 #define MAP_WIDTH 5000 //map max width
