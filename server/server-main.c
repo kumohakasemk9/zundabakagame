@@ -35,7 +35,7 @@ typedef struct {
 	char usr[UNAME_SIZE];
 	char pwd[PASSWD_SIZE];
 	int op;
-	time_t ban;
+	int ban;
 	char banreason[BAN_REASON_SIZE];
 } userinfo_t;
 
@@ -869,14 +869,11 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 				DisconnectWithReason(cid, "Bad packet.");
 				return;
 			}
+			memcpy(chatbuf, chathead, chatlen);
+			chatbuf[chatlen] = 0;
 			//is private msg?
 			if(whispercid != -1) {
-				memcpy(chatbuf, &chathead[2], chatlen - 2);
-				chatbuf[chatlen - 2] = 0;
-				Log(cid, "Whisper to cid %d\n", hdr, whispercid);
-			} else {
-				memcpy(chatbuf, chathead, chatlen);
-				chatbuf[chatlen] = 0;
+				Log(cid, "Whisper to cid %d\n", whispercid);
 			}
 			if(chatbuf[0] == '?') {
 				Log(cid, "servercommand: %s\n", chatbuf);
@@ -954,8 +951,13 @@ void ExecServerCommand(char* cmd, int cid) {
 		if(GetUserOpLevel(cid) >= 2) {
 			if(uid != -1) {
 				Log(cid, "User %s will be banned.\n", UserInformations[uid].usr);
-				UserInformations[uid].usr[0] = 0;
-				//todo
+				UserInformations[uid].ban = -1;
+				//Disconnect if banned user is connected
+				for(int i = 0; i < MAX_CLIENTS; i++) {
+					if(C[i].uid == uid && C[i].fd != -1) {
+						C[i].closereq = 1;
+					}
+				}
 			} else {
 				Log(cid, "Specified user not found.\n");
 			}
@@ -1006,12 +1008,13 @@ void GetEvent(int cid) {
 					}
 				}
 				//Process secret chat (char 0 = destination cid, char1 = 0)
-				/*if(evhead[0] == EV_CHAT) {
+				if(evhead[0] == EV_CHAT) {
 					ev_chat_t *hdr = (ev_chat_t*)evhead;
-					if(!(cid == hdr->dstcid || cid == ecid) ) {
+					int dcid = hdr->dstcid;
+					if(0 <= dcid && dcid <= MAX_CLIENTS && (cid != dcid && cid != ecid) ) {
 						copyevent = 0;
 					}
-				}*/
+				}
 			} else {
 				copyevent = 0;
 			}
