@@ -885,7 +885,13 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 			Log(cid, "AddEvent(): round reset request\n");
 			if(GetUserOpLevel(cid) < 1) {
 				copyev = 0;
-				Log(cid, "AddEvent(): Round reset request denied, bad op level.\n");
+				Log(cid, "AddEvent(): Request denied, bad op level.\n");
+			}
+		} else if(evhead[0] == EV_CHANGE_ATKGAIN) {
+			Log(cid, "AddEvent(): change atkgain\n");
+			if(GetUserOpLevel(cid) < 1) {
+				copyev = 0;
+				Log(cid, "AddEvent(): Request denied, bad op level.\n");
 			}
 		} else if(evhead[0] == EV_HELLO || evhead[0] == EV_BYE) {
 			if(cid != -1) {
@@ -1123,6 +1129,8 @@ ssize_t GetEventPacketSize(uint8_t *d, int l) {
 		r = sizeof(ev_bye_t);
 	} else if(d[0] == EV_CHANGE_PLAYABLE_ID) {
 		r = sizeof(ev_changeplayableid_t);
+	} else if(d[0] == EV_CHANGE_ATKGAIN) {
+		r = sizeof(ev_changeatkgain_t);
 	}
 	//return -1 if data length is nou enough to store struct
 	if(r > l) {

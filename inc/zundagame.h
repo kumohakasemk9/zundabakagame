@@ -31,8 +31,8 @@ main.h: integrated header file
 void detect_syslang();
 WASMIMPORT int32_t make_tcp_socket(char*, char*);
 WASMIMPORT int32_t close_tcp_socket();
-WASMIMPORT ssize_t send_tcp_socket(uint8_t*, size_t);
-ssize_t recv_tcp_socket(uint8_t*, size_t);
+WASMIMPORT ssize_t send_tcp_socket(void*, size_t);
+ssize_t recv_tcp_socket(void*, size_t);
 int32_t isconnected_tcp_socket();
 int16_t network2host_fconv_16(uint16_t);
 int32_t network2host_fconv_32(uint32_t);

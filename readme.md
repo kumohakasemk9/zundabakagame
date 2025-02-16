@@ -22,7 +22,7 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 - `/en`              : Switch to english
 - `/jp`              : Switch to japanese
 - `/chfont fontname` : load fontlist separated by ","
-- `/version`         : Show version string
+- `/builddate`       : Show build date
 - `/credit`          : Show credit string
 - `/reset`           : Round reset
 - `/smp id`          : Set your SMP connection profile id. Used when connect. id will start from 1       

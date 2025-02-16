@@ -670,13 +670,12 @@ void execcmd() {
 		return;
 	}
 
-	if(strcmp(CommandBuffer, "/version") == 0) {
-		//Show Version
-		chatf("Version: %s", VERSION_STRING);
-
-	} else if(strcmp(CommandBuffer, "/credit") == 0) {
+	if(strcmp(CommandBuffer, "/credit") == 0) {
 		//Show Credit
 		chat(CREDIT_STRING);
+	} else if(strcmp(CommandBuffer, "/builddate") == 0) {
+		//Show build date
+		chat(__TIMESTAMP__);
 
 	} else if(memcmp(CommandBuffer, "/smp ", 5) == 0) {
 		//Change SMP profile id
@@ -816,6 +815,7 @@ void atkgain_cmd() {
 		return;
 	}
 	DifATKGain = i;
+	info("atkgain_cmd(): atkgain changed to %f\n", DifATKGain);
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		stack_packet(EV_CHANGE_ATKGAIN);
 	}
@@ -957,7 +957,7 @@ void showstatus(const char* ctx, ...) {
 
 int32_t gameinit(char* fn) {
 	//Gameinit function, load assets and more. Called when program starts.
-	info("Welcome to zundagame. Initializing: %s\n", VERSION_STRING);
+	info("Welcome to zundagame.\n");
 	info("%s\n", CONSOLE_CREDIT_STRING);
 	info("Build date: %s\n", __TIMESTAMP__);
 	

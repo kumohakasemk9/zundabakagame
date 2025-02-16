@@ -357,7 +357,7 @@ int32_t close_tcp_socket() {
 }
 
 //Send bytes to connected server
-ssize_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
+ssize_t send_tcp_socket(void* ctx, size_t ctxlen) {
 	if(ConnectionSocket == -1) {
 		warn("send_tcp_socket(): socket is not open!\n");
 		return -1;
@@ -374,7 +374,7 @@ ssize_t send_tcp_socket(uint8_t* ctx, size_t ctxlen) {
 }
 
 //Receive bytes from connected server, returns read bytes
-ssize_t recv_tcp_socket(uint8_t* ctx, size_t ctxlen) {
+ssize_t recv_tcp_socket(void* ctx, size_t ctxlen) {
 	if(ConnectionSocket == -1) {
 		warn("recv_tcp_socket(): socket is not open!\n");
 		return -1;
