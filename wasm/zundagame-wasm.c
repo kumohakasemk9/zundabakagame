@@ -85,7 +85,7 @@ uint32_t host2network_fconv_32(int32_t d) {
 	return htonl( (uint32_t)d);
 }
 
-ssize_t recv_tcp_socket(uint8_t* b, size_t a) {
+ssize_t recv_tcp_socket(void* b, size_t a) {
 	warn("This function should be never called\n");
 	return 0;
 }
