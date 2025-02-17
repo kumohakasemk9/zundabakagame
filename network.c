@@ -29,7 +29,7 @@ uint8_t SMPsalt[SALT_LENGTH]; //Filled when connected
 int32_t SMPcid; //My client id
 extern int32_t SMPProfCount;
 extern SMPProfile_t *SMPProfs;
-extern int32_t SelectedSMPProf;
+int32_t SelectedSMPProf;
 extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
 uint8_t TempRXBuffer[NET_BUFFER_SIZE];
 size_t TRXBLength;
@@ -257,13 +257,17 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 }
 
 //Connect to specified address
-void connect_server() {
+void connect_server_cmd(char* cmdparam) {
+	//Convert parameter to int
+	int sp = atoi(cmdparam);
+
 	//Check for parameter
-	if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
-		warn("connect_server(): Bad profile number: %d\n", SMPProfCount);
+	if(!is_range(sp, 0, SMPProfCount - 1) ) {
+		warn("connect_server(): Bad profile number: %d\n", sp);
 		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
 		return;
 	}
+	SelectedSMPProf = sp;
 
 	//If already connected, return
 	if(SMPStatus != NETWORK_DISCONNECTED) {
@@ -273,8 +277,8 @@ void connect_server() {
 	}
 
 	//Announce and reset variables
-	showstatus("%s %s", getlocalizedstring(17), SMPProfs[SelectedSMPProf].host);
-	info("connect_server(): Attempting to connect to %s:%s\n", SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
+	showstatus("%s %s", getlocalizedstring(17), SMPProfs[sp].host);
+	info("connect_server(): Attempting to connect to %s:%s\n", SMPProfs[sp].host, SMPProfs[sp].port);
 	RXSMPEventLen = 0;
 	TXSMPEventLen = 0;
 	TRXBLength = 0;
@@ -288,7 +292,7 @@ void connect_server() {
 	SMPStatus = NETWORK_CONNECTING;
 
 	//Connect
-	if(make_tcp_socket(SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port) != 0) {
+	if(make_tcp_socket(SMPProfs[sp].host, SMPProfs[sp].port) != 0) {
 		showstatus( (char*)getlocalizedstring(18) ); //can not connect
 		SMPStatus = NETWORK_DISCONNECTED;
 		return;
@@ -696,6 +700,10 @@ int32_t process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 
 //Lookup smp client information id from client id
 int32_t lookup_smp_player_from_cid(int32_t cid) {
+	if(!is_range(cid, 0, MAX_CLIENTS) ) {
+		return -1;
+	}
+
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		if(SMPPlayerInfo[i].cid == cid) {
 			return i;
@@ -823,9 +831,14 @@ int32_t evh_chat(uint8_t* evbuffer, size_t eventoff, size_t clen, int32_t cid) {
 	char ctx[NET_CHAT_LIMIT];
 	memcpy(ctx, netchat, clen);
 	ctx[clen] = 0; //Terminate string with NUL
-	int32_t cidinf = lookup_smp_player_from_cid(cid);
+	int32_t cidinf = -1;
+	cidinf = lookup_smp_player_from_cid(cid);
 	if(cidinf == -1) {
-		chatf("[SMP-CID%d] %s", cid, ctx);
+		if(cid == -1) {
+			chatf("[Server] %s", ctx);
+		} else {
+			chatf("[SMP-CID%d] %s", cid, ctx);
+		}
 	} else {
 		chatf("<%s> %s", SMPPlayerInfo[cid].usr, ctx);
 	}

@@ -38,13 +38,13 @@ double get_distance_raw(double, double, double, double);
 void select_next_item();
 void select_prev_item();
 void spawn_playable_me();
-void get_smp_cmd();
+void get_smp_cmd(char*);
 void reset_game_cmd();
-void smp_cmd();
 void addid_cmd();
 void ebcount_cmd();
 void ebdist_cmd();
 void atkgain_cmd();
+void getcurrentsmp_cmd();
 void changetimeout_cmd();
 void cmd_enter();
 void cmd_cancel();
@@ -87,8 +87,8 @@ int32_t MapRequiredEnergyLevel = 0; //Increases when item placed except generato
 int32_t SkillKeyState;
 smpstatus_t SMPStatus = NETWORK_DISCONNECTED; //Network status.
 int32_t SMPProfCount = 0; //Loaded smp profiles count from credentials.txt
+extern int32_t SelectedSMPProf;
 SMPProfile_t *SMPProfs = NULL; //SMP profiles form credentials.txt
-int32_t SelectedSMPProf = 0; //Current selected SMP profile
 SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //Server's player informations
 extern int32_t SMPcid; //ID of our client (told from SMP server)
 int32_t StatusShowTimer; //For showstatus(), it countdowns and if it gots 0 status message disappears
@@ -677,17 +677,18 @@ void execcmd() {
 		//Show build date
 		chat(__TIMESTAMP__);
 
-	} else if(memcmp(CommandBuffer, "/smp ", 5) == 0) {
-		//Change SMP profile id
-		smp_cmd();
-
 	} else if(strcmp(CommandBuffer, "/getsmps") == 0) {
 		//Get current loaded SMP profile count
 		chatf("getsmps: %d", SMPProfCount);
 
-	} else if(strcmp(CommandBuffer, "/getsmp") == 0) {
+	} else if(memcmp(CommandBuffer, "/getsmp ", 8) == 0) {
 		//get selected smp profile info
-		get_smp_cmd();
+		get_smp_cmd(&CommandBuffer[8]);
+
+	} else if(strcmp(CommandBuffer, "/getcurrentsmp") == 0) {
+		//get current SMP profile.
+		getcurrentsmp_cmd();
+
 	} else if(memcmp(CommandBuffer, "/addsmp ", 8) == 0) {
 		//Add SMP profile
 		add_smp_cmd(&CommandBuffer[8]);
@@ -708,9 +709,9 @@ void execcmd() {
 		//Load font list
 		loadfont(&CommandBuffer[8]);
 
-	} else if(strcmp(CommandBuffer, "/connect") == 0) {
+	} else if(memcmp(CommandBuffer, "/connect ", 9) == 0) {
 		//Connect to SMP server
-		connect_server();
+		connect_server_cmd(&CommandBuffer[9]);
 
 	} else if(strcmp(CommandBuffer, "/disconnect") == 0) {
 		//Disconnect from SMP server
@@ -741,12 +742,24 @@ void execcmd() {
 		chatf("timeout: %d", NetworkTimeout);
 
 	} else {
-		//If not command, treat them as a chat
-		if(SMPStatus == NETWORK_LOGGEDIN) {
-			stack_packet(EV_CHAT, CommandBuffer);
+		if(CommandBuffer[0] == '/') {
+			chatf( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) );
 		} else {
-			chatf("[local] %s", CommandBuffer);
+			if(SMPStatus == NETWORK_LOGGEDIN) {
+				stack_packet(EV_CHAT, CommandBuffer);
+			} else {
+				chatf("[local] %s", CommandBuffer);
+			}
 		}
+	}
+}
+
+void getcurrentsmp_cmd() {
+	//Command to get connection state
+	if(SMPStatus == NETWORK_DISCONNECTED) {
+		chat( (char*)getlocalizedstring(25) );	
+	} else {
+		chatf("getcurrentsmp: %d (%s@%s:%s)", SelectedSMPProf, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
 	}
 }
 
@@ -821,27 +834,14 @@ void atkgain_cmd() {
 	}
 }
 
-void smp_cmd() {
-	//Changing selecting smp prof id (Can't be changed in SMP) (id)
-	if(SMPStatus != NETWORK_DISCONNECTED) {
-		warn("smp_cmd(): /smp: in connection, you can not change SMP profile.\n");
-		chat( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
-		return;
-	}
-	int32_t i = (int32_t)strtol(&CommandBuffer[5], NULL, 10);
-	if(is_range(i, 1, SMPProfCount) ) {
-		SelectedSMPProf = i - 1;
-	} else {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-	}
-}
-
-void get_smp_cmd() {
+void get_smp_cmd(char *param) {
 	//Get current selected SMP profile
-	if(!is_range(SelectedSMPProf, 0, SMPProfCount - 1) ) {
-		chatf("getsmp: %d (ID overflow)", SelectedSMPProf + 1);
+	int i = atoi(param);
+	if(is_range(i, 0, SMPProfCount - 1) ) {
+		chatf("getsmp: %d (%s@%s:%s)", i, SMPProfs[i].usr, SMPProfs[i].host, SMPProfs[i].port);
 	} else {
-		chatf("getsmp: %d (%s@%s:%s)", SelectedSMPProf + 1, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
+		warn("get_smp_cmd(): bad SMP id.\n");
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 	}
 }
 
@@ -1164,7 +1164,7 @@ void mousemotion_handler(int32_t x, int32_t y) {
 //Switch debug info
 void switch_debug_info() {
 	DebugStatType++;
-	if(DebugStatType > 2) {DebugStatType = 0;} //0 to 2	
+	if(DebugStatType > 3) {DebugStatType = 0;} //0 to 2	
 }
 
 void keypress_handler(char kc, specialkey_t ks) {

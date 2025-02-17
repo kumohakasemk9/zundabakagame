@@ -48,7 +48,7 @@ zunda-defs.h: definitions
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
 #define ITEM_COUNT 5 //Max item id
-#define MAX_STRINGS 25 // Max string count
+#define MAX_STRINGS 26 // Max string count
 #define MAX_TID 24 //max type id
 #define SKILL_COUNT 3 //Skill Count
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count

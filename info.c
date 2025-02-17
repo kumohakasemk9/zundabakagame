@@ -43,7 +43,8 @@ const char* JP_STRINGS[MAX_STRINGS] = {
 	"SMPエラー",
 	"がゲームに参加しました",
 	"がゲームから切断しました",
-	"応答なし"
+	"応答なし",
+	"接続していません"
 };
 
 const char *EN_STRINGS[MAX_STRINGS] = {
@@ -71,7 +72,8 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"SMP error.",
 	"joined in the game.",
 	"left from the game.",
-	"Timed out"
+	"Timed out",
+	"Offline"
 };
 
 //TID names LUT

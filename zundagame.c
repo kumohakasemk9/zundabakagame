@@ -14,8 +14,6 @@ main.c: linux entry point, X11 funcs.
 
 TODO List
 simplify UI
-change connect command behavior
-fix use_skill packet
 nickname feature in SMP
 chat mute feature in SMP
 add getCurrentPlayableCharacterId()

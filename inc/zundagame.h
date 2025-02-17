@@ -91,7 +91,7 @@ const char *getlocalizeditemdesc(int32_t);
 void network_recv_task();
 void process_smp();
 void stack_packet(event_type_t, ...);
-void connect_server();
+void connect_server_cmd(char*);
 void close_connection_cmd();
 void close_connection(char*);
 int32_t lookup_smp_player_from_cid(int32_t);

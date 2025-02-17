@@ -67,6 +67,8 @@ double DrawTime; //DrawTime (in milliseconds)
 extern double GameTickTime;
 extern int32_t AddingTID; //Debug mode appending object id
 extern int32_t DebugStatType;
+extern SMPProfile_t SMPProfs[];
+extern int32_t SelectedSMPProf;
 
 //Paint event of window client, called for every 30mS
 void game_paint() {
@@ -310,6 +312,8 @@ void draw_cui() {
 		drawstringf(0, 0, "System: %.2f %.2f (%.2f%%) %.2f%%", DrawTime, GameTickTime, GameTickTime / 10.0, (double)objc / (double)MAX_OBJECT_COUNT); //System Statics
 	} else if(DebugStatType == 2) {
 		drawstringf(0, 0, "Input: (%d, %d) (%d, %d) 0x%02x", CameraX, CameraY, CursorX, CursorY, KeyFlags); //Input Statics
+	} else if(DebugStatType == 3) {
+		drawstringf(0, 0, "Network: %d %d", SMPStatus, SelectedSMPProf);
 	}
 
 	//Show command input window if command mode
@@ -401,11 +405,6 @@ void draw_info() {
 	//Show current Energy level
 	chcolor(ttxtclr, 1);
 	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 32, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
-	//Show "connected" string if connected with smp server
-	if(SMPStatus != NETWORK_DISCONNECTED) {
-		chcolor(COLOR_TEXTCMD, 1);
-		drawstring(STATUS_XOFF + 70, IHOTBAR_YOFF, "remote");
-	}
 }
 
 void draw_lolhotbar(double offsx, double offsy) {
