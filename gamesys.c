@@ -24,7 +24,6 @@ gamesys.c: game process and related functions
 //gamesys.c
 void read_creds();
 void local2map(double, double, double*, double*);
-void chat(char*);
 void set_speed_for_going_location(int32_t, double, double, double);
 void start_command_mode(int32_t);
 void switch_character_move();
@@ -38,14 +37,11 @@ double get_distance_raw(double, double, double, double);
 void select_next_item();
 void select_prev_item();
 void spawn_playable_me();
-void get_smp_cmd(char*);
 void reset_game_cmd();
 void addid_cmd();
 void ebcount_cmd();
 void ebdist_cmd();
 void atkgain_cmd();
-void getcurrentsmp_cmd();
-void changetimeout_cmd();
 void cmd_enter();
 void cmd_cancel();
 void cmd_cursor_back();
@@ -53,8 +49,6 @@ void cmd_cursor_forward();
 void cmd_putch(char);
 void modifyKeyFlags(keyflags_t, int32_t);
 void switch_debug_info();
-int32_t add_smp_profile(char*, char);
-void add_smp_cmd(char*);
 
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
 int32_t ChatTimeout = 0; //Douncounting timer, chat will shown it this is not 0
@@ -85,11 +79,11 @@ int32_t MapTechnologyLevel; //Increases when google item placed, buffs playable
 int32_t MapEnergyLevel; //Increases when generator item placed, if it is lower than MapRequiredEnergyLevel, then all facilities stop.
 int32_t MapRequiredEnergyLevel = 0; //Increases when item placed except generator item.
 int32_t SkillKeyState;
-smpstatus_t SMPStatus = NETWORK_DISCONNECTED; //Network status.
-int32_t SMPProfCount = 0; //Loaded smp profiles count from credentials.txt
+extern smpstatus_t SMPStatus;
+extern int32_t SMPProfCount;
 extern int32_t SelectedSMPProf;
-SMPProfile_t *SMPProfs = NULL; //SMP profiles form credentials.txt
-SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //Server's player informations
+extern SMPProfile_t *SMPProfs;
+extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //Server's player informations
 extern int32_t SMPcid; //ID of our client (told from SMP server)
 int32_t StatusShowTimer; //For showstatus(), it countdowns and if it gots 0 status message disappears
 char StatusTextBuffer[BUFFER_SIZE]; //For showstatus(), status text storage
@@ -99,7 +93,7 @@ int32_t DifEnemyBaseDist = 500; //Default enemy boss distance from each other
 double DifATKGain = 1.00; //Attack damage gain
 double GameTickTime; //Game tick running time (avg)
 int32_t DebugStatType = 0; //Shows information if nonzero 0: No debug, 1: System profiler, 2: Input test
-int32_t NetworkTimeout = 10; //If there's period that has no packet longer than this value, assumed as disconnected. 0: disable timeout
+extern int32_t NetworkTimeout; //If there's period that has no packet longer than this value, assumed as disconnected. 0: disable timeout
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -735,7 +729,7 @@ void execcmd() {
 	
 	} else if(memcmp(CommandBuffer, "/chtimeout ", 11) == 0) {
 		//Setting timeout command
-		changetimeout_cmd();
+		changetimeout_cmd(&CommandBuffer[11]);
 
 	} else if(strcmp(CommandBuffer, "/timeout") == 0) {
 		//Get timeout
@@ -752,33 +746,6 @@ void execcmd() {
 			}
 		}
 	}
-}
-
-void getcurrentsmp_cmd() {
-	//Command to get connection state
-	if(SMPStatus == NETWORK_DISCONNECTED) {
-		chat( (char*)getlocalizedstring(25) );	
-	} else {
-		chatf("getcurrentsmp: %d (%s@%s:%s)", SelectedSMPProf, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
-	}
-}
-
-void add_smp_cmd(char* p) {
-	//Add SMP profile
-	if(add_smp_profile(p, ' ') != 0) {
-			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-	}
-}
-
-void changetimeout_cmd() {
-	//change network timeout
-	int32_t i = (int32_t)strtol(&CommandBuffer[11], NULL, 10);
-	if(!is_range(i, 0, 1000) ) {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-		warn("changetimeout_cmd(): paraneter must be 0 to 1000.\n");
-		return;
-	}
-	NetworkTimeout = i;
 }
 
 void ebcount_cmd() {
@@ -831,17 +798,6 @@ void atkgain_cmd() {
 	info("atkgain_cmd(): atkgain changed to %f\n", DifATKGain);
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		stack_packet(EV_CHANGE_ATKGAIN);
-	}
-}
-
-void get_smp_cmd(char *param) {
-	//Get current selected SMP profile
-	int i = atoi(param);
-	if(is_range(i, 0, SMPProfCount - 1) ) {
-		chatf("getsmp: %d (%s@%s:%s)", i, SMPProfs[i].usr, SMPProfs[i].host, SMPProfs[i].port);
-	} else {
-		warn("get_smp_cmd(): bad SMP id.\n");
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 	}
 }
 
@@ -1033,64 +989,6 @@ void read_creds(char *fn) {
 		}
 	}
 	fclose(f);
-}
-
-int32_t add_smp_profile(char* line, char spliter) {
-	SMPProfile_t t_rec;
-	char *t = line;
-	for(int32_t i = 0; i < 4; i++) {
-		const size_t rec_size[] = {HOSTNAME_SIZE, PORTNAME_SIZE, UNAME_SIZE, PASSWD_SIZE};
-		char *rec_ptr[] = {t_rec.host, t_rec.port, t_rec.usr, t_rec.pwd};
-		//Find splitter letter
-		char *t2 = strchr(t, spliter);
-		//Last record will be finished by newline character
-		if(i == 3) {
-			t2 = strchr(t, '\n');
-			if(t2 == NULL) {
-				t2 = line + strlen(line);
-			}
-		}
-		if(t2 == NULL) {
-			warn("add_smp_profile(): No splitter letter.\n");
-			return -1;
-		}
-
-		//Measure distance to the letter
-		size_t reclen = (size_t)t2 - (size_t)t;
-		if(reclen >= rec_size[i]) {
-			warn("add_smp_profile(): Record size overflow.\n");
-			return -1;
-		}
-		if(reclen == 0) {
-			warn("add_smp_profile(): Empty field detected.\n");
-			return -1;
-		}
-
-		//Copy string from t to the splitter letter into elem
-		memcpy(rec_ptr[i], t, reclen);
-		rec_ptr[i][reclen] = 0;
-		t = &t2[1]; //Set next record finding position right after the splitter letter
-	}
-	info("SMP Credential append (ID%d): Host: %s, Port: %s, User: %s\n", SMPProfCount, t_rec.host, t_rec.port, t_rec.usr);
-	
-	//append to SMPProfs
-	if(SMPProfs == NULL) {
-		SMPProfs = malloc(sizeof(SMPProfile_t) );
-		if(SMPProfs == NULL) {
-			warn("add_smp_profile(): insufficient memory, malloc failure.\n");
-			return -1;
-		}
-	} else {
-		SMPProfile_t *t = realloc(SMPProfs, sizeof(SMPProfile_t) * (size_t)(SMPProfCount + 1) );
-		if(t == NULL) {
-			warn("add_smp_profile(): insufficient memory, realloc failure.\n");
-			return -1;
-		}
-		SMPProfs = t;
-	}
-	memcpy(&SMPProfs[SMPProfCount], &t_rec, sizeof(SMPProfile_t) );
-	SMPProfCount++;
-	return 0;
 }
 
 //Execute typed command and exit command mode

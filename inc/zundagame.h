@@ -58,6 +58,7 @@ void set_speed_for_following(int32_t);
 int32_t find_nearest_unit(int32_t, int32_t, facility_type_t);
 void chatf(const char*, ...);
 int32_t find_random_unit(int32_t, int32_t, facility_type_t);
+void chat(char*);
 void showstatus(const char*, ...);
 int32_t spawn_playable(int32_t);
 void reset_game();
@@ -95,6 +96,11 @@ void connect_server_cmd(char*);
 void close_connection_cmd();
 void close_connection(char*);
 int32_t lookup_smp_player_from_cid(int32_t);
+void changetimeout_cmd(char*);
+void getcurrentsmp_cmd();
+void get_smp_cmd(char*);
+int32_t add_smp_profile(char*, char);
+void add_smp_cmd(char*);
 
 //aiproc.c
 void procai();

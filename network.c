@@ -21,19 +21,19 @@ network.c: process network packets
 
 extern int32_t CurrentPlayableCharacterID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
-extern smpstatus_t SMPStatus;
+smpstatus_t SMPStatus = NETWORK_DISCONNECTED; //Current connection status
 size_t RXSMPEventLen; //Remote event len
 size_t TXSMPEventLen; //Client Event len
 uint8_t RXSMPEventBuffer[NET_BUFFER_SIZE], TXSMPEventBuffer[NET_BUFFER_SIZE]; //SMP Event Buffer
 uint8_t SMPsalt[SALT_LENGTH]; //Filled when connected
 int32_t SMPcid; //My client id
-extern int32_t SMPProfCount;
-extern SMPProfile_t *SMPProfs;
+int32_t SMPProfCount = 0; //Loaded SMP credential count
+SMPProfile_t *SMPProfs = NULL; //SMP Connection credentials
 int32_t SelectedSMPProf;
-extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
+SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //Client information (Modified by server)
 uint8_t TempRXBuffer[NET_BUFFER_SIZE];
 size_t TRXBLength;
-extern int32_t NetworkTimeout;
+int32_t NetworkTimeout = 10; //If there's still no packet after this period, client will auto disconnect.
 int32_t TimeoutTimer;
 int32_t ConnectionTimeoutTimer;
 extern int32_t DifEnemyBaseCount[4];
@@ -991,3 +991,100 @@ int32_t evh_hello(uint8_t *eventbuffer, size_t eventoffset, size_t funame_len, i
 	}
 	return 0;
 }
+
+void changetimeout_cmd(char *param) {
+	//change network timeout
+	int32_t i = (int32_t)strtol(param, NULL, 10);
+	if(!is_range(i, 0, 1000) ) {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		warn("changetimeout_cmd(): paraneter must be 0 to 1000.\n");
+		return;
+	}
+	NetworkTimeout = i;
+}
+
+void getcurrentsmp_cmd() {
+	//Command to get connection state
+	if(SMPStatus == NETWORK_DISCONNECTED) {
+		chat( (char*)getlocalizedstring(25) );	
+	} else {
+		chatf("getcurrentsmp: %d (%s@%s:%s)", SelectedSMPProf, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
+	}
+}
+
+void add_smp_cmd(char* p) {
+	//Add SMP profile
+	if(add_smp_profile(p, ' ') != 0) {
+			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+	}
+}
+
+void get_smp_cmd(char *param) {
+	//Get current selected SMP profile
+	int i = atoi(param);
+	if(is_range(i, 0, SMPProfCount - 1) ) {
+		chatf("getsmp: %d (%s@%s:%s)", i, SMPProfs[i].usr, SMPProfs[i].host, SMPProfs[i].port);
+	} else {
+		warn("get_smp_cmd(): bad SMP id.\n");
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+	}
+}
+
+int32_t add_smp_profile(char* line, char spliter) {
+	SMPProfile_t t_rec;
+	char *t = line;
+	for(int32_t i = 0; i < 4; i++) {
+		const size_t rec_size[] = {HOSTNAME_SIZE, PORTNAME_SIZE, UNAME_SIZE, PASSWD_SIZE};
+		char *rec_ptr[] = {t_rec.host, t_rec.port, t_rec.usr, t_rec.pwd};
+		//Find splitter letter
+		char *t2 = strchr(t, spliter);
+		//Last record will be finished by newline character
+		if(i == 3) {
+			t2 = strchr(t, '\n');
+			if(t2 == NULL) {
+				t2 = line + strlen(line);
+			}
+		}
+		if(t2 == NULL) {
+			warn("add_smp_profile(): No splitter letter.\n");
+			return -1;
+		}
+
+		//Measure distance to the letter
+		size_t reclen = (size_t)t2 - (size_t)t;
+		if(reclen >= rec_size[i]) {
+			warn("add_smp_profile(): Record size overflow.\n");
+			return -1;
+		}
+		if(reclen == 0) {
+			warn("add_smp_profile(): Empty field detected.\n");
+			return -1;
+		}
+
+		//Copy string from t to the splitter letter into elem
+		memcpy(rec_ptr[i], t, reclen);
+		rec_ptr[i][reclen] = 0;
+		t = &t2[1]; //Set next record finding position right after the splitter letter
+	}
+	info("SMP Credential append (ID%d): Host: %s, Port: %s, User: %s\n", SMPProfCount, t_rec.host, t_rec.port, t_rec.usr);
+	
+	//append to SMPProfs
+	if(SMPProfs == NULL) {
+		SMPProfs = malloc(sizeof(SMPProfile_t) );
+		if(SMPProfs == NULL) {
+			warn("add_smp_profile(): insufficient memory, malloc failure.\n");
+			return -1;
+		}
+	} else {
+		SMPProfile_t *t = realloc(SMPProfs, sizeof(SMPProfile_t) * (size_t)(SMPProfCount + 1) );
+		if(t == NULL) {
+			warn("add_smp_profile(): insufficient memory, realloc failure.\n");
+			return -1;
+		}
+		SMPProfs = t;
+	}
+	memcpy(&SMPProfs[SMPProfCount], &t_rec, sizeof(SMPProfile_t) );
+	SMPProfCount++;
+	return 0;
+}
+
