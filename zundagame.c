@@ -13,13 +13,14 @@ Zundamon is from https://zunko.jp/
 main.c: linux entry point, X11 funcs.
 
 TODO List
+simplify UI
+change connect command behavior
+fix use_skill packet
 nickname feature in SMP
 chat mute feature in SMP
-add lol style death/kill anouncement
 add getCurrentPlayableCharacterId()
 Make me ahri
 change Character constant information structure to each function getters
-Delete SMP added character when disconnect from server.
 */
 
 #include "inc/zundagame.h"

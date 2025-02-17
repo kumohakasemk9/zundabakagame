@@ -263,8 +263,8 @@ void procai() {
 					//If target object is not dead
 					if(Gobjs[i].timeout == 1) {
 						//Make explosion (diam 600) on target before pcannon disappears
-						int32_t r = add_character(TID_EXPLOSION, Gobjs[Gobjs[i].aiming_target].x, Gobjs[Gobjs[i].aiming_target].y, i);
-						Gobjs[r].hitdiameter = 1200;
+						int32_t r = add_character(TID_ALLYEXPLOSION, Gobjs[Gobjs[i].aiming_target].x, Gobjs[Gobjs[i].aiming_target].y, i);
+						Gobjs[r].hitdiameter = 800;
 						Gobjs[r].damage = 5;
 					}
 					damage_object(Gobjs[i].aiming_target, i);
