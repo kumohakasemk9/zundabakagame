@@ -831,17 +831,23 @@ int32_t evh_chat(uint8_t* evbuffer, size_t eventoff, size_t clen, int32_t cid) {
 	char ctx[NET_CHAT_LIMIT];
 	memcpy(ctx, netchat, clen);
 	ctx[clen] = 0; //Terminate string with NUL
-	int32_t cidinf = -1;
-	cidinf = lookup_smp_player_from_cid(cid);
-	if(cidinf == -1) {
-		if(cid == -1) {
-			chatf("[Server] %s", ctx);
-		} else {
-			chatf("[SMP-CID%d] %s", cid, ctx);
-		}
-	} else {
-		chatf("<%s> %s", SMPPlayerInfo[cid].usr, ctx);
+	char chathdr[BUFFER_SIZE];
+	char w[] = "private ";
+	if(dstcid == -1) {
+		w[0] = 0;
 	}
+	if(cid == -1) {
+		snprintf(chathdr, BUFFER_SIZE, "[Server]");
+	} else {
+		int32_t t = lookup_smp_player_from_cid(cid);
+		if(t != -1) {
+			snprintf(chathdr, BUFFER_SIZE, "%s<%s>",w ,SMPPlayerInfo[t].usr);
+		} else {
+			info("unknown user chat: %s\n", ctx);
+			return 0;
+		}
+	}
+	chatf("%s %s", chathdr, ctx);
 	return 0;
 }
 
