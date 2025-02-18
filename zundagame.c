@@ -13,6 +13,7 @@ Zundamon is from https://zunko.jp/
 main.c: linux entry point, X11 funcs.
 
 TODO List
+fix deathlog in multiplay
 implement lifes, make it adjustable
 nickname feature in SMP
 chat mute feature in SMP

@@ -35,6 +35,7 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 - `/ebcount`         : Set difficulty parameter `ebcount`, this command takes 1 to 4 parameters. need at least 1 and omitted ones considered to `0`.
 - `/ebdist`          : Set difficulty parameter `ebdist`.
 - `/atkgain`         : Set difficulty parameter `atkgain`.
+- `/chspawn`         : Set max count to allow respawning. `-1` means no limit.
     
 # About difficulty parameters
 They can be changed by commands for adjusting game difficulty, some    

@@ -68,6 +68,7 @@ extern int32_t AddingTID; //Debug mode appending object id
 extern int32_t DebugStatType;
 extern SMPProfile_t SMPProfs[];
 extern int32_t SelectedSMPProf;
+extern int32_t SpawnRemain;
 
 //Paint event of window client, called for every 30mS
 void game_paint() {
@@ -425,9 +426,13 @@ void draw_info() {
 	//Show status about playable character
 	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) && is_playable_character(Gobjs[PlayingCharacterID].tid) && lookup(Gobjs[PlayingCharacterID].tid, &t) != -1) {
 		int32_t myhp = Gobjs[PlayingCharacterID].hp;
-		drawimage(STATUS_XOFF + 80, STATUS_YOFF + 16, 20); //Show mouse icon
+		if(CharacterMove) {
+			drawimage(STATUS_XOFF + 80, STATUS_YOFF + 16, 20); //Show mouse icon
+		} else {
+			drawimage(STATUS_XOFF + 80, STATUS_YOFF + 16, 35); //Show keyboard icon
+		}
 		chcolor(COLOR_TEXTCMD, 1);
-		drawstringf(STATUS_XOFF + 96, STATUS_YOFF + 16, "%d/%d", myhp, t.inithp);
+		drawstringf(STATUS_XOFF + 96, STATUS_YOFF + 16, "%d/%d x %d", myhp, t.inithp, SpawnRemain);
 	} else {
 		chcolor(COLOR_TEXTERROR, 1);
 		drawstringf(STATUS_XOFF + 96, STATUS_YOFF + 16, "%d", StateChangeTimer);

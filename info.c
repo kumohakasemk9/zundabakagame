@@ -245,8 +245,9 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"adwaitalegacy/battery-full-charging.png", //30 power plant (hotbar)
 	"adwaitalegacy/battery-full.png", //31 full battery icon
 	"adwaitalegacy/battery-caution.png", //32 Insufficient energy level icon
-	"img/kumo9-x24/kumolaser.png", //33 Kumo x24 laser icon (LOL hotbar)
-	"img/kumo9-x24/positron.png" //34 Kumo x24 positron icon (LOL hotbar)
+	"img/kumo9-x24/kumolaser.png", //33 Kumo x24 laser icon (hotbar)
+	"img/kumo9-x24/positron.png", //34 Kumo x24 positron icon (hotbar)
+	"adwaitalegacy/input-keyboard.png" //35 keyboard input icon (status bar)
 };
 
 //InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout, requirepowerlevel

@@ -33,6 +33,8 @@ extern int32_t CharacterMove;
 extern int32_t SMPStatus;
 extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
 extern double DifATKGain;
+extern int32_t SpawnRemain;
+extern int32_t InitSpawnRemain;
 
 void procai() {
 	//AI proc
@@ -61,8 +63,17 @@ void procai() {
 			//Check if playable character is dead
 			if(i == PlayingCharacterID) {
 				PlayingCharacterID = -1;
-				GameState = GAMESTATE_DEAD;
-				StateChangeTimer = 1000;
+				//If SpawnRemain is not zero, decrease it and respawn
+				if(SpawnRemain > 0 || InitSpawnRemain == -1) {
+					if(SpawnRemain > 0) {
+						SpawnRemain--;
+					}
+					GameState = GAMESTATE_DEAD;
+					StateChangeTimer = 1000;
+				} else {
+					//Orelse game over
+					GameState = GAMESTATE_GAMEOVER;
+				}
 			} else {
 				//If SMP remote player is dead, respawn after several times
 				if(SMPStatus == NETWORK_LOGGEDIN) {
@@ -539,8 +550,8 @@ void damage_object(int32_t dstid, int32_t srcid) {
 					
 			}
 			char smpkiller[UNAME_SIZE + 2] = "", smpvictim[UNAME_SIZE + 2] = "";
-			//If SMP, show smp username
-			if(SMPStatus == NETWORK_LOGGEDIN) {
+			//If SMP, show smp username (if object is playable)
+			if(SMPStatus == NETWORK_LOGGEDIN && is_playable_character(Gobjs[dstid].tid) ) {
 				//If object SMP playable, get username of character owner
 				for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 					if(SMPPlayerInfo[i].playable_objid == dstid) {

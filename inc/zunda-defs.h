@@ -14,7 +14,7 @@ zunda-defs.h: definitions
 */
 
 //Data storage sizes
-#define IMAGE_COUNT 35 //Preload image count
+#define IMAGE_COUNT 36 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define BUFFER_SIZE 1024 //Command, message buffer size
 #define NET_BUFFER_SIZE 8192 //Network buffer size for receiving
@@ -31,6 +31,7 @@ zunda-defs.h: definitions
 #define MIN_EBDIST 100 //Minimum ebdist
 #define MAX_EBDIST 500 //Maximum ebdist
 #define MAX_ZINDEX 3 //Max z-index
+#define MAX_SPAWN_COUNT 10 //Maximum revival count
 
 //Sizes
 #define MAP_WIDTH 5000 //map max width

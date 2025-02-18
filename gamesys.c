@@ -41,6 +41,7 @@ void reset_game_cmd();
 void ebcount_cmd();
 void ebdist_cmd();
 void atkgain_cmd();
+void chspawn_cmd(char*);
 void cmd_enter();
 void cmd_cancel();
 void cmd_cursor_back();
@@ -93,6 +94,9 @@ double DifATKGain = 1.00; //Attack damage gain
 double GameTickTime; //Game tick running time (avg)
 int32_t DebugStatType = 0; //Shows information if nonzero 0: No debug, 1: System profiler, 2: Input test
 extern int32_t NetworkTimeout; //If there's period that has no packet longer than this value, assumed as disconnected. 0: disable timeout
+int32_t SpawnRemain; //playable character can not respawn if it is 0.
+int32_t InitSpawnRemain = 5; //how many times can playable character respawn?
+
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -739,7 +743,10 @@ void execcmd() {
 	} else if(strcmp(CommandBuffer, "/difficulty") == 0) {
 		//Difficulty query command
 		chatf("difficulty: ATKGain: %.2f EBDist: %d EBCount: %d %d %d\n", DifATKGain, DifEnemyBaseDist, DifEnemyBaseCount[0], DifEnemyBaseCount[1], DifEnemyBaseCount[2]);
-	
+	} else if(memcmp(CommandBuffer, "/chspawn ", 9) == 0) {
+		//Allowable spawn count change cmd
+		chspawn_cmd(&CommandBuffer[9]);
+
 	} else if(memcmp(CommandBuffer, "/chtimeout ", 11) == 0) {
 		//Setting timeout command
 		changetimeout_cmd(&CommandBuffer[11]);
@@ -762,6 +769,16 @@ void execcmd() {
 				chatf("[local] %s", CommandBuffer);
 			}
 		}
+	}
+}
+
+void chspawn_cmd(char* param) {
+	//Change allowed spawn count
+	int32_t i = atoi(param);
+	if(is_range(i, -1, MAX_SPAWN_COUNT) ) {
+		InitSpawnRemain = i;
+	} else {
+		warn( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 	}
 }
 
@@ -838,6 +855,7 @@ void reset_game() {
 	CameraX = 0;
 	CameraY = 0;
 	SkillKeyState = -1;
+	SpawnRemain = InitSpawnRemain;
 	//Init Skill state and timer
 	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
 		SkillCooldownTimers[i] = 0;
