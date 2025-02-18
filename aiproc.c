@@ -76,14 +76,13 @@ void procai() {
 				}
 			} else {
 				//If SMP remote player is dead, respawn after several times
-				if(SMPStatus == NETWORK_LOGGEDIN) {
-					if(is_playable_character(tid) ) {
-						for(int32_t j = 0; j < MAX_CLIENTS; j++) {
-							if(SMPPlayerInfo[j].playable_objid == i) {
-								//Set specific player's SMP character respawn timer.
-								SMPPlayerInfo[j].respawn_timer = 1000;
-								break;
-							}
+				if(SMPStatus == NETWORK_LOGGEDIN && is_playable_character(tid) ) {
+					for(int32_t j = 0; j < MAX_CLIENTS; j++) {
+						if(SMPPlayerInfo[j].playable_objid == i) {
+							//Set specific player's SMP character respawn timer.
+							SMPPlayerInfo[j].respawn_timer = 1000;
+							SMPPlayerInfo[j].playable_objid = -1;
+							break;
 						}
 					}
 				}
@@ -525,7 +524,7 @@ void damage_object(int32_t dstid, int32_t srcid) {
 			
 		}
 
-		//Write deathlog if facilities or unit dead
+		//Write deathlog if facilities or playable character
 		if(dstinfo.objecttype == UNITTYPE_FACILITY || is_playable_character(Gobjs[dstid].tid) ) {
 			int32_t killerid = Gobjs[srcid].srcid;
 			//printlog("Object %d (srcid=%d) killed %d.\n", srcid, killerid, dstid);
@@ -551,15 +550,15 @@ void damage_object(int32_t dstid, int32_t srcid) {
 			}
 			char smpkiller[UNAME_SIZE + 2] = "", smpvictim[UNAME_SIZE + 2] = "";
 			//If SMP, show smp username (if object is playable)
-			if(SMPStatus == NETWORK_LOGGEDIN && is_playable_character(Gobjs[dstid].tid) ) {
+			if(SMPStatus == NETWORK_LOGGEDIN) {
 				//If object SMP playable, get username of character owner
 				for(int32_t i = 0; i < MAX_CLIENTS; i++) {
-					if(SMPPlayerInfo[i].playable_objid == dstid) {
+					if(is_playable_character(Gobjs[dstid].tid) && SMPPlayerInfo[i].playable_objid == dstid) {
 						strcpy(smpvictim, " <");
 						strcat(smpvictim, SMPPlayerInfo[i].usr);
 						strcat(smpvictim, ">");
 					}
-					if(SMPPlayerInfo[i].playable_objid == srcid) {
+					if(is_playable_character(Gobjs[srcid].tid) && SMPPlayerInfo[i].playable_objid == srcid) {
 						strcpy(smpkiller, " <");
 						strcat(smpkiller, SMPPlayerInfo[i].usr);
 						strcat(smpkiller, ">");

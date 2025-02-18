@@ -13,6 +13,15 @@ Zundamon is from https://zunko.jp/
 network.c: process network packets
 */
 
+#define NET_BUFFER_SIZE 8192 //Network buffer size for receiving
+
+//Text consts
+#define TEXT_DISCONNECTED 19 //Disconnected from server
+#define TEXT_SMP_ERROR 21 //Disconnected because error in SMP routine
+#define TEXT_SMP_TIMEOUT 24 //Timed out
+#define TEXT_OFFLINE 25 //Offline
+#define TEXT_UNAVAILABLE 10 //Command or item unavailable
+
 #include "inc/zundagame.h"
 
 #include <string.h>
@@ -288,6 +297,7 @@ void connect_server_cmd(char* cmdparam) {
 	DisconnectReasonProvided = 0;
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		SMPPlayerInfo[i].cid = -1;
+		SMPPlayerInfo[i].playable_objid = -1;
 	}
 	SMPStatus = NETWORK_CONNECTING;
 
@@ -1098,10 +1108,10 @@ void getclients_cmd() {
 		size_t p = 0;
 		for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 			if(SMPPlayerInfo[i].cid != -1) {
-				char t[BUFFER_SIZE];
+				char t[UNAME_SIZE + 5];
 				size_t s;
-				s = snprintf(t, BUFFER_SIZE, "%s (%d), ", SMPPlayerInfo[i].usr, SMPPlayerInfo[i].cid);
-				if(p + s >= BUFFER_SIZE) {
+				s = snprintf(t, UNAME_SIZE + 5, "%s (%d), ", SMPPlayerInfo[i].usr, SMPPlayerInfo[i].cid);
+				if(p + s >= UNAME_SIZE + 5) {
 					warn("getclients(): overflow condition while making list.\n");
 					return;
 				}

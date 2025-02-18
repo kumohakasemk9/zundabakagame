@@ -17,21 +17,20 @@ zunda-defs.h: definitions
 #define IMAGE_COUNT 36 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define BUFFER_SIZE 1024 //Command, message buffer size
-#define NET_BUFFER_SIZE 8192 //Network buffer size for receiving
 #define MAX_STRINGS 26 // Max string count
 #define CHARACTER_TIMER_COUNT 4
 #define MAX_TID 24 //max type id
+#define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
 #define HOSTNAME_SIZE 64 //SMPServerInfo_t host record max len
 #define PORTNAME_SIZE 6 //SMPServerInfo_t port record max len
-#define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
 
 //Parameter limits
 #define MAX_ATKGAIN 8.0 //Maxmium AtkGain
 #define MIN_ATKGAIN 0.1 //Minimum AtkGain
 #define MIN_EBDIST 100 //Minimum ebdist
 #define MAX_EBDIST 500 //Maximum ebdist
-#define MAX_ZINDEX 3 //Max z-index
 #define MAX_SPAWN_COUNT 10 //Maximum revival count
+#define MAX_ZINDEX 3 //Max z-index
 
 //Sizes
 #define MAP_WIDTH 5000 //map max width
@@ -42,26 +41,7 @@ zunda-defs.h: definitions
 #define ITEM_COUNT 5 //Max item id
 #define SKILL_COUNT 3 //Skill Count
 
-//Colors
-#define COLOR_TEXTBG 0x60000000 //Text background color (30% opaque black)
-#define COLOR_TEXTCMD 0xff00ff00 //Command and Chat text color (Green)
-#define COLOR_TEXTCHAT 0xffffffff //Chat text color
-#define COLOR_TEXTERROR 0xffff0000 //Error text color: RED
-#define COLOR_ENEMY 0xffff0000 //Enemy HP bar and marker color
-#define COLOR_ALLY 0xff00ffa0 //Enemy HP bar and marker color
-#define COLOR_UNUSABLE 0x60000000 //Gray out color
-#define COLOR_KUMO9_X24_PCANNON 0xc0ffffff //kumo9 x24 pcannon color
-
-//Coordinates
-#define IHOTBAR_XOFF 5 //Item hotbar X offset
-#define IHOTBAR_YOFF (WINDOW_HEIGHT - 100) //Item hotbar Y offset
-#define STATUS_XOFF (WINDOW_WIDTH / 2)
-#define STATUS_YOFF IHOTBAR_YOFF + 48
-
-//Game settings
-#define CHAT_TIMEOUT 1000 //Chat message timeout
-#define ERROR_SHOW_TIMEOUT 500 //Error message timeout
-#define FONT_DEFAULT_SIZE 14 //Default fontsize
+//Game Settings
 #define EARTH_RADAR_DIAM 500 //Earth radar diameter
 #define ENEMYBASE_RADAR_DIAM 600 //Enemy base radar diameter
 #define PIT_RADAR_DIAM 600 //Pit radar diameter
@@ -72,36 +52,14 @@ zunda-defs.h: definitions
 #define KUMO9_X24_MISSILE_RANGE 500
 #define KUMO9_X24_LASER_RANGE 600
 #define KUMO9_X24_PCANNON_RANGE 1000
-
-//Image ID Definition for special purposes
-#define IMG_ITEM_UNUSABLE 13 //Cross icon, this means item is unusable
-#define IMG_EARTH_ICO 17 //Earth icon, represents the earth or its HP
-#define IMG_STAT_MONEY_ICO 18 //Money Icon
-#define IMG_MOUSE_ICO 20 //Mouse Icon
-#define IMG_PIT_MAP_MARK 21 //pit map mark
-#define IMG_ICO_IMGMISSING 22 //Image Missing icon
-#define IMG_STAT_TECH_ICO 23 //Technology level icon
-#define IMG_STAT_ENERGY_GOOD 31 //Energy icon (good)
-#define IMG_STAT_ENERGY_BAD 32 //Energy icon (insufficient energy)
+#define FONT_DEFAULT_SIZE 14 //Default fontsize
 
 //Some localized string IDs
-#define TEXT_DISCONNECTED 19 //Disconnected from server
 #define TEXT_BAD_COMMAND_PARAM 1 //Bad command parameter
-#define TEXT_UNAVAILABLE 10 //Command or item unavailable
-#define TEXT_SMP_ERROR 21 //Disconnected because error in SMP routine
-#define TEXT_SMP_TIMEOUT 24 //Timed out
-#define TEXT_OFFLINE 25 //Offline
 
 //Others
 #define OBJID_INVALID -1 //Special object number, means pointing nothing
 #define DISTANCE_INFINITY 65535 //Infinity finddist value
-#define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
-#define CONSOLE_CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0\n" \
-							  "Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社\n" \
-							  "(C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr\n" \
-							  "Please consider supporting me through ko-fi or pateron\n" \
-							  "https://ko-fi.com/kumohakase\n" \
-							  "https://www.patreon.com/kumohakasemk8\n"
 
 //Enums
 //Language ID

@@ -13,6 +13,18 @@ Zundamon is from https://zunko.jp/
 gamesys.c: game process and related functions
 */
 
+//Game settings
+#define CHAT_TIMEOUT 1000 //Chat message timeout
+#define ERROR_SHOW_TIMEOUT 500 //Error message timeout
+
+#define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
+#define CONSOLE_CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0\n" \
+							  "Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社\n" \
+							  "(C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr\n" \
+							  "Please consider supporting me through ko-fi or pateron\n" \
+							  "https://ko-fi.com/kumohakase\n" \
+							  "https://www.patreon.com/kumohakasemk8\n"
+
 #include "inc/zundagame.h"
 
 #include <string.h>
@@ -95,7 +107,7 @@ double GameTickTime; //Game tick running time (avg)
 int32_t DebugStatType = 0; //Shows information if nonzero 0: No debug, 1: System profiler, 2: Input test
 extern int32_t NetworkTimeout; //If there's period that has no packet longer than this value, assumed as disconnected. 0: disable timeout
 int32_t SpawnRemain; //playable character can not respawn if it is 0.
-int32_t InitSpawnRemain = 5; //how many times can playable character respawn?
+int32_t InitSpawnRemain = -1; //how many times can playable character respawn?
 
 
 //Translate local coordinate into global coordinate

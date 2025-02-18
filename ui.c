@@ -13,6 +13,33 @@ Zundamon is from https://zunko.jp/
 ui.c: gamescreen drawing
 */
 
+//Image ID Definition for special purposes
+#define IMG_ITEM_UNUSABLE 13 //Cross icon, this means item is unusable
+#define IMG_EARTH_ICO 17 //Earth icon, represents the earth or its HP
+#define IMG_STAT_MONEY_ICO 18 //Money Icon
+#define IMG_MOUSE_ICO 20 //Mouse Icon
+#define IMG_PIT_MAP_MARK 21 //pit map mark
+#define IMG_ICO_IMGMISSING 22 //Image Missing icon
+#define IMG_STAT_TECH_ICO 23 //Technology level icon
+#define IMG_STAT_ENERGY_GOOD 31 //Energy icon (good)
+#define IMG_STAT_ENERGY_BAD 32 //Energy icon (insufficient energy)
+
+//Colors
+#define COLOR_TEXTBG 0x60000000 //Text background color (30% opaque black)
+#define COLOR_TEXTCMD 0xff00ff00 //Command and Chat text color (Green)
+#define COLOR_TEXTCHAT 0xffffffff //Chat text color
+#define COLOR_TEXTERROR 0xffff0000 //Error text color: RED
+#define COLOR_ENEMY 0xffff0000 //Enemy HP bar and marker color
+#define COLOR_ALLY 0xff00ffa0 //Enemy HP bar and marker color
+#define COLOR_UNUSABLE 0x60000000 //Gray out color
+#define COLOR_KUMO9_X24_PCANNON 0xc0ffffff //kumo9 x24 pcannon color
+
+//Coordinates
+#define IHOTBAR_XOFF 5 //Item hotbar X offset
+#define IHOTBAR_YOFF (WINDOW_HEIGHT - 100) //Item hotbar Y offset
+#define STATUS_XOFF (WINDOW_WIDTH / 2)
+#define STATUS_YOFF IHOTBAR_YOFF + 48
+
 #include "inc/zundagame.h"
 
 #include <string.h>
@@ -197,7 +224,7 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 		if(t.teamid == TEAMID_ALLY) {
 			cc = COLOR_ALLY;
 		}
-		int32_t hpy = y - 7;
+		double hpy = y - 7;
 		//facility hpbar can be bottom of the object if they will be out of frame
 		if(t.objecttype == UNITTYPE_FACILITY && hpy < 0) {
 			hpy = y + h + 2;
@@ -418,14 +445,14 @@ void draw_info() {
 	//Show Earth HP
 	LookupResult_t t;
 	if(is_range(EarthID, 0, MAX_OBJECT_COUNT - 1) && Gobjs[EarthID].tid == TID_EARTH && lookup(Gobjs[EarthID].tid, &t) != -1) {
-		int32_t earthhp = Gobjs[EarthID].hp;
+		int32_t earthhp = (int32_t)Gobjs[EarthID].hp;
 		chcolor(COLOR_TEXTCMD, 1);
 		drawstringf(STATUS_XOFF + 96, STATUS_YOFF, "%d/%d", earthhp, t.inithp);
 	}
 
 	//Show status about playable character
 	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) && is_playable_character(Gobjs[PlayingCharacterID].tid) && lookup(Gobjs[PlayingCharacterID].tid, &t) != -1) {
-		int32_t myhp = Gobjs[PlayingCharacterID].hp;
+		int32_t myhp = (int32_t)Gobjs[PlayingCharacterID].hp;
 		if(CharacterMove) {
 			drawimage(STATUS_XOFF + 80, STATUS_YOFF + 16, 20); //Show mouse icon
 		} else {
@@ -481,7 +508,7 @@ void draw_hotbar(double offsx, double offsy) {
 				itemlabel = SkillCooldownTimers[j];
 			} else {
 				//Draw QWE Label
-				const char* L[] = {"Q", "W", "E"};
+				char* L[] = {"Q", "W", "E"};
 				chcolor(COLOR_TEXTCMD, 1);
 				drawstring(tx + 2, offsy + 2 + 24, L[j]);
 			}
