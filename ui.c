@@ -22,7 +22,7 @@ ui.c: gamescreen drawing
 void draw_game_main();
 void draw_cui();
 void draw_info();
-void draw_mchotbar(double, double);
+void draw_hotbar(double, double);
 void draw_game_object(int32_t, LookupResult_t, double, double);
 void draw_shapes(int32_t, double, double);
 void draw_hpbar(double, double, double, double, double, double, uint32_t, uint32_t);
@@ -81,7 +81,7 @@ void game_paint() {
 	//Draw game
 	draw_game_main(); //draw characters
 	draw_cui(); //draw minecraft like cui
-	draw_mchotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
+	draw_hotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
 	draw_info(); //draw game information
 	#ifndef __WASM
 		//Calculate draw time (AVG)
@@ -392,16 +392,16 @@ void draw_info() {
 		}
 	}
 
-
 	//Show game status
 	//Show icons
-	drawimage(STATUS_XOFF, IHOTBAR_YOFF, IMG_STAT_MONEY_ICO); //Money ico
-	drawimage(STATUS_XOFF, IHOTBAR_YOFF + 16, IMG_STAT_TECH_ICO); //Tech icon
+	drawimage(STATUS_XOFF, STATUS_YOFF, IMG_STAT_MONEY_ICO); //Money ico
+	drawimage(STATUS_XOFF, STATUS_YOFF + 16, IMG_STAT_TECH_ICO); //Tech icon
+	drawimage(STATUS_XOFF + 80, STATUS_YOFF, IMG_EARTH_ICO); //Earth Icon
 	//Show Money val
 	chcolor(COLOR_TEXTCMD, 1);
-	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF, "%d", Money);
+	drawstringf(STATUS_XOFF + 16, STATUS_YOFF, "%d", Money);
 	//Show MapTechnologyLevel
-	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 16, "%d", MapTechnologyLevel);
+	drawstringf(STATUS_XOFF + 16, STATUS_YOFF + 16, "%d", MapTechnologyLevel);
 	//Show Energy Level
 	//Show Energy Icon
 	uint8_t tiid = IMG_STAT_ENERGY_GOOD; //battery icon index, if energy level is inefficient, change icon
@@ -410,13 +410,31 @@ void draw_info() {
 		tiid = IMG_STAT_ENERGY_BAD;
 		ttxtclr = COLOR_TEXTERROR;
 	}
-	drawimage(STATUS_XOFF, IHOTBAR_YOFF + 32, tiid);
+	drawimage(STATUS_XOFF, STATUS_YOFF + 32, tiid);
 	//Show current Energy level
 	chcolor(ttxtclr, 1);
-	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 32, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
+	drawstringf(STATUS_XOFF + 16, STATUS_YOFF + 32, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
+	//Show Earth HP
+	LookupResult_t t;
+	if(is_range(EarthID, 0, MAX_OBJECT_COUNT - 1) && Gobjs[EarthID].tid == TID_EARTH && lookup(Gobjs[EarthID].tid, &t) != -1) {
+		int32_t earthhp = Gobjs[EarthID].hp;
+		chcolor(COLOR_TEXTCMD, 1);
+		drawstringf(STATUS_XOFF + 96, STATUS_YOFF, "%d/%d", earthhp, t.inithp);
+	}
+
+	//Show status about playable character
+	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) && is_playable_character(Gobjs[PlayingCharacterID].tid) && lookup(Gobjs[PlayingCharacterID].tid, &t) != -1) {
+		int32_t myhp = Gobjs[PlayingCharacterID].hp;
+		drawimage(STATUS_XOFF + 80, STATUS_YOFF + 16, 20); //Show mouse icon
+		chcolor(COLOR_TEXTCMD, 1);
+		drawstringf(STATUS_XOFF + 96, STATUS_YOFF + 16, "%d/%d", myhp, t.inithp);
+	} else {
+		chcolor(COLOR_TEXTERROR, 1);
+		drawstringf(STATUS_XOFF + 96, STATUS_YOFF + 16, "%d", StateChangeTimer);
+	}
 }
 
-void draw_mchotbar(double offsx, double offsy) {
+void draw_hotbar(double offsx, double offsy) {
 	//Show item candidates and skill
 	PlayableInfo_t plinf;
 	if(lookup_playable(CurrentPlayableCharacterID, &plinf) == -1) {
@@ -424,13 +442,14 @@ void draw_mchotbar(double offsx, double offsy) {
 	}
 	for(uint8_t i = 0; i < ITEM_COUNT + SKILL_COUNT; i++) {
 		double tx = offsx + (i * 50);
-		int32_t itemlabel;
+		int32_t itemlabel = 0;
 		int32_t itemdisabled = 0;
 		//Draw item background
 		if(SelectingItemID == i) {
 			//When item is selected, change backcolor and show item description
 			chcolor(COLOR_TEXTCMD, 1);
 			drawstring_inwidth(offsx, offsy + 52, (char*)getlocalizeditemdesc(SelectingItemID), WINDOW_WIDTH / 2, COLOR_TEXTBG);
+			chcolor(COLOR_TEXTCHAT, 1);
 		} else {
 			chcolor(COLOR_TEXTBG, 1);
 		}
@@ -442,11 +461,11 @@ void draw_mchotbar(double offsx, double offsy) {
 			//If item is not available, make text red.
 			if(ItemCooldownTimers[i] != 0 || Money < ITEMPRICES[i]) {
 				itemdisabled = 1;
-				if(ItemCooldownTimers[i] != 0) {
-					itemlabel = ItemCooldownTimers[i];
-				} else {
-					itemlabel = ITEMPRICES[i];
-				}
+			}
+			if(ItemCooldownTimers[i] != 0) {
+				itemlabel = ItemCooldownTimers[i];
+			} else {
+				itemlabel = ITEMPRICES[i];
 			}
 		} else {
 			//Draw Skills Icon

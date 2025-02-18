@@ -13,26 +13,35 @@ Zundamon is from https://zunko.jp/
 zunda-defs.h: definitions
 */
 
-//Version rule 1.2.3-releasedate (1 will increase if existing function name/param changed or deleted or variable/const renamed or changed, 2 will increase function added (feature add), 3 will increase if function update (bugfix)
-#define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
-#define CONSOLE_CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0\n" \
-							  "Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社\n" \
-							  "(C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr\n" \
-							  "Please consider supporting me through ko-fi or pateron\n" \
-							  "https://ko-fi.com/kumohakase\n" \
-							  "https://www.patreon.com/kumohakasemk8\n"
-
-#define MAX_ATKGAIN 5.0 //Maxmium AtkGain
-#define MIN_ATKGAIN 0.5 //Minimum AtkGain
-#define MIN_EBDIST 100 //Minimum ebdist
-#define MAX_EBDIST 500 //Maximum ebdist
-#define WINDOW_WIDTH 800 //Game width
-#define WINDOW_HEIGHT 600 //Game height
-#define MAP_WIDTH 5000 //map max width
-#define MAP_HEIGHT 5000 //map max height
+//Data storage sizes
 #define IMAGE_COUNT 35 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
+#define BUFFER_SIZE 1024 //Command, message buffer size
+#define NET_BUFFER_SIZE 8192 //Network buffer size for receiving
+#define MAX_STRINGS 26 // Max string count
+#define CHARACTER_TIMER_COUNT 4
+#define MAX_TID 24 //max type id
+#define HOSTNAME_SIZE 64 //SMPServerInfo_t host record max len
+#define PORTNAME_SIZE 6 //SMPServerInfo_t port record max len
+#define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
+
+//Parameter limits
+#define MAX_ATKGAIN 7.0 //Maxmium AtkGain
+#define MIN_ATKGAIN 0.2 //Minimum AtkGain
+#define MIN_EBDIST 100 //Minimum ebdist
+#define MAX_EBDIST 500 //Maximum ebdist
 #define MAX_ZINDEX 3 //Max z-index
+
+//Sizes
+#define MAP_WIDTH 5000 //map max width
+#define MAP_HEIGHT 5000 //map max height
+#define WINDOW_WIDTH 800 //Game width
+#define WINDOW_HEIGHT 600 //Game height
+#define MAX_CHAT_COUNT 5 //Maximum chat show count
+#define ITEM_COUNT 5 //Max item id
+#define SKILL_COUNT 3 //Skill Count
+
+//Colors
 #define COLOR_TEXTBG 0x60000000 //Text background color (30% opaque black)
 #define COLOR_TEXTCMD 0xff00ff00 //Command and Chat text color (Green)
 #define COLOR_TEXTCHAT 0xffffffff //Chat text color
@@ -41,17 +50,17 @@ zunda-defs.h: definitions
 #define COLOR_ALLY 0xff00ffa0 //Enemy HP bar and marker color
 #define COLOR_UNUSABLE 0x60000000 //Gray out color
 #define COLOR_KUMO9_X24_PCANNON 0xc0ffffff //kumo9 x24 pcannon color
-#define MAX_CHAT_COUNT 5 //Maximum chat show count
-#define BUFFER_SIZE 1024 //Command, message buffer size
-#define NET_BUFFER_SIZE 8192 //Network buffer size for receiving
+
+//Coordinates
+#define IHOTBAR_XOFF 5 //Item hotbar X offset
+#define IHOTBAR_YOFF (WINDOW_HEIGHT - 100) //Item hotbar Y offset
+#define STATUS_XOFF (WINDOW_WIDTH / 2)
+#define STATUS_YOFF IHOTBAR_YOFF + 48
+
+//Game settings
 #define CHAT_TIMEOUT 1000 //Chat message timeout
 #define ERROR_SHOW_TIMEOUT 500 //Error message timeout
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
-#define ITEM_COUNT 5 //Max item id
-#define MAX_STRINGS 26 // Max string count
-#define MAX_TID 24 //max type id
-#define SKILL_COUNT 3 //Skill Count
-#define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
 #define EARTH_RADAR_DIAM 500 //Earth radar diameter
 #define ENEMYBASE_RADAR_DIAM 600 //Enemy base radar diameter
 #define PIT_RADAR_DIAM 600 //Pit radar diameter
@@ -59,20 +68,9 @@ zunda-defs.h: definitions
 #define ZUNDAMON2_RADAR_DIAM 600 //ZUNDAMON2 radar diameter
 #define ZUNDAMON3_RADAR_DIAM 800 //ZUNDAMON3 radar diameter
 #define PLAYABLE_AUTOMACHINEGUN_DIAM 500
-#define DISTANCE_INFINITY 65535 //Infinity finddist value
-#define IHOTBAR_XOFF 5 //Item hotbar X offset
-#define IHOTBAR_YOFF (WINDOW_HEIGHT - 100) //Item hotbar Y offset
-#define STATUS_XOFF (IHOTBAR_XOFF + (ITEM_COUNT * 50) + 10)
-#define LHOTBAR_WIDTH ( ( SKILL_COUNT * 54) + 100)
-#define LHOTBAR_XOFF (WINDOW_WIDTH - LHOTBAR_WIDTH) //LOL hotbar X
-#define LHOTBAR_YOFF (WINDOW_HEIGHT - 100) //LOL hotbar Y
-#define OBJID_INVALID -1 //Special object number, means pointing nothing
-#define CHARACTER_TIMER_COUNT 4
 #define KUMO9_X24_MISSILE_RANGE 500
 #define KUMO9_X24_LASER_RANGE 600
 #define KUMO9_X24_PCANNON_RANGE 1000
-#define HOSTNAME_SIZE 64 //SMPServerInfo_t host record max len
-#define PORTNAME_SIZE 6 //SMPServerInfo_t port record max len
 
 //Image ID Definition for special purposes
 #define IMG_ITEM_UNUSABLE 13 //Cross icon, this means item is unusable
@@ -93,6 +91,18 @@ zunda-defs.h: definitions
 #define TEXT_SMP_TIMEOUT 24 //Timed out
 #define TEXT_OFFLINE 25 //Offline
 
+//Others
+#define OBJID_INVALID -1 //Special object number, means pointing nothing
+#define DISTANCE_INFINITY 65535 //Infinity finddist value
+#define CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0, Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr"
+#define CONSOLE_CREDIT_STRING "Zundamon bakage (C) 2024 Kumohakase https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0\n" \
+							  "Zundamon is from https://zunko.jp/ (C) 2024 ＳＳＳ合同会社\n" \
+							  "(C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr\n" \
+							  "Please consider supporting me through ko-fi or pateron\n" \
+							  "https://ko-fi.com/kumohakase\n" \
+							  "https://www.patreon.com/kumohakasemk8\n"
+
+//Enums
 //Language ID
 typedef enum {
 	LANGID_EN = 0,
