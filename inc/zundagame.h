@@ -80,8 +80,8 @@ int32_t constrain_i32(int32_t, int32_t, int32_t);
 double get_current_time_ms();
 
 //info.c
-void lookup(obj_type_t, LookupResult_t*);
-void lookup_playable(int32_t, PlayableInfo_t*);
+int32_t lookup(obj_type_t, LookupResult_t*);
+int32_t lookup_playable(int32_t, PlayableInfo_t*);
 int32_t is_playable_character(obj_type_t);
 const char *getlocalizedstring(int32_t);
 void check_data();

@@ -125,7 +125,9 @@ int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
 	}
 	//Add new character
 	LookupResult_t t;
-	lookup(tid, &t);
+	if(lookup(tid, &t) == -1) {
+		return 0;
+	}
 	Gobjs[newid].imgid = t.initimgid;
 	Gobjs[newid].tid = tid;
 	Gobjs[newid].x = x;
@@ -146,7 +148,9 @@ int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
 		//Otherwise inherit from parent.
 		if(is_range(Gobjs[parid].tid, 0, MAX_TID - 1) ) {
 			LookupResult_t t2;
-			lookup(Gobjs[parid].tid, &t2);
+			if(lookup(Gobjs[parid].tid, &t2) == -1) {
+				return -1;
+			}
 			if(t2.objecttype == UNITTYPE_UNIT || t2.objecttype == UNITTYPE_FACILITY) {
 				Gobjs[newid].srcid = parid;
 			} else {
@@ -262,7 +266,9 @@ void set_speed_for_following(int32_t srcid) {
 	double dstx = Gobjs[targetid].x;
 	double dsty = Gobjs[targetid].y;
 	LookupResult_t t;
-	lookup((uint8_t)Gobjs[srcid].tid, &t);
+	if(lookup((uint8_t)Gobjs[srcid].tid, &t) == -1) {
+		return;
+	}
 	double spdlimit = t.maxspeed;
 	set_speed_for_going_location(srcid, dstx, dsty, spdlimit);
 	//print(f"line 499: ID={srcid} set_speed_for_following maxspeed={spdlimit} sx={sx} sy={sy}")
@@ -320,8 +326,9 @@ int32_t find_nearest_unit(int32_t srcid, int32_t finddist, facility_type_t cfilt
 			//C = self.lookup(e.tid)
 			LookupResult_t dstinfo;
 			LookupResult_t srcinfo;
-			lookup(Gobjs[i].tid, &dstinfo);
-			lookup(Gobjs[srcid].tid, &srcinfo);
+			if(lookup(Gobjs[i].tid, &dstinfo) == -1 || lookup(Gobjs[srcid].tid, &srcinfo) == -1) {
+				return -1;
+			}
 			//if objects are in same team, exclude from searching
 			if(dstinfo.teamid != srcinfo.teamid && (cfilter & dstinfo.objecttype) ) {
 				double dist = get_distance(i, srcid);
@@ -356,8 +363,9 @@ int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilte
 			//C = self.lookup(e.tid)
 			LookupResult_t dstinfo;
 			LookupResult_t srcinfo;
-			lookup(Gobjs[i].tid, &dstinfo);
-			lookup(Gobjs[srcid].tid, &srcinfo);
+			if(lookup(Gobjs[i].tid, &dstinfo) == -1 || lookup(Gobjs[srcid].tid, &srcinfo) == -1) {
+				return -1;
+			}
 			//if objects are in same team, exclude from searching
 			//if object type is not in cfilter, exclude
 			//if object im more far than finddist / 2, exclude
@@ -403,7 +411,9 @@ void gametick() {
 		for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 			if(Gobjs[i].tid == TID_EARTH || Gobjs[i].tid == TID_ENEMYBASE) {
 				LookupResult_t t;
-				lookup((uint8_t)Gobjs[i].tid, &t);
+				if(lookup((uint8_t)Gobjs[i].tid, &t) == -1) {
+					return;
+				}
 				Gobjs[i].hp = constrain_number(Gobjs[i].hp + 25, 0, t.inithp);
 				//If hp became full, move camera to show another object
 				if(Gobjs[i].hp == t.inithp) {
@@ -476,7 +486,9 @@ void proc_playable_op() {
 		return;
 	}
 	PlayableInfo_t plinf;
-	lookup_playable(CurrentPlayableCharacterID, &plinf);
+	if(lookup_playable(CurrentPlayableCharacterID, &plinf) == -1) {
+		return;
+	}
 	//Move Playable character
 	double tx = 0, ty = 0;
 	if(CharacterMove && GameState == GAMESTATE_PLAYING) {
@@ -588,7 +600,9 @@ int32_t buy_facility(int32_t fid) {
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		if(Gobjs[i].tid == TID_NULL) { continue; }
 		LookupResult_t t;
-		lookup(Gobjs[i].tid, &t);
+		if(lookup(Gobjs[i].tid, &t) == -1) {
+			return -1;
+		}
 		if(t.objecttype == UNITTYPE_FACILITY) {
 			if(get_distance_raw(Gobjs[i].x, Gobjs[i].y, mx, my) < 500) {
 				//showerrorstr(0);
@@ -889,7 +903,9 @@ void spawn_playable_me() {
 //Spawn specificated playable character by pid at fixed coordinate
 int32_t spawn_playable(int32_t pid) {
 	PlayableInfo_t t;
-	lookup_playable(pid, &t);
+	if(lookup_playable(pid, &t) == -1) {
+		return 0;
+	}
 	return add_character(t.associatedtid, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, OBJID_INVALID);
 }
 

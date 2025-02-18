@@ -805,7 +805,9 @@ int32_t evh_use_skill(uint8_t* eventbuffer, size_t eventoff, int32_t cid) {
 
 	//Use skill as remote player
 	PlayableInfo_t p;
-	lookup_playable(pid, &p);
+	if(lookup_playable(pid, &p) == -1) {
+		return -1;
+	}
 	use_skill(playable_objid, skillid, p);
 	return 0;
 }

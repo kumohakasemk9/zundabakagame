@@ -45,7 +45,9 @@ void procai() {
 		obj_type_t tid = Gobjs[i].tid;
 		if(Gobjs[i].tid == TID_NULL) {continue;}
 		LookupResult_t srcinfo;
-		lookup(Gobjs[i].tid, &srcinfo);
+		if(lookup(Gobjs[i].tid, &srcinfo) == -1) {
+			return;
+		}
 		//Process dead character (skip when inithp = 0, it means they are invulnerable)
 		if(Gobjs[i].hp == 0 && srcinfo.inithp != 0) {
 			if(srcinfo.objecttype == UNITTYPE_FACILITY) {
@@ -281,7 +283,9 @@ void procai() {
 			if(i == j) { continue; }
 			if(Gobjs[j].tid == TID_NULL) { continue; }
 			LookupResult_t dstinfo;
-			lookup(Gobjs[j].tid, &dstinfo);
+			if(lookup(Gobjs[j].tid, &dstinfo) == -1) {
+				return;
+			}
 			double d = get_distance(i, j);
 			//normal hitdetection
 			if(d < ((Gobjs[i].hitdiameter + Gobjs[j].hitdiameter) / 2)) {
@@ -472,8 +476,9 @@ void damage_object(int32_t dstid, int32_t srcid) {
 
 	//Lookup for info
 	LookupResult_t srcinfo, dstinfo;
-	lookup(Gobjs[srcid].tid, &srcinfo);
-	lookup(Gobjs[dstid].tid, &dstinfo);
+	if(lookup(Gobjs[srcid].tid, &srcinfo) == -1 || lookup(Gobjs[dstid].tid, &dstinfo) == -1) {
+		return;
+	}
 
 	//Decrease target HP
 	double m = 1.00;

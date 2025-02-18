@@ -23,7 +23,6 @@ void draw_game_main();
 void draw_cui();
 void draw_info();
 void draw_mchotbar(double, double);
-void draw_lolhotbar(double, double);
 void draw_game_object(int32_t, LookupResult_t, double, double);
 void draw_shapes(int32_t, double, double);
 void draw_hpbar(double, double, double, double, double, double, uint32_t, uint32_t);
@@ -83,7 +82,6 @@ void game_paint() {
 	draw_game_main(); //draw characters
 	draw_cui(); //draw minecraft like cui
 	draw_mchotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
-	draw_lolhotbar(LHOTBAR_XOFF, LHOTBAR_YOFF); //draw lol like hotbar
 	draw_info(); //draw game information
 	#ifndef __WASM
 		//Calculate draw time (AVG)
@@ -104,7 +102,9 @@ void draw_game_main() {
 	//draw lol type skill helper
 	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) && is_range(CurrentPlayableCharacterID, 0, PLAYABLE_CHARACTERS_COUNT - 1) && is_range(SkillKeyState,0, SKILL_COUNT - 1) ) {
 		PlayableInfo_t t;
-		lookup_playable(CurrentPlayableCharacterID, &t);
+		if(lookup_playable(CurrentPlayableCharacterID, &t) == -1) {
+			return;
+		}
 		double x, y;
 		getlocalcoord(PlayingCharacterID, &x, &y);
 		chcolor(0x600000ff, 1);
@@ -115,7 +115,9 @@ void draw_game_main() {
 		for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 			if(Gobjs[i].tid == TID_NULL) {continue;} //Skip if slot is not used.
 			LookupResult_t t;
-			lookup(Gobjs[i].tid, &t);
+			if(lookup(Gobjs[i].tid, &t) == -1) {
+				return;
+			}
 			double x, y;
 			getlocalcoord(i, &x, &y);
 			if(z == 2) {
@@ -134,7 +136,7 @@ void draw_game_main() {
 					double tx = x - hw;
 					double ty = y - hh;
 					if(!is_range_number(tx, -w, WINDOW_WIDTH) || !is_range_number(ty, -h, WINDOW_HEIGHT) ) {
-						//object is out of range
+						//if object is out of range, show indicator
 						double px = constrain_number(x, 0, WINDOW_WIDTH - 16);
 						double py = constrain_number(y, 0, WINDOW_HEIGHT - 114);
 						if(Gobjs[i].tid == TID_PIT) {
@@ -194,7 +196,12 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 		if(t.teamid == TEAMID_ALLY) {
 			cc = COLOR_ALLY;
 		}
-		draw_hpbar(x, y - 7, w, 5, Gobjs[idx].hp, t.inithp, COLOR_TEXTCHAT, cc);
+		int32_t hpy = y - 7;
+		//facility hpbar can be bottom of the object if they will be out of frame
+		if(t.objecttype == UNITTYPE_FACILITY && hpy < 0) {
+			hpy = y + h + 2;
+		}
+		draw_hpbar(x, hpy, w, 5, Gobjs[idx].hp, t.inithp, COLOR_TEXTCHAT, cc);
 	}
 	//In SMP: If the object is playable and from foreign client (SMP), draw name tag
 	if(SMPStatus == NETWORK_LOGGEDIN && is_playable_character(Gobjs[idx].tid) ) {
@@ -211,7 +218,9 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 		for(uint8_t i = 0; i < SKILL_COUNT; i++) {
 			if(Gobjs[idx].timers[i + 1] != 0) {
 				PlayableInfo_t plinfo;
-				lookup_playable(CurrentPlayableCharacterID, &plinfo);
+				if(lookup_playable(CurrentPlayableCharacterID, &plinfo) == -1) {
+					return;
+				}
 				draw_hpbar(x, bary, w, 5, Gobjs[idx].timers[i + 1], plinfo.skillinittimers[i], COLOR_ENEMY, COLOR_TEXTCHAT);
 				bary += 7;
 			}
@@ -407,130 +416,63 @@ void draw_info() {
 	drawstringf(STATUS_XOFF + 16, IHOTBAR_YOFF + 32, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
 }
 
-void draw_lolhotbar(double offsx, double offsy) {
-	//Show LOL like hotbar
-	PlayableInfo_t t;
-	lookup_playable(0, &t);
-	chcolor(COLOR_TEXTBG, 1);
-	fillrect(offsx, offsy, LHOTBAR_WIDTH, 100); //show bg
-	//show portrait image
-	drawimage(offsx + 2, offsy + 2, t.portraitimgid);
-	//Show Mouse Icon if Moving
-	if(CharacterMove) {
-		drawimage(offsx + 2, offsy + 2, 20);
-	}
-	//Show respawn timer if dead
-	if(GameState == GAMESTATE_DEAD) {
-		//gray out portrait
-		chcolor(COLOR_UNUSABLE, 1);
-		fillrect(offsx + 2, offsy + 2, 96, 96);
-		//Show respawn timer
-		chcolor(COLOR_TEXTERROR, 1);
-		drawstringf(offsx + 2, offsy + 2, "%d", StateChangeTimer);
-	}
-	//Draw hp bar
-	double chp = 0;
-	double fhp = 1;
-	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
-		LookupResult_t t2;
-		lookup(Gobjs[PlayingCharacterID].tid, &t2);
-		chp = Gobjs[PlayingCharacterID].hp;
-		fhp = t2.inithp;
-		chcolor(COLOR_TEXTCMD, 1);
-		//Draw current speed
-		drawstringf(offsx + 120, offsy + 75, "X: %.1f Y: %.1f", Gobjs[PlayingCharacterID].sx, Gobjs[PlayingCharacterID].sy);
-	}
-	draw_hpbar(offsx + 100, offsy + 53, LHOTBAR_WIDTH - 100, 10, chp, fhp, COLOR_ENEMY, COLOR_ALLY);
-	//Show Earth HP If there's earth
-	if(is_range(EarthID, 0, MAX_OBJECT_COUNT - 1) && Gobjs[EarthID].tid == TID_EARTH) {
-		//Show Earth Icon (Earth HP)
-		drawimage(offsx + 100, offsy + 67, IMG_EARTH_ICO);
-		//Draw Earth HP bar
-		LookupResult_t t;
-		lookup(TID_EARTH, &t);
-		draw_hpbar(offsx + 117, offsy + 67, LHOTBAR_WIDTH - 122, 10, Gobjs[EarthID].hp, t.inithp, COLOR_ENEMY, COLOR_ALLY);
-	}
-	//show skill images and cooldown (if needed)
-	char* L[] = {"Q", "W", "E"};
-	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
-		double tx = offsx + 102 + (i * 54);
-		if(is_range(t.skillimageids[i], 0, IMAGE_COUNT - 1) ) {
-			drawimage_scale(tx, offsy + 2, 48, 48, t.skillimageids[i]);
-		}
-		chcolor(COLOR_TEXTCMD, 1);
-		hollowrect(tx, offsy + 2, 48, 48);
-		//If it is in cooldown, grayout button in LOL way
-		if(SkillCooldownTimers[i] != 0) {
-			//LOL like gray out
-			uint16_t r = (uint16_t)scale_number(SkillCooldownTimers[i], t.skillcooldowns[i], 360);
-			double p[12] = {0, -24, 24, 0, 0, 48, -48, 0, 0, -48, 24, 0};
-			uint8_t np = 6;
-			if(is_range(r, 0, 45)) {
-				//half of top line of rect (x: 0 - 24)
-				p[2] = scale_number(r, 45, 24); //x line grow left
-				np = 2;
-			} else if(is_range(r, 46, 135) ) {
-				//left line of rect (y: -24 - 24)
-				p[5] = scale_number(r - 46, 89, 48); //y line grow down
-				np = 3;
-			} else if(is_range(r, 136, 225) ) {
-				//bottom line of rect (x: 24 - -24)
-				p[6] = -scale_number(r - 136, 89, 48); //x line grow right
-				np = 4;
-			} else if(is_range(r, 226, 315) ) {
-				//right line of rect (y: 24 - -24)
-				p[9] = -scale_number(r - 226, 89, 48); //y line grow up
-				np = 5;
-			} else {
-				//half of top lineof rect (x -24 - 0)
-				p[10] = scale_number(r - 316, 44, 24); //x line grows right
-				np = 6;
-			}
-			chcolor(COLOR_TEXTBG, 1);
-			draw_polygon(tx + 24, offsy + 2 + 24, np, p);
-		}
-		if(SkillCooldownTimers[i] == 0) {
-			//Draw QWE Label
-			chcolor(COLOR_TEXTCMD, 1);
-			drawstring(tx + 2, offsy + 2 + 24, L[i]);
-		} else {
-			//Draw timer
-			chcolor(COLOR_TEXTERROR, 1);
-			drawstringf(tx + 2, offsy + 2 + 24, "%d", SkillCooldownTimers[i]);
-		}
-	}
-}
-
 void draw_mchotbar(double offsx, double offsy) {
-	//Show item candidates (Minecraft hotbar style)
-	for(uint8_t i = 0; i < ITEM_COUNT; i++) {
+	//Show item candidates and skill
+	PlayableInfo_t plinf;
+	if(lookup_playable(CurrentPlayableCharacterID, &plinf) == -1) {
+		return;
+	}
+	for(uint8_t i = 0; i < ITEM_COUNT + SKILL_COUNT; i++) {
 		double tx = offsx + (i * 50);
+		int32_t itemlabel;
+		int32_t itemdisabled = 0;
+		//Draw item background
 		if(SelectingItemID == i) {
-			//When selected, show description in bottom
+			//When item is selected, change backcolor and show item description
 			chcolor(COLOR_TEXTCMD, 1);
 			drawstring_inwidth(offsx, offsy + 52, (char*)getlocalizeditemdesc(SelectingItemID), WINDOW_WIDTH / 2, COLOR_TEXTBG);
-			//When selected, change color
-			chcolor(COLOR_TEXTCHAT, 1);
 		} else {
-			//When unselected
 			chcolor(COLOR_TEXTBG, 1);
 		}
 		fillrect(tx, offsy, 48, 48);
-		//Show Item Image (hotbar)
-		drawimage_scale(tx, offsy, 48, 48, ITEMIMGIDS[i]);
-		//calculate position of additional text
-		double ty = offsy + 24; //Center of width
-		//If in cooldown, show cooldowntimer orelse show item value
-		if(ItemCooldownTimers[i] != 0) {
+
+		if(i < ITEM_COUNT) {
+			//Show Item Image (hotbar)
+			drawimage_scale(tx, offsy, 48, 48, ITEMIMGIDS[i]);
+			//If item is not available, make text red.
+			if(ItemCooldownTimers[i] != 0 || Money < ITEMPRICES[i]) {
+				itemdisabled = 1;
+				if(ItemCooldownTimers[i] != 0) {
+					itemlabel = ItemCooldownTimers[i];
+				} else {
+					itemlabel = ITEMPRICES[i];
+				}
+			}
+		} else {
+			//Draw Skills Icon
+			int32_t j = i - ITEM_COUNT;
+			drawimage_scale(tx, offsy + 2, 48, 48, plinf.skillimageids[j]);
+			if(SkillCooldownTimers[j] != 0) {
+				itemdisabled = 1;
+				itemlabel = SkillCooldownTimers[j];
+			} else {
+				//Draw QWE Label
+				const char* L[] = {"Q", "W", "E"};
+				chcolor(COLOR_TEXTCMD, 1);
+				drawstring(tx + 2, offsy + 2 + 24, L[j]);
+			}
+		}
+	
+		//draw unusable icon if unavailable
+		if(itemdisabled) {
+			drawimage(tx, offsy, IMG_ITEM_UNUSABLE);
 			chcolor(COLOR_TEXTERROR, 1);
-			drawstringf(tx, ty, "%d", ItemCooldownTimers[i]);
 		} else {
 			chcolor(COLOR_TEXTCMD, 1);
-			drawstringf(tx, ty, "%d", ITEMPRICES[i]);
 		}
-		//draw unusable icon if unavailable
-		if(ItemCooldownTimers[i] != 0 || Money < ITEMPRICES[i]) {
-			drawimage(tx, offsy, IMG_ITEM_UNUSABLE);
+		if(!(i >= ITEM_COUNT && !itemdisabled) ) {
+			//already drawn: skill label when skill usable
+			drawstringf(tx + 2, offsy + 2 + 24, "%d", itemlabel);
 		}
 	}
 }

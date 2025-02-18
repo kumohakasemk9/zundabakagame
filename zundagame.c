@@ -15,9 +15,9 @@ main.c: linux entry point, X11 funcs.
 TODO List
 implement lifes, make it adjustable
 simplify UI
+Make HP bar bottom when it was out of frame
 nickname feature in SMP
 chat mute feature in SMP
-add getCurrentPlayableCharacterId()
 Make me ahri
 change Character constant information structure to each function getters
 */

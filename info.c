@@ -318,10 +318,10 @@ const char* getlocalizedstring(int32_t stringid) {
 	}
 }
 
-void lookup(obj_type_t i, LookupResult_t* r) {
+int32_t lookup(obj_type_t i, LookupResult_t* r) {
 	if(!is_range(i, 0, MAX_TID - 1)) {
 		die("lookup() failed: bad tid: %d\n", i);
-		return;
+		return -1;
 	}
 	r->initimgid = NUMINFO[i][0];
 	r->inithp = NUMINFO[i][1];
@@ -333,6 +333,7 @@ void lookup(obj_type_t i, LookupResult_t* r) {
 	r->inithitdiameter = NUMINFO[i][6];
 	r->timeout = NUMINFO[i][7];
 	r->requirepower = NUMINFO[i][8];
+	return 0;
 }
 
 void check_data() {
@@ -401,10 +402,10 @@ void check_data() {
 	}
 }
 
-void lookup_playable(int32_t i, PlayableInfo_t *t) {
+int32_t lookup_playable(int32_t i, PlayableInfo_t *t) {
 	if(!is_range(i, 0, PLAYABLE_CHARACTERS_COUNT - 1) ) {
 		die("lookup_playable(): bad id passed!\n");
-		return;
+		return -1;
 	}
 	t->associatedtid = (obj_type_t)PLAYABLE_INFORMATION[i][0];
 	t->portraitimgid = PLAYABLE_INFORMATION[i][1];
@@ -413,6 +414,7 @@ void lookup_playable(int32_t i, PlayableInfo_t *t) {
 	t->skillimageids = SKILLICONIDS[i];
 	t->skillinittimers = SKILL_INIT_TIMERS[i];
 	t->skillranges = SKILL_RANGES[i];
+	return 0;
 }
 
 const char* getlocalizeditemdesc(int32_t did) {
