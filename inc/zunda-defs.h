@@ -91,6 +91,7 @@ zunda-defs.h: definitions
 #define TEXT_UNAVAILABLE 10 //Command or item unavailable
 #define TEXT_SMP_ERROR 21 //Disconnected because error in SMP routine
 #define TEXT_SMP_TIMEOUT 24 //Timed out
+#define TEXT_OFFLINE 25 //Offline
 
 //Language ID
 typedef enum {

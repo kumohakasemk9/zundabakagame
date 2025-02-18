@@ -1006,7 +1006,7 @@ void changetimeout_cmd(char *param) {
 void getcurrentsmp_cmd() {
 	//Command to get connection state
 	if(SMPStatus == NETWORK_DISCONNECTED) {
-		chat( (char*)getlocalizedstring(25) );	
+		chat( (char*)getlocalizedstring(TEXT_OFFLINE) );
 	} else {
 		chatf("getcurrentsmp: %d (%s@%s:%s)", SelectedSMPProf, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
 	}
@@ -1088,3 +1088,29 @@ int32_t add_smp_profile(char* line, char spliter) {
 	return 0;
 }
 
+void getclients_cmd() {
+	//Get current connected users
+	if(SMPStatus == NETWORK_LOGGEDIN) {
+		//Make client username list divided by ,
+		char clientlist[BUFFER_SIZE] = "";
+		size_t p = 0;
+		for(int32_t i = 0; i < MAX_CLIENTS; i++) {
+			if(SMPPlayerInfo[i].cid != -1) {
+				char t[BUFFER_SIZE];
+				size_t s;
+				s = snprintf(t, BUFFER_SIZE, "%s (%d), ", SMPPlayerInfo[i].usr, SMPPlayerInfo[i].cid);
+				if(p + s >= BUFFER_SIZE) {
+					warn("getclients(): overflow condition while making list.\n");
+					return;
+				}
+				memcpy(&clientlist[p], t, s);
+				p += s;
+			}
+		}
+		clientlist[p - 2] = 0;
+		chatf("getclients: %s", clientlist);
+	} else {
+		warn("getclients_cmd(): disconnected.\n");
+		chat( (char*)getlocalizedstring(TEXT_OFFLINE) ); //Offline
+	}
+}

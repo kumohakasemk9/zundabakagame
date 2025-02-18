@@ -25,10 +25,11 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 - `/builddate`       : Show build date
 - `/credit`          : Show credit string
 - `/reset`           : Round reset
-- `/smp id`          : Set your SMP connection profile id. Used when connect. id will start from 1       
+- `/getclients`      : Get client list in connected SMP server.   
+- `/getcurrentsmp`   : Get current SMP profile used for connection.         
 - `/getsmps`         : Get total loaded SMP connection profile count.   
-- `/getsmp`          : Show current selected SMP connection profile.  
-- `/connect`         : Connect to SMP server using selected profile.   
+- `/getsmp id`       : Show selected SMP connection profile.  
+- `/connect id`      : Connect to SMP server using selected profile.   
 - `/disconnect`      : Disconnect from SMP server.  
 - `/difficulty`      : Get current difficulty parameters.
 - `/ebcount`         : Set difficulty parameter `ebcount`, this command takes 1 to 4 parameters. need at least 1 and omitted ones considered to `0`.
@@ -56,15 +57,16 @@ You may experience very insane de-synced game like object
 pops out of nowhere, etc ....   Before doing SMP, you need to   
 modify `credentials.txt` in the game directory. Please write one profile   
 in one line, this can hold multiple profile (the file can be multi-lined),   
-and you can change profile by `/smp` command.   
+and you can connect server using profile by `/connect id` command.   
 Profile id is associated in reading order. It means the profile written in    
-the first line gets id 1. The format is:   
+the first line gets id `0`. The format is:   
 ```
 hostname<tab>portname<tab>username<tab>password<lf>
 
 Example:
 127.0.0.1<tab>25566<tab>kumohakase403<tab>kumokumo<lf>
 ```
+(This will expressed as `kumohakase403@127.0.0.1:25566` in game.)    
 Each information is splitted by tab letters, ensure new line    
 comes at last. (Do not eorry if you are in windows, in windows code, cr
 is recognized as newline instead.)   

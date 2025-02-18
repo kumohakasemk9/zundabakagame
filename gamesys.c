@@ -38,7 +38,6 @@ void select_next_item();
 void select_prev_item();
 void spawn_playable_me();
 void reset_game_cmd();
-void addid_cmd();
 void ebcount_cmd();
 void ebdist_cmd();
 void atkgain_cmd();
@@ -734,6 +733,10 @@ void execcmd() {
 	} else if(strcmp(CommandBuffer, "/timeout") == 0) {
 		//Get timeout
 		chatf("timeout: %d", NetworkTimeout);
+
+	} else if(strcmp(CommandBuffer, "/getclients") == 0) {
+		//Get connected users
+		getclients_cmd();
 
 	} else {
 		if(CommandBuffer[0] == '/') {
