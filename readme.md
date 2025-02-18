@@ -49,7 +49,7 @@ parameter won't apply until next round.
    Defines how far will enemybase placed to next. Default value is `500` and this can be `100` to `500`.    
    This won't apply until next round.     
  - `atkgain`
-   Defines damage rate when playable character attacks. Default is `1.000` and can be `0.500` to `5.000`.
+   Defines damage rate when playable character attacks. Default is `1.000` and can be `0.100` to `8.000`.
 
 # About SMP   
 SMP support is still in development      

@@ -26,8 +26,8 @@ zunda-defs.h: definitions
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
 
 //Parameter limits
-#define MAX_ATKGAIN 7.0 //Maxmium AtkGain
-#define MIN_ATKGAIN 0.2 //Minimum AtkGain
+#define MAX_ATKGAIN 8.0 //Maxmium AtkGain
+#define MIN_ATKGAIN 0.1 //Minimum AtkGain
 #define MIN_EBDIST 100 //Minimum ebdist
 #define MAX_EBDIST 500 //Maximum ebdist
 #define MAX_ZINDEX 3 //Max z-index
