@@ -928,7 +928,7 @@ void ExecServerCommand(char* cmd, int cid) {
 			Log(cid, "Bad op level\n");
 		}
 
-	} else if(memcmp("?adduser ", cmd, 9) == 0) {
+	/*} else if(memcmp("?adduser ", cmd, 9) == 0) {
 		//adduser command
 		if(GetUserOpLevel(cid) >= 3) {
 			AddUser(&cmd[9]);
@@ -950,7 +950,7 @@ void ExecServerCommand(char* cmd, int cid) {
 			}
 		} else {
 			Log(cid, "Bad op level.\n");
-		}
+		}*/
 	
 	} else if(memcmp("?ban ", cmd, 5) == 0) {
 		//Ban command
@@ -972,8 +972,11 @@ void ExecServerCommand(char* cmd, int cid) {
 			SendPrivateChat(SERVER_EVENT, cid, "Insufficient permission.");
 			Log(cid, "Bad op level.\n");
 		}
-
-	} else {
+	
+	/*} else if(memcmp("?test", cmd) == 0) {
+		//Test command
+		SendJoinPacket(15);
+	*/} else {
 		SendPrivateChat(SERVER_EVENT, cid, "Bad server command");
 		Log(cid, "Bad command.\n");
 	}
@@ -1127,7 +1130,7 @@ ssize_t GetEventPacketSize(uint8_t *d, int l) {
 	} else if (d[0] == EV_HELLO) {
 		size_t t = strnlen(&d[1], UNAME_SIZE - 1);
 		if(t < UNAME_SIZE) {
-			r = t + 1;
+			r = t + 2;
 		}
 	} else if (d[0] == EV_BYE) {
 		r = 1;
