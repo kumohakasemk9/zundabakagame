@@ -18,25 +18,35 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 (2) You can use item also by right click.   
 (3) You can switch movement also by left click.   
    
-# Command Help
+# System Commands
 - `/en`              : Switch to english
 - `/jp`              : Switch to japanese
 - `/chfont fontname` : load fontlist separated by ","
 - `/builddate`       : Show build date
 - `/credit`          : Show credit string
+
+# Game Commands
 - `/reset`           : Round reset
+- `/difficulty`      : Get current difficulty parameters.
+- `/ebcount`         : Set difficulty parameter `ebcount`, this command takes 1 to 4 parameters. need at least 1 and omitted ones considered to `0`.
+- `/ebdist`          : Set difficulty parameter `ebdist`.
+- `/atkgain`         : Set difficulty parameter `atkgain`.
+- `/chspawn`         : Set max count to allow respawning. `-1` means no limit.
+- `/chplayable id`   : Change playable character, currently kumo7-x48 is only playable.
+ 
+# SMP commands
 - `/getclients`      : Get client list in connected SMP server.   
 - `/getcurrentsmp`   : Get current SMP profile used for connection.         
 - `/getsmps`         : Get total loaded SMP connection profile count.   
 - `/getsmp id`       : Show selected SMP connection profile.  
 - `/connect id`      : Connect to SMP server using selected profile.   
 - `/disconnect`      : Disconnect from SMP server.  
-- `/difficulty`      : Get current difficulty parameters.
-- `/ebcount`         : Set difficulty parameter `ebcount`, this command takes 1 to 4 parameters. need at least 1 and omitted ones considered to `0`.
-- `/ebdist`          : Set difficulty parameter `ebdist`.
-- `/atkgain`         : Set difficulty parameter `atkgain`.
-- `/chspawn`         : Set max count to allow respawning. `-1` means no limit.
-    
+- `/togglechat`      : On/off chat.  
+- `/ignore name`     : Add name to chat ignore list.
+- `/listen name`     : Delete name from chat ignore list.
+- `/listmuted`       : Show chat ignore list. Chat messages from users who are in list will be hidden (still shown on console).
+- `/getclients`      : Show connected users.
+
 # About difficulty parameters
 They can be changed by commands for adjusting game difficulty, some    
 parameter won't apply until next round.   
