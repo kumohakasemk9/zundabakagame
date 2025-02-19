@@ -18,7 +18,7 @@ main.h: integrated header file
 #include <stdint.h>
 
 #include "zunda-defs.h"
-#include "zunda-server.h"
+#include "network.h"
 #include "zunda-structs.h"
 
 #ifdef __WASM

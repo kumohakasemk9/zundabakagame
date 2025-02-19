@@ -10,8 +10,9 @@ Zundamon bakage powered by cairo, X11.
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
 
-zunda-server.h: server client common definitions (like commands)
+network.h: server client common definitions (like commands)
 */
+
 #define PACKED __attribute__((packed))
 #define MAX_CLIENTS 20 //maximum count of clients
 #define UNAME_SIZE 20 //max username length (includes zero)
