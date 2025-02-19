@@ -6,24 +6,24 @@ permissions:
  contents: write
 jobs:
   
- build-mac:
-  runs-on: macos-latest
-  steps:
-   - uses: actions/checkout@v2
-   - name: prepare dependencies
-     run: |
-      brew install --cask xquartz
-      brew install pango
-
-   - name: build
-     run: |
-      make
-      mv zundagame zundagame-mac
-
-   - uses: xresloader/upload-to-github-release@v1
-     with:
-      file: zundagame-mac
-      draft: false
+# build-mac:
+#  runs-on: macos-latest
+#  steps:
+#   - uses: actions/checkout@v2
+#   - name: prepare dependencies
+#     run: |
+#      brew install --cask xquartz
+#      brew install pango
+#
+#   - name: build
+#     run: |
+#      make
+#      mv zundagame zundagame-mac
+#
+#   - uses: xresloader/upload-to-github-release@v1
+#     with:
+#      file: zundagame-mac
+#      draft: false
 
  build-pages:
   runs-on: ubuntu-latest
