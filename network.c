@@ -38,8 +38,8 @@ int32_t SMPProfCount = 0; //Loaded SMP credential count
 SMPProfile_t *SMPProfs = NULL; //SMP Connection credentials
 int32_t SelectedSMPProf; //Current SMP profile ID
 SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //Client information (Modified by server)
-uint8_t TempRXBuffer[NET_BUFFER_SIZE];
-size_t TRXBLength;
+uint8_t TempRXBuffer[NET_BUFFER_SIZE]; //For packet size grantee
+size_t TRXBLength; //For packet size grantee
 int32_t NetworkTimeout = 10; //If there's still no packet after this period, client will auto disconnect.
 int32_t TimeoutTimer;
 int32_t ConnectionTimeoutTimer;
@@ -50,6 +50,9 @@ int32_t DisconnectReasonProvided = 0; //To avoid erasing disconnect message
 int32_t DebugSpam = 0; //If this set to 1, packets that sent so frequently, will be print.
 extern int32_t InitSpawnRemain;
 int32_t DisconnectWhenBadPacket = 1; //Need to be modified by gdb
+char **BlockedUsers = NULL; //blocked username ptr array (dynamic alloc)
+int32_t BlockedUsersCount = 0; //Elements of Blocked Users
+int32_t IsChatEnable = 1; //0 to supress chat
 
 #ifdef __WASM
 	extern void wasm_login_to_smp(char*, char*, uint8_t*);
@@ -68,6 +71,7 @@ int32_t evh_change_atkgain(uint8_t*, size_t, int32_t);
 ssize_t evh_hello(uint8_t*, size_t, int32_t);
 int32_t evh_bye(int32_t);
 int32_t evh_change_playable_id(uint8_t*, size_t, int32_t);
+int32_t findblockeduser(char*);
 
 void close_connection_cmd() {
 	info("Disconnect requested from user.\n");
@@ -296,6 +300,7 @@ void connect_server_cmd(char* cmdparam) {
 	TimeoutTimer = 0;
 	ConnectionTimeoutTimer = 0;
 	DisconnectReasonProvided = 0;
+	IsChatEnable = 1;
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		SMPPlayerInfo[i].cid = -1;
 		SMPPlayerInfo[i].playable_objid = -1;
@@ -808,6 +813,7 @@ ssize_t evh_chat(uint8_t* evbuffer, size_t eventoff, int32_t cid) {
 	ctx[clen] = 0; //Terminate string with NUL
 	char chathdr[BUFFER_SIZE];
 	char w[] = "private ";
+	int32_t isblocked = 0;
 	if(dstcid == -1) {
 		w[0] = 0;
 	}
@@ -816,13 +822,19 @@ ssize_t evh_chat(uint8_t* evbuffer, size_t eventoff, int32_t cid) {
 	} else {
 		int32_t t = lookup_smp_player_from_cid(cid);
 		if(t != -1) {
-			snprintf(chathdr, BUFFER_SIZE, "%s<%s>",w ,SMPPlayerInfo[t].usr);
+			char* usr = SMPPlayerInfo[t].usr;
+			snprintf(chathdr, BUFFER_SIZE, "%s<%s>",w ,usr);
+			if(findblockeduser(usr) != -1) {
+				isblocked = 1;
+			}
 		} else {
 			info("unknown user chat: %s\n", ctx);
 			return clen + sizeof(ev_chat_t) + 1;
 		}
 	}
-	chatf("%s %s", chathdr, ctx);
+	if(IsChatEnable && !isblocked) {
+		chatf("%s %s", chathdr, ctx);
+	}
 	return clen + sizeof(ev_chat_t) + 1;
 }
 
@@ -1127,5 +1139,152 @@ void getclients_cmd() {
 	} else {
 		warn("getclients_cmd(): disconnected.\n");
 		chat( (char*)getlocalizedstring(TEXT_OFFLINE) ); //Offline
+	}
+}
+
+//Find specified name from BlockedUsers array, return id if match (otherwise return -1)
+int32_t findblockeduser(char *n) {
+	//Search for specified string
+	for(int32_t i = 0; i < BlockedUsersCount; i++) {
+		char *e = BlockedUsers[i];
+		if(e == NULL) {
+			continue;
+		}
+		if(strcmp(n, e) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void addusermute_cmd(char *p) {
+	size_t l = strnlen(p, UNAME_SIZE);
+	//Check param
+	if(l >= UNAME_SIZE) {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		warn("addusermute_cmd(): too long username.\n");
+		return;
+	}
+
+	//Check for dup
+	if(findblockeduser(p) != -1) {
+		warn("addusermute_cmd(): You already have that.\n");
+		return;
+	}
+	
+	//If it is first time to add, malloc. if there's NULL in array, overwrite it. if no space, grow the array.
+	int32_t i = -1;
+	if(BlockedUsers == NULL) {
+		BlockedUsers = malloc( sizeof(char*) );
+		if(BlockedUsers == NULL) {
+			warn("addusermute_cmd(): malloc() failed.\n");
+			return;
+		}
+		BlockedUsersCount++;
+		i = 0;
+	} else {
+		//Find NULL
+		for(int32_t j = 0; j < BlockedUsersCount; j++) {
+			if(BlockedUsers[j] == NULL) {
+				i = j;
+				break;
+			}
+		}
+		//Grow if there's no NULL
+		if(i == -1) {
+			char **t = realloc(BlockedUsers, sizeof(char*) * (BlockedUsersCount + 1) );
+			if(t == NULL) {
+				warn("addusermute_cmd(): malloc() failed.\n");
+				return;
+			}
+			BlockedUsers = t;
+			i = BlockedUsersCount;
+			BlockedUsersCount++;
+		}
+	}
+
+	//Store value
+	if(is_range(i, 0, BlockedUsersCount - 1) ) {
+		BlockedUsers[i] = malloc(l + 1);
+		if(BlockedUsers[i] == NULL) {
+			warn("addusermute_cmd(): malloc() failed.\n");
+			return;
+		}
+		strcpy(BlockedUsers[i], p);
+	} else {
+		warn("addusermute_cmd(): You made buggy code!!\n");
+	}
+}
+
+void delusermute_cmd(char *p) {
+	//Unmute user command
+	size_t l = strnlen(p, UNAME_SIZE);
+
+	//Check param
+	if(l >= UNAME_SIZE) {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		warn("addusermute_cmd(): too long username.\n");
+		return;
+	}
+	
+	//Search for specified string
+	int32_t i = findblockeduser(p);
+	if(is_range(i, 0, BlockedUsersCount - 1) ) {
+		//If find, free it and make it NULL
+		free(BlockedUsers[i]);
+		BlockedUsers[i] = NULL;
+	} else {
+		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		warn("addusermute_cmd(): not found on list!\n");
+	}
+}
+
+void listusermute_cmd() {
+	//list muted users
+	if(BlockedUsers == NULL || BlockedUsersCount == 0) {
+		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
+		return;
+	}
+
+	//Make list
+	char t[BUFFER_SIZE];
+	size_t p = 0;
+	int32_t c = 0;
+	for(int32_t i = 0; i < BlockedUsersCount; i++) {
+		char *e = BlockedUsers[i];
+		if(e == NULL) {
+			continue;
+		}
+		size_t l = strnlen(BlockedUsers[i], UNAME_SIZE);
+		if(l >= UNAME_SIZE) {
+			continue;
+		}
+		//Check array boundary
+		if(p + l + 2 >= BUFFER_SIZE) {
+			warn("listusermute_cmd(): overflow condition\n");
+			return;
+		}
+		memcpy(&t[p], BlockedUsers[i], l);
+		//Terminate last element with 0, else append ", "
+		if(i == BlockedUsersCount - 1) {
+			t[p + l] = 0;
+		} else {
+			memcpy(&t[p + l], ", ", 2);
+		}
+		p += l + 2;
+		c++;
+	}
+
+	chatf("listmuted (%d): %s", c, t);
+}
+
+void togglechat_cmd() {
+	//Chat toggle command
+	if(IsChatEnable) {
+		IsChatEnable = 0;
+		showstatus( (char*)getlocalizedstring(27));
+	} else {
+		IsChatEnable = 1;
+		showstatus( (char*)getlocalizedstring(26));
 	}
 }

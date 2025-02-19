@@ -105,6 +105,11 @@ void get_smp_cmd(char*);
 int32_t add_smp_profile(char*, char);
 void add_smp_cmd(char*);
 void getclients_cmd();
+void listusermute_cmd();
+void togglechat_cmd();
+void addusermute_cmd(char*);
+void delusermute_cmd(char*);
+
 
 //aiproc.c
 void procai();

@@ -46,7 +46,9 @@ const char* JP_STRINGS[MAX_STRINGS] = {
 	"がゲームに参加しました",
 	"がゲームから切断しました",
 	"応答なし",
-	"接続していません"
+	"接続していません",
+	"チャットは表示されます",
+	"チャットを非表示にしました"
 };
 
 const char *EN_STRINGS[MAX_STRINGS] = {
@@ -75,7 +77,9 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"joined in the game.",
 	"left from the game.",
 	"Timed out",
-	"Offline"
+	"Offline",
+	"Enabled chat",
+	"Disabled chat"
 };
 
 //TID names LUT

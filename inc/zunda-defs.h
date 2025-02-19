@@ -17,7 +17,7 @@ zunda-defs.h: definitions
 #define IMAGE_COUNT 36 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define BUFFER_SIZE 1024 //Command, message buffer size
-#define MAX_STRINGS 26 // Max string count
+#define MAX_STRINGS 28 // Max string count
 #define CHARACTER_TIMER_COUNT 4
 #define MAX_TID 24 //max type id
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count

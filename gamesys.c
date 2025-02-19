@@ -87,12 +87,12 @@ extern int32_t ITEMCOOLDOWNS[ITEM_COUNT]; //Default ITEMcooldown LUT
 int32_t SkillCooldownTimers[SKILL_COUNT]; //Set to nonzero balue when skill used, countdowns and if it gets 0 you can use skill again
 int32_t CurrentPlayableID; //Current selected playable character id (Not Gobjs id!) for more playables
 int32_t PlayableID = 0; //Current selected playable character id (Do not confuse it with PlayingCharacterID)
-keyflags_t KeyFlags;
+keyflags_t KeyFlags; //Key Bitmap
 int32_t ProgramExiting = 0; //Program should exit when 1
 int32_t MapTechnologyLevel; //Increases when google item placed, buffs playable
 int32_t MapEnergyLevel; //Increases when generator item placed, if it is lower than MapRequiredEnergyLevel, then all facilities stop.
 int32_t MapRequiredEnergyLevel = 0; //Increases when item placed except generator item.
-int32_t SkillKeyState;
+int32_t SkillKeyState; //Pushing skill key number
 extern smpstatus_t SMPStatus;
 extern int32_t SMPProfCount;
 extern int32_t SelectedSMPProf;
@@ -110,7 +110,6 @@ int32_t DebugStatType = 0; //Shows information if nonzero 0: No debug, 1: System
 extern int32_t NetworkTimeout; //If there's period that has no packet longer than this value, assumed as disconnected. 0: disable timeout
 int32_t SpawnRemain; //playable character can not respawn if it is 0.
 int32_t InitSpawnRemain = -1; //how many times can playable character respawn?
-
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -759,6 +758,7 @@ void execcmd() {
 	} else if(strcmp(CommandBuffer, "/difficulty") == 0) {
 		//Difficulty query command
 		chatf("difficulty: ATKGain: %.2f EBDist: %d EBCount: %d %d %d\n", DifATKGain, DifEnemyBaseDist, DifEnemyBaseCount[0], DifEnemyBaseCount[1], DifEnemyBaseCount[2]);
+
 	} else if(memcmp(CommandBuffer, "/chspawn ", 9) == 0) {
 		//Allowable spawn count change cmd
 		chspawn_cmd(&CommandBuffer[9]);
@@ -782,6 +782,22 @@ void execcmd() {
 	} else if(strcmp(CommandBuffer, "/getplayable") == 0) {
 		//Get playable
 		chatf("getplayable: %d", PlayableID);
+
+	} else if(memcmp(CommandBuffer, "/ignore ", 8) == 0) {
+		//Add blocked user
+		addusermute_cmd(&CommandBuffer[8]);
+
+	} else if(memcmp(CommandBuffer, "/listen ", 8) == 0) {
+		//Delete blocked user
+		delusermute_cmd(&CommandBuffer[8]);
+		
+	} else if(strcmp(CommandBuffer, "/listmuted") == 0) {
+		//list blocked user
+		listusermute_cmd();
+
+	} else if(strcmp(CommandBuffer, "/togglechat") == 0) {
+		//Togglechat cmd
+		togglechat_cmd();
 
 	} else {
 		if(CommandBuffer[0] == '/') {
@@ -862,10 +878,11 @@ void atkgain_cmd() {
 		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		return;
 	}
-	DifATKGain = i;
-	info("atkgain_cmd(): atkgain changed to %f\n", DifATKGain);
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		stack_packet(EV_CHANGE_ATKGAIN);
+	} else {
+		DifATKGain = i;
+		info("atkgain_cmd(): atkgain changed to %f\n", DifATKGain);
 	}
 }
 

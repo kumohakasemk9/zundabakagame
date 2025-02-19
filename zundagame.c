@@ -14,8 +14,6 @@ main.c: linux entry point, X11 funcs.
 
 TODO List
 back to GTK
-nickname feature in SMP
-chat mute feature in SMP
 Make me ahri
 Enable CtrlV
 */
