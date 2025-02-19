@@ -17,6 +17,8 @@ info.c: game object information and localization info
 
 extern langid_t LangID;
 
+int32_t get_playableid_from_tid(obj_type_t);
+
 //message strings
 const char* JP_STRINGS[MAX_STRINGS] = {
 	"施設同士の距離が近すぎます。",
@@ -308,7 +310,7 @@ const double DBLINFO[MAX_TID] = {
 
 const char* getlocalizedstring(int32_t stringid) {
 	if(!is_range(stringid, 0, MAX_STRINGS - 1) ) {
-		die("getlocalizedstring(): bad stringid passed.\n");
+		warn("getlocalizedstring(): bad stringid passed.\n");
 		return NULL;
 	}
 	switch(LangID) {
@@ -321,7 +323,7 @@ const char* getlocalizedstring(int32_t stringid) {
 
 int32_t lookup(obj_type_t i, LookupResult_t* r) {
 	if(!is_range(i, 0, MAX_TID - 1)) {
-		die("lookup() failed: bad tid: %d\n", i);
+		warn("lookup() failed: bad tid: %d\n", i);
 		return -1;
 	}
 	r->initimgid = NUMINFO[i][0];
@@ -405,7 +407,7 @@ void check_data() {
 
 int32_t lookup_playable(int32_t i, PlayableInfo_t *t) {
 	if(!is_range(i, 0, PLAYABLE_CHARACTERS_COUNT - 1) ) {
-		die("lookup_playable(): bad id passed!\n");
+		warn("lookup_playable(): bad id passed!\n");
 		return -1;
 	}
 	t->associatedtid = (obj_type_t)PLAYABLE_INFORMATION[i][0];
@@ -420,7 +422,7 @@ int32_t lookup_playable(int32_t i, PlayableInfo_t *t) {
 
 const char* getlocalizeditemdesc(int32_t did) {
 	if(!is_range(did,0 ,ITEM_COUNT - 1) ) {
-		die("getlocalizeditemdesc(): bad did passed: %d\n", did);
+		warn("getlocalizeditemdesc(): bad did passed: %d\n", did);
 		return NULL;
 	}
 	if(LangID == LANGID_JP) {
@@ -432,7 +434,7 @@ const char* getlocalizeditemdesc(int32_t did) {
 
 const char* getlocalizedcharactername(int32_t did) {
 	if(!is_range(did,0 , MAX_TID - 1) ) {
-		die("getlocalizedcharactername(): bad did passed: %d\n", did);
+		warn("getlocalizedcharactername(): bad did passed: %d\n", did);
 		return NULL;
 	}
 	if(LangID == LANGID_JP) {
@@ -448,3 +450,72 @@ int32_t is_playable_character(obj_type_t tid) {
 	}
 	return 0;
 } 
+
+//Get PlayableCharacterID (Not game objid) from tid
+int32_t get_playableid_from_tid(obj_type_t tid) {
+	if(!is_range(tid, 0, MAX_TID - 1) ) {
+		warn("get_playableid_from_tid(): bad tid passed.");
+		return -1;
+	}
+	for(int32_t i = 0; i < PLAYABLE_CHARACTERS_COUNT; i++) {
+		if(PLAYABLE_INFORMATION[i][0] == tid) {
+			return i;
+		}
+	}
+	warn("get_skillcooldown(): this tid is not registered!\n");
+	return -1;
+}
+
+//Get Default SkillCoolDown[skillid] of specified tid
+int32_t get_skillcooldown(obj_type_t tid, int skillid) {
+	if(!is_range(tid, 0, MAX_TID - 1) ) {
+		warn("get_skillcooldown(): bad tid passed.");
+		return 0;
+	}
+	if(!is_range(skillid, 0, SKILL_COUNT - 1) ) {
+		warn("get_skillcooldown(): bad skillid passed.");
+		return 0;
+	}
+	int32_t j = get_playableid_from_tid(tid);
+	if(j == -1) {
+		warn("get_skillcooldown(): this tid is not registered!\n");
+		return 0;
+	}
+	return SKILLCOOLDOWNS[j][skillid];
+}
+
+//Get SKILL_INIT_TIMERS[skillid] of specified tid
+int32_t get_skillinittimer(obj_type_t tid, int skillid) {
+	if(!is_range(tid, 0, MAX_TID - 1) ) {
+		warn("get_skillinittimer(): bad tid passed.");
+		return 0;
+	}
+	if(!is_range(skillid, 0, SKILL_COUNT - 1) ) {
+		warn("get_skillinittimer(): bad skillid passed.");
+		return 0;
+	}
+	int32_t j = get_playableid_from_tid(tid);
+	if(j == -1) {
+		warn("get_skillinittimer(): this tid is not registered!\n");
+		return 0;
+	}
+	return SKILL_INIT_TIMERS[j][skillid];
+}
+
+//Get SKILL_RANGES[skillid] of specified tid
+int32_t get_skillrange(obj_type_t tid, int32_t skillid) {
+	if(!is_range(tid, 0, MAX_TID - 1) ) {
+		warn("get_skillrange(): bad tid passed.");
+		return 0;
+	}
+	if(!is_range(skillid, 0, SKILL_COUNT - 1) ) {
+		warn("get_skillrange(): bad skillid passed.");
+		return 0;
+	}
+	int32_t j = get_playableid_from_tid(tid);
+	if(j == -1) {
+		warn("get_skillrange(): this tid is not registered!\n");
+		return 0;
+	}
+	return SKILL_RANGES[j][skillid];
+}

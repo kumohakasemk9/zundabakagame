@@ -62,7 +62,7 @@ void chat(char*);
 void showstatus(const char*, ...);
 int32_t spawn_playable(int32_t);
 void reset_game();
-void use_skill(int32_t, int32_t, PlayableInfo_t);
+void use_skill(int32_t, int32_t);
 void getlocalcoord(int32_t, double*, double*);
 
 //util.c
@@ -87,6 +87,9 @@ const char *getlocalizedstring(int32_t);
 void check_data();
 const char *getlocalizedcharactername(int32_t);
 const char *getlocalizeditemdesc(int32_t);
+int32_t get_skillcooldown(obj_type_t, int32_t);
+int32_t get_skillinittimer(obj_type_t, int32_t);
+int32_t get_skillrange(obj_type_t, int32_t);
 
 //network.c
 void network_recv_task();

@@ -23,6 +23,7 @@ zunda-defs.h: definitions
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
 #define HOSTNAME_SIZE 64 //SMPServerInfo_t host record max len
 #define PORTNAME_SIZE 6 //SMPServerInfo_t port record max len
+#define NET_BUFFER_SIZE 8192 //Network buffer size for receiving
 
 //Parameter limits
 #define MAX_ATKGAIN 8.0 //Maxmium AtkGain

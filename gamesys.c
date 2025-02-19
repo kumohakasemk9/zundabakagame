@@ -501,10 +501,7 @@ void proc_playable_op() {
 		warn("proc_playable_op(): Player TID is -1??\n");
 		return;
 	}
-	PlayableInfo_t plinf;
-	if(lookup_playable(CurrentPlayableCharacterID, &plinf) == -1) {
-		return;
-	}
+	
 	//Move Playable character
 	double tx = 0, ty = 0;
 	if(CharacterMove && GameState == GAMESTATE_PLAYING) {
@@ -525,6 +522,7 @@ void proc_playable_op() {
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		stack_packet(EV_PLAYABLE_LOCATION, Gobjs[PlayingCharacterID].x, Gobjs[PlayingCharacterID].y);
 	}
+
 	//Set camera location to display playable character in the center of display.
 	CameraX = (int32_t)constrain_number(Gobjs[PlayingCharacterID].x - (WINDOW_WIDTH / 2.0), 0, MAP_WIDTH - WINDOW_WIDTH);
 	CameraY = (int32_t)constrain_number(Gobjs[PlayingCharacterID].y - (WINDOW_HEIGHT / 2.0), 0, MAP_HEIGHT - WINDOW_HEIGHT);
@@ -542,7 +540,7 @@ void proc_playable_op() {
 				if(SkillKeyState == i) {
 					//Dedicated key pressed before
 					SkillKeyState = -1;
-					use_skill(PlayingCharacterID, i, plinf);
+					use_skill(PlayingCharacterID, i);
 					if(SMPStatus == NETWORK_LOGGEDIN) {
 						stack_packet(EV_USE_SKILL, i); //if logged in to SMP server, notify event instead
 					}
@@ -550,7 +548,7 @@ void proc_playable_op() {
 					if(DebugMode) {
 						SkillCooldownTimers[i] = 100;
 					} else {
-						SkillCooldownTimers[i] = plinf.skillcooldowns[i];
+						SkillCooldownTimers[i] = get_skillcooldown(Gobjs[PlayingCharacterID].tid, i);
 					}
 				}
 			}
@@ -559,7 +557,7 @@ void proc_playable_op() {
 }
 
 //Activate Skill
-void use_skill(int32_t cid, int32_t sid, PlayableInfo_t plinf) {
+void use_skill(int32_t cid, int32_t sid) {
 	if(!is_range(cid, 0, MAX_OBJECT_COUNT - 1) || !is_range(sid, 0, SKILL_COUNT - 1) ) {
 		die("use_skill(): bad parameter!\n");
 		return;
@@ -568,7 +566,7 @@ void use_skill(int32_t cid, int32_t sid, PlayableInfo_t plinf) {
 		warn("use_skill(): target object is not playable!\n");
 		return;
 	}
-	Gobjs[cid].timers[sid + 1] = plinf.skillinittimers[sid];
+	Gobjs[cid].timers[sid + 1] = get_skillinittimer(Gobjs[cid].tid, sid);
 }
 
 void use_item() {
@@ -969,14 +967,10 @@ int32_t gameinit(char* fn) {
 	//Debug
 	info("sizeof(event_hdr_t): %ld\n", sizeof(event_hdr_t) );
 	info("sizeof(np_greeter_t): %ld\n", sizeof(np_greeter_t) );
-	info("sizeof(userlist_hdr_t): %ld\n", sizeof(userlist_hdr_t) );
 	info("sizeof(ev_placeitem_t): %ld\n", sizeof(ev_placeitem_t) );
 	info("sizeof(ev_useskill_t): %ld\n", sizeof(ev_useskill_t) );
-	info("sizeof(ev_playablelocation_t): %ld\n", sizeof(ev_playablelocation_t) );
 	info("sizeof(ev_chat_t): %ld\n", sizeof(ev_chat_t) );
 	info("sizeof(ev_reset_t): %ld\n", sizeof(ev_reset_t) );
-	info("sizeof(ev_hello_t): %ld\n", sizeof(ev_hello_t) );
-	info("sizeof(ev_bye_t): %ld\n", sizeof(ev_bye_t) );
 	info("sizeof(ev_changeatkgain_t): %ld\n", sizeof(ev_changeatkgain_t) );
 	
 	#ifndef __WASM

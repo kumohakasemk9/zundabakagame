@@ -55,6 +55,8 @@ typedef struct  {
 	char httpupgrade[HTTP_LINE_LIMIT];
 	char httpfirstline[HTTP_LINE_LIMIT];
 	char httpwskey[HTTP_LINE_LIMIT];
+	int16_t playable_x;
+	int16_t playable_y;
 } cliinfo_t;
 
 int ServerSocket;
@@ -383,21 +385,21 @@ void SendPrivateChat(int cid, int destcid, char* chat) {
 	size_t cl = strlen(chat);
 	ev_chat_t hdr = {
 		.evtype = EV_CHAT,
-		.dstcid = destcid,
-		.clen = htons(cl)
+		.dstcid = destcid
 	};
-	size_t evsiz = cl + sizeof(hdr);
+	size_t evsiz = cl + sizeof(hdr) + 1;
 	if(evsiz >= SIZE_NET_BUFFER) {
 		printf("SendPrivateChat(): EV_CHAT packet overflow.\n");
 		return;
 	}
 	memcpy(t, &hdr, sizeof(hdr) );
 	memcpy(&t[sizeof(hdr)], chat, cl);
+	t[sizeof(hdr) + cl] = 0;
 	AddEvent(t, evsiz, cid);
 }
 
 void SendJoinPacket(int cid) {
-	uint8_t t[UNAME_SIZE + sizeof(ev_hello_t)];
+	uint8_t t[UNAME_SIZE + 1];
 	if(!(0 <= cid && cid <= MAX_CLIENTS) ) {
 		printf("SendJoinPacket(): invalid cid passed.\n");
 		return;
@@ -407,26 +409,24 @@ void SendJoinPacket(int cid) {
 		printf("SetupJoinPacket(): good cid, but not logged in.\n");
 		return;
 	}
-	ev_hello_t ev = {
-		.evtype = EV_HELLO,
-		.cid = cid,
-		.uname_len = strlen(UserInformations[uid].usr) + 1
-	};
-	memcpy(&t, &ev, sizeof(ev_hello_t) );
-	memcpy(&t[sizeof(ev_hello_t)], UserInformations[uid].usr, ev.uname_len);
-	AddEvent(t, ev.uname_len + sizeof(ev_hello_t), SERVER_EVENT);
+	int uname_len = strlen(UserInformations[uid].usr);
+	t[0] = EV_HELLO;
+	memcpy(&t[1], UserInformations[uid].usr, uname_len);
+	t[uname_len + 2] = 0;
+	AddEvent(t, uname_len + 2, cid);
 }
 
 void SendLeavePacket(int cid) {
+	uint8_t ev[1] = { EV_BYE };
+	if(!(0 <= cid && cid <= MAX_CLIENTS) ) {
+		printf("SendLeavePacket(): invalid cid passed.\n");
+		return;
+	}
 	//Do not execute for non logged in user
 	if(C[cid].uid == -1) {
 		return;
 	}
-	ev_bye_t ev = {
-		.evtype = EV_BYE,
-		.cid = cid
-	};
-	AddEvent( (uint8_t*)&ev, sizeof(ev), SERVER_EVENT);
+	AddEvent(ev, 1, cid);
 }
 
 void AcceptNewClient() {
@@ -859,10 +859,10 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 		int copyev = 1;
 		if(evhead[0] == EV_CHAT) {
 			ev_chat_t *hdr = (ev_chat_t*)&evhead[0];
-			size_t chatlen = (size_t)ntohs(hdr->clen);
+			uint8_t* chathead = &evhead[sizeof(ev_chat_t)];
+			size_t chatlen = strlen( (char*)chathead);
 			int whispercid = hdr->dstcid;
 			char chatbuf[NET_CHAT_LIMIT];
-			uint8_t* chathead = &evhead[sizeof(ev_chat_t)];
 			if(dlen < chatlen || chatlen >= NET_CHAT_LIMIT) {
 				Log(cid, "Chat overflow or too short chat packet.\n");
 				DisconnectWithReason(cid, "Bad packet.");
@@ -893,10 +893,12 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 				copyev = 0;
 				Log(cid, "AddEvent(): Request denied, bad op level.\n");
 			}
-		} else if(evhead[0] == EV_HELLO || evhead[0] == EV_BYE) {
-			if(cid != -1) {
-				copyev = 0; //EV_HELLO and EV_BYE event can not be issued from client
-			}
+		} else if(evhead[0] == EV_PLAYABLE_LOCATION) {
+			//Update current client's coordinate information, do not stack the packet.
+			ev_playablelocation_t *ev = (ev_playablelocation_t*)evhead;
+			C[cid].playable_x = ev->x;
+			C[cid].playable_y = ev->y;
+			copyev = 0;
 		}
 		if(copyev == 1) {
 			memcpy(&EventBuffer[EBptr + sizeof(event_hdr_t) + pdlen], evhead, evlen);
@@ -986,23 +988,24 @@ int GetUserOpLevel(int cid) {
 }
 
 void GetEvent(int cid) {
-	char tb[SIZE_EVENT_BUFFER + 1];
+	char tb[SIZE_EVENT_BUFFER];
 	tb[0] = NP_EXCHANGE_EVENTS;
 	int elen = EBptr - C[cid].bufcur;
 	//Copy events to sending buffer, but get rid of the events that has same owner to sender (except chat)
 	uint8_t *head = &EventBuffer[C[cid].bufcur];
-	int p = 0;
-	int w_ptr = 1;
+	int p = 0; //Pointer of event chunk array
+	int w_ptr = 1; //Copied Event chunk ptr
 	while(p < elen) {
 		event_hdr_t *evchdr = (event_hdr_t*)&head[p];
-		int ecid = evchdr->cid;
-		int eclen = evchdr->evlen;
-		int chunkp = 0;
-		int w_evclen = 0;
+		int ecid = evchdr->cid; //Event chunk owner
+		int eclen = evchdr->evlen; //Event chunk len
+		int chunkp = 0; //Read event chunk ptr
+		int w_evclen = 0; //Write event chunk ptr
 		while(chunkp < eclen) {
 			uint8_t *evhead = &head[p + sizeof(event_hdr_t) + chunkp];
 			int evlen = eclen - chunkp;
 			int copyevent = 1;
+			//Get actual event size
 			int tl = GetEventPacketSize(evhead, evlen);
 			if(tl != -1) {
 				evlen = tl;
@@ -1011,13 +1014,14 @@ void GetEvent(int cid) {
 					if(ecid == cid) {
 						copyevent = 0;
 					}
-				}
-				//Process secret chat (char 0 = destination cid, char1 = 0)
-				if(evhead[0] == EV_CHAT) {
-					ev_chat_t *hdr = (ev_chat_t*)evhead;
-					int dcid = hdr->dstcid;
-					if(0 <= dcid && dcid <= MAX_CLIENTS && (cid != dcid && cid != ecid) ) {
-						copyevent = 0;
+				
+					//Process secret chat (char 0 = destination cid, char1 = 0)
+					if(evhead[0] == EV_CHAT) {
+						ev_chat_t *hdr = (ev_chat_t*)evhead;
+						int dcid = hdr->dstcid;
+						if(0 <= dcid && dcid <= MAX_CLIENTS && (cid != dcid && cid != ecid) ) {
+							copyevent = 0;
+						}
 					}
 				}
 			} else {
@@ -1029,7 +1033,7 @@ void GetEvent(int cid) {
 			}
 			chunkp += evlen;
 		}
-		//Write event chunk header
+		//Write event chunk header if there's copied data
 		if(w_evclen) {
 			event_hdr_t w_evchdr = {
 				.cid = ecid,
@@ -1114,19 +1118,19 @@ ssize_t GetEventPacketSize(uint8_t *d, int l) {
 		r = sizeof(ev_useskill_t);
 	} else if (d[0] == EV_CHAT) {
 		ev_chat_t *e = (ev_chat_t*)d;
-		int chatlen = ntohs(e->clen);
+		size_t chatlen = strnlen(&d[sizeof(ev_chat_t)], NET_CHAT_LIMIT - 1);
 		if(chatlen < NET_CHAT_LIMIT) {
-			r = sizeof(ev_chat_t) + chatlen;
+			r = sizeof(ev_chat_t) + chatlen + 1;
 		}
 	} else if (d[0] == EV_RESET) {
 		r = sizeof(ev_reset_t);
 	} else if (d[0] == EV_HELLO) {
-		ev_hello_t *e = (ev_hello_t*)d;
-		if(e->uname_len < UNAME_SIZE) {
-			r = sizeof(ev_hello_t) + e->uname_len;
+		size_t t = strnlen(&d[1], UNAME_SIZE - 1);
+		if(t < UNAME_SIZE) {
+			r = t + 1;
 		}
 	} else if (d[0] == EV_BYE) {
-		r = sizeof(ev_bye_t);
+		r = 1;
 	} else if(d[0] == EV_CHANGE_PLAYABLE_ID) {
 		r = sizeof(ev_changeplayableid_t);
 	} else if(d[0] == EV_CHANGE_ATKGAIN) {
@@ -1238,18 +1242,16 @@ void SendUserLists(int cid) {
 	for(int i = 0; i < MAX_CLIENTS; i++) {
 		if(C[i].fd == -1 || !(0 <= C[i].uid && C[i].uid <= UserCount) ) { continue; }
 		char *un = UserInformations[C[i].uid].usr;
-		userlist_hdr_t t = {
-			.cid = i,
-			.uname_len = strlen(un) + 1
-		};
-		int psize = t.uname_len + sizeof(userlist_hdr_t);
+		size_t uname_len = strnlen(un, UNAME_SIZE - 1);
+		int psize = uname_len + 2;
 		if(psize + w_ptr >= SIZE_NET_BUFFER) {
 			Log(cid, "SendUserLists(): Buffer overflow.\n");
 			DisconnectWithReason(cid, "Error.");
 			return;
 		}
-		memcpy(&sendbuf[w_ptr], &t, sizeof(userlist_hdr_t) );
-		memcpy(&sendbuf[w_ptr + sizeof(userlist_hdr_t)], un, t.uname_len);
+		sendbuf[w_ptr] = i;
+		memcpy(&sendbuf[w_ptr + 1], un, uname_len);
+		sendbuf[w_ptr + 1 + uname_len] = 0;
 		w_ptr += psize;
 	}
 	send_packet(sendbuf, w_ptr, cid);

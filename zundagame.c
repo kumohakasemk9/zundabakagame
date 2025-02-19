@@ -16,6 +16,8 @@ TODO List
 nickname feature in SMP
 chat mute feature in SMP
 Make me ahri
+Do not use CurrentPlayableCharacterID for lookup_playable
+Enable CtrlV
 change Character constant information structure to each function getters
 */
 

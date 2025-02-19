@@ -103,7 +103,7 @@ void game_paint() {
 	#ifndef __WASM
 		double tbefore = get_current_time_ms();
 	#endif
-
+	
 	clear_screen();
 
 	//Draw game
@@ -128,15 +128,11 @@ void game_paint() {
 
 void draw_game_main() {
 	//draw lol type skill helper
-	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) && is_range(CurrentPlayableCharacterID, 0, PLAYABLE_CHARACTERS_COUNT - 1) && is_range(SkillKeyState,0, SKILL_COUNT - 1) ) {
-		PlayableInfo_t t;
-		if(lookup_playable(CurrentPlayableCharacterID, &t) == -1) {
-			return;
-		}
+	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) && is_range(SkillKeyState,0, SKILL_COUNT - 1) ) {
 		double x, y;
 		getlocalcoord(PlayingCharacterID, &x, &y);
 		chcolor(0x600000ff, 1);
-		fillcircle(x, y, t.skillranges[SkillKeyState]);
+		fillcircle(x, y, get_skillrange(Gobjs[PlayingCharacterID].tid, SkillKeyState) );
 	}
 	//draw characters
 	for(uint8_t z = 0; z < MAX_ZINDEX; z++) {
@@ -245,11 +241,7 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 		//Timer bar for skill
 		for(uint8_t i = 0; i < SKILL_COUNT; i++) {
 			if(Gobjs[idx].timers[i + 1] != 0) {
-				PlayableInfo_t plinfo;
-				if(lookup_playable(CurrentPlayableCharacterID, &plinfo) == -1) {
-					return;
-				}
-				draw_hpbar(x, bary, w, 5, Gobjs[idx].timers[i + 1], plinfo.skillinittimers[i], COLOR_ENEMY, COLOR_TEXTCHAT);
+				draw_hpbar(x, bary, w, 5, Gobjs[idx].timers[i + 1], get_skillinittimer(Gobjs[idx].tid, i), COLOR_ENEMY, COLOR_TEXTCHAT);
 				bary += 7;
 			}
 		}

@@ -32,15 +32,15 @@ typedef enum {
 
 //EventType
 typedef enum {
-	EV_PLAYABLE_LOCATION = 0,
-	EV_PLACE_ITEM = 1,
-	EV_USE_SKILL = 2,
-	EV_CHAT = 3,
-	EV_RESET = 4,
-	EV_HELLO = 5,
-	EV_BYE = 6,
-	EV_CHANGE_PLAYABLE_ID = 7,
-	EV_CHANGE_ATKGAIN = 8
+	EV_PLACE_ITEM = 0,
+	EV_USE_SKILL = 1,
+	EV_CHAT = 2,
+	EV_RESET = 3,
+	EV_HELLO = 4,
+	EV_BYE = 5,
+	EV_CHANGE_PLAYABLE_ID = 6,
+	EV_CHANGE_ATKGAIN = 7,
+	EV_PLAYABLE_LOCATION = 8
 } event_type_t;
 
 //Event header
@@ -56,13 +56,14 @@ typedef struct {
 	uint8_t salt[SALT_LENGTH]; //salt
 } PACKED np_greeter_t;
 
-//Userlist packet header
-typedef struct {
-	uint8_t cid;
-	uint8_t uname_len;
-} PACKED userlist_hdr_t;
-
 //Event packet
+//Player coordinate broadcast
+typedef struct {
+	uint8_t evtype; //EV_PLAYABLE_LOCATION
+	uint16_t x; //X
+	uint16_t y; //Y
+} PACKED ev_playablelocation_t;
+
 //Place item event
 typedef struct {
 	uint8_t evtype; //EV_PLACE_ITEM
@@ -77,18 +78,10 @@ typedef struct {
 	uint8_t skillid; //SkillID
 } PACKED ev_useskill_t;
 
-//Player move event
-typedef struct {
-	uint8_t evtype; //EV_PLAYABLE_LOCATION
-	uint16_t x; //SpeedX
-	uint16_t y; //SppedY
-} PACKED ev_playablelocation_t;
-
 //Chat event
 typedef struct {
 	uint8_t evtype; //EV_CHAT
 	int8_t dstcid; //Destination cid (-1 if public message)
-	uint16_t clen; //Chat length (does not include null char)
 } PACKED ev_chat_t;
 
 //Round reset request event (usually issued from server)
@@ -102,19 +95,6 @@ typedef struct {
 	uint16_t basedistance; //how close each enemy bases in one cluster
 	float atkgain; //attack damage gain of playable
 } PACKED ev_reset_t;
-
-//Remote user connect event (usually issued from server)
-typedef struct {
-	uint8_t evtype; //EV_HELLO
-	uint8_t cid; //client id
-	uint8_t uname_len; //login username length
-} PACKED ev_hello_t;
-
-//Remote user disconnect event (usually issued from server)
-typedef struct {
-	uint8_t evtype; //EV_BYE
-	uint8_t cid; //client id
-} PACKED ev_bye_t;
 
 //Remote user playable character id change notice event
 typedef struct {
