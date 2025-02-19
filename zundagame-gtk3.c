@@ -1,5 +1,5 @@
 /*
-Zundamon bakage (C) 2024 Kumohakase
+Zundamon bakage (C) 2025 Kumohakase
 https://creativecommons.org/licenses/by-sa/4.0/ CC-BY-SA 4.0
 Please consider supporting me through ko-fi or pateron
 https://ko-fi.com/kumohakase
@@ -10,51 +10,22 @@ Zundamon bakage powered by cairo, X11.
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
 
-zundagame.c: linux entry point, X11 funcs.
-
-TODO List
-back to GTK
-Make me ahri
-Enable CtrlV
+zundagame-gtk3.c: gtk3 entry point, funcs.
 */
 
 #include "inc/zundagame.h"
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-
-#include <cairo/cairo-xlib.h>
-#include <openssl/evp.h>
-
-#include <unistd.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <pthread.h>
-#include <poll.h>
-
-#include <netinet/tcp.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-
 #include <errno.h>
 #include <string.h>
 
-Display *Disp = NULL; //XDisplay
-Window Win; //XWindow
-cairo_surface_t *GSsfc; //GameScreen drawer surface
-cairo_t *GS; //GameScreen Drawer
+#include <gtk/gtk.h>
+
 extern cairo_surface_t *Gsfc; //game screen
 int ConnectionSocket = -1;
 extern int32_t ProgramExiting;
 extern langid_t LangID;
 
-void redraw_win();
-void xwindowevent_handler(XEvent, Atom);
-void *thread_cb(void*);
-
+/*
 void redraw_win() {
 	game_paint();
 	//Apply game screen
@@ -112,7 +83,8 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 		
 		mousepressed_handler(t);
 	}
-} 
+}
+*/
 
 int main(int argc, char *argv[]) {
 	char *fn = "credentials.txt";
@@ -132,14 +104,13 @@ int main(int argc, char *argv[]) {
 	}
 	info("gameinit(): OK\n");
 	
-	//Connect to X display
-	Disp = XOpenDisplay(NULL);
-	if(Disp == NULL) {
-		fail("main(): Failed to open XDisplay.\n");
-		do_finalize();
-		return 1;
-	}
-	info("X11 opened.\n");
+	//Init GTK
+	GtkApplication *app;
+	int s;
+	app = gtk_application_new(NULL, G_APPLICATION_DEFAULT_FLAGS);
+	g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+	s = g_application_run(G_APPLICATION(app), argc, argv);
+	g_object_unref(app);
 	
 	//Create and show window
 	Window r = DefaultRootWindow(Disp);
@@ -246,7 +217,7 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 }
 
 //Sub thread handler
-void *thread_cb(void* p) {
+/*void *thread_cb(void* p) {
 	info("Gametick thread is running now.\n");
 	double tbefore = get_current_time_ms();
 	while(1) {
@@ -256,7 +227,7 @@ void *thread_cb(void* p) {
 		}
 		usleep(100);
 	}
-}
+}*/
 
 /*
 void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
