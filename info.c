@@ -313,10 +313,9 @@ const char* getlocalizedstring(int32_t stringid) {
 		warn("getlocalizedstring(): bad stringid passed.\n");
 		return NULL;
 	}
-	switch(LangID) {
-	case LANGID_JP:
+	if(LangID == LANGID_JP) {
 		return JP_STRINGS[stringid];
-	default:
+	} else {
 		return EN_STRINGS[stringid];
 	}
 }

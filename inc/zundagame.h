@@ -62,7 +62,7 @@ void chat(char*);
 void showstatus(const char*, ...);
 int32_t spawn_playable(int32_t);
 void reset_game();
-void use_skill(int32_t, int32_t);
+void use_skill(int32_t, int32_t, PlayableInfo_t);
 void getlocalcoord(int32_t, double*, double*);
 
 //util.c

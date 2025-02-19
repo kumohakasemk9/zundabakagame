@@ -61,6 +61,7 @@ void cmd_cursor_forward();
 void cmd_putch(char);
 void modifyKeyFlags(keyflags_t, int32_t);
 void switch_debug_info();
+void changeplayable_cmd(char*);
 
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
 int32_t ChatTimeout = 0; //Douncounting timer, chat will shown it this is not 0
@@ -73,7 +74,7 @@ char CommandBuffer[BUFFER_SIZE]; //Command string buffer
 int32_t DebugMode = 0; //If it is 1, you can see hitbox, object ids and more, it can be changed through gdb.
 gamestate_t GameState; //Current game status
 int32_t StateChangeTimer = 0; //Not it is almost like respawn timer
-int32_t PlayingCharacterID = -1; //Playable character's ID for Gobjs[]
+int32_t PlayingCharacterID = -1; //Playable character's object ID in Gobjs[]
 int32_t Money; //Money value, increaes when enemy killed, decreases when item purchased
 int32_t EarthID; //Earth object ID
 int32_t CharacterMove; //If it is 1, playable character will follow mouse
@@ -84,7 +85,8 @@ langid_t LangID; //Language ID for internationalization
 int32_t ItemCooldownTimers[ITEM_COUNT]; //Set to nonzero value when item purchased, countdowns, if it got 0 you can buy item again.
 extern int32_t ITEMCOOLDOWNS[ITEM_COUNT]; //Default ITEMcooldown LUT
 int32_t SkillCooldownTimers[SKILL_COUNT]; //Set to nonzero balue when skill used, countdowns and if it gets 0 you can use skill again
-int32_t CurrentPlayableCharacterID = 0; //Current selected playable character id (Not Gobjs id!) for more playables
+int32_t CurrentPlayableID; //Current selected playable character id (Not Gobjs id!) for more playables
+int32_t PlayableID = 0; //Current selected playable character id (Do not confuse it with PlayingCharacterID)
 keyflags_t KeyFlags;
 int32_t ProgramExiting = 0; //Program should exit when 1
 int32_t MapTechnologyLevel; //Increases when google item placed, buffs playable
@@ -538,9 +540,13 @@ void proc_playable_op() {
 			} else {
 				//KeyRelease
 				if(SkillKeyState == i) {
+					PlayableInfo_t plinf;
+					if(lookup_playable(CurrentPlayableID, &plinf) == -1) {
+						return;
+					}
 					//Dedicated key pressed before
 					SkillKeyState = -1;
-					use_skill(PlayingCharacterID, i);
+					use_skill(PlayingCharacterID, i, plinf);
 					if(SMPStatus == NETWORK_LOGGEDIN) {
 						stack_packet(EV_USE_SKILL, i); //if logged in to SMP server, notify event instead
 					}
@@ -548,7 +554,7 @@ void proc_playable_op() {
 					if(DebugMode) {
 						SkillCooldownTimers[i] = 100;
 					} else {
-						SkillCooldownTimers[i] = get_skillcooldown(Gobjs[PlayingCharacterID].tid, i);
+						SkillCooldownTimers[i] = plinf.skillcooldowns[i];
 					}
 				}
 			}
@@ -557,7 +563,7 @@ void proc_playable_op() {
 }
 
 //Activate Skill
-void use_skill(int32_t cid, int32_t sid) {
+void use_skill(int32_t cid, int32_t sid, PlayableInfo_t plinf) {
 	if(!is_range(cid, 0, MAX_OBJECT_COUNT - 1) || !is_range(sid, 0, SKILL_COUNT - 1) ) {
 		die("use_skill(): bad parameter!\n");
 		return;
@@ -566,7 +572,7 @@ void use_skill(int32_t cid, int32_t sid) {
 		warn("use_skill(): target object is not playable!\n");
 		return;
 	}
-	Gobjs[cid].timers[sid + 1] = get_skillinittimer(Gobjs[cid].tid, sid);
+	Gobjs[cid].timers[sid + 1] = plinf.skillinittimers[sid];
 }
 
 void use_item() {
@@ -769,6 +775,14 @@ void execcmd() {
 		//Get connected users
 		getclients_cmd();
 
+	} else if(memcmp(CommandBuffer, "/chplayable ", 12) == 0 ) {
+		//Change playable
+		changeplayable_cmd(&CommandBuffer[12]);
+
+	} else if(strcmp(CommandBuffer, "/getplayable") == 0) {
+		//Get playable
+		chatf("getplayable: %d", PlayableID);
+
 	} else {
 		if(CommandBuffer[0] == '/') {
 			chatf( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) );
@@ -779,6 +793,16 @@ void execcmd() {
 				chatf("[local] %s", CommandBuffer);
 			}
 		}
+	}
+}
+
+void changeplayable_cmd(char *param) {
+	//Change playable character for next round
+	int32_t i = atoi(param);
+	if(is_range(i, 0, PLAYABLE_CHARACTERS_COUNT - 1) ) {
+		PlayableID = i;
+	} else {
+		warn( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 	}
 }
 
@@ -866,6 +890,7 @@ void reset_game() {
 	CameraY = 0;
 	SkillKeyState = -1;
 	SpawnRemain = InitSpawnRemain;
+	CurrentPlayableID = PlayableID;
 	//Init Skill state and timer
 	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
 		SkillCooldownTimers[i] = 0;
@@ -916,7 +941,7 @@ void reset_game() {
 //Spawn playable character
 void spawn_playable_me() {
 	CharacterMove = 0;
-	PlayingCharacterID = spawn_playable(CurrentPlayableCharacterID);
+	PlayingCharacterID = spawn_playable(CurrentPlayableID);
 	//For SMP, register own playable character object id to client list
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		int32_t i = lookup_smp_player_from_cid(SMPcid);

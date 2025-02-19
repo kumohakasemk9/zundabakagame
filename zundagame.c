@@ -13,12 +13,12 @@ Zundamon is from https://zunko.jp/
 main.c: linux entry point, X11 funcs.
 
 TODO List
+back to GTK
+fix reset packet, enforce RespawnRemain Gamerule to SMP
 nickname feature in SMP
 chat mute feature in SMP
 Make me ahri
-Do not use CurrentPlayableCharacterID for lookup_playable
 Enable CtrlV
-change Character constant information structure to each function getters
 */
 
 #include "inc/zundagame.h"

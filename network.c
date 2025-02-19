@@ -26,7 +26,7 @@ network.c: process network packets
 #include <stdarg.h>
 #include <errno.h>
 
-extern int32_t CurrentPlayableCharacterID;
+extern int32_t CurrentPlayableID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
 smpstatus_t SMPStatus = NETWORK_DISCONNECTED; //Current connection status
 size_t RXSMPEventLen; //Remote event len
@@ -545,7 +545,7 @@ void stack_packet(event_type_t etype, ...) {
 		//playable character id change event
 		ev_changeplayableid_t ev = {
 			.evtype = etype,
-			.pid = (uint8_t)CurrentPlayableCharacterID
+			.pid = (uint8_t)CurrentPlayableID
 		};
 		pktlen = sizeof(ev_changeplayableid_t);
 		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
@@ -763,7 +763,9 @@ int32_t evh_use_skill(uint8_t* eventbuffer, size_t eventoff, int32_t cid) {
 	}
 
 	//Use skill as remote player
-	use_skill(playable_objid, skillid);
+	PlayableInfo_t plinf;
+	lookup_playable(pid, &plinf);
+	use_skill(playable_objid, skillid, plinf);
 	return 0;
 }
 

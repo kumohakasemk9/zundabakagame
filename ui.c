@@ -69,8 +69,9 @@ extern char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chat message buffer
 extern int32_t CursorX, CursorY; //Current Cursor Pos
 extern int32_t DebugMode;
 extern gamestate_t GameState;
-extern int32_t EarthID;
-extern int32_t PlayingCharacterID; //Current Playable Character type ID
+extern int32_t EarthID; //Gobjs[] ID of Earth
+extern int32_t PlayingCharacterID; //Playable character object id
+extern int32_t CurrentPlayableID; //Current Playable Character type ID
 extern int32_t Money; //Current map money amount
 extern int32_t CharacterMove; //Character Moving on/off
 extern int32_t SelectingItemID;
@@ -81,7 +82,6 @@ extern int32_t StatusShowTimer;
 extern int32_t StateChangeTimer;
 extern int32_t ItemCooldownTimers[ITEM_COUNT];
 extern int32_t SkillCooldownTimers[SKILL_COUNT];
-extern int32_t CurrentPlayableCharacterID; //Current Playable Character ID
 extern keyflags_t KeyFlags;
 extern int32_t SkillKeyState; //Keyflag for skill keys
 extern int32_t MapTechnologyLevel; //Current map technology level (Increases when google placed)
@@ -128,7 +128,7 @@ void game_paint() {
 
 void draw_game_main() {
 	//draw lol type skill helper
-	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) && is_range(SkillKeyState,0, SKILL_COUNT - 1) ) {
+	if(is_range(SkillKeyState,0, SKILL_COUNT - 1) && is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
 		double x, y;
 		getlocalcoord(PlayingCharacterID, &x, &y);
 		chcolor(0x600000ff, 1);
@@ -443,7 +443,7 @@ void draw_info() {
 	}
 
 	//Show status about playable character
-	if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) && is_playable_character(Gobjs[PlayingCharacterID].tid) && lookup(Gobjs[PlayingCharacterID].tid, &t) != -1) {
+	if(is_range(CurrentPlayableID, 0, MAX_OBJECT_COUNT - 1) && is_playable_character(Gobjs[PlayingCharacterID].tid) && lookup(Gobjs[PlayingCharacterID].tid, &t) != -1) {
 		int32_t myhp = (int32_t)Gobjs[PlayingCharacterID].hp;
 		if(CharacterMove) {
 			drawimage(STATUS_XOFF + 80, STATUS_YOFF + 16, 20); //Show mouse icon
@@ -461,7 +461,7 @@ void draw_info() {
 void draw_hotbar(double offsx, double offsy) {
 	//Show item candidates and skill
 	PlayableInfo_t plinf;
-	if(lookup_playable(CurrentPlayableCharacterID, &plinf) == -1) {
+	if(lookup_playable(CurrentPlayableID, &plinf) == -1) {
 		return;
 	}
 	for(uint8_t i = 0; i < ITEM_COUNT + SKILL_COUNT; i++) {
