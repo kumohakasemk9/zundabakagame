@@ -48,8 +48,8 @@ typedef struct  {
 	char httpupgrade[HTTP_LINE_LIMIT];
 	char httpfirstline[HTTP_LINE_LIMIT];
 	char httpwskey[HTTP_LINE_LIMIT];
-	int16_t playable_x;
-	int16_t playable_y;
+	//int16_t playable_x;
+	//int16_t playable_y;
 } cliinfo_t;
 
 //command.c

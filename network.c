@@ -49,6 +49,7 @@ extern double DifATKGain;
 int32_t DisconnectReasonProvided = 0; //To avoid erasing disconnect message
 int32_t DebugSpam = 0; //If this set to 1, packets that sent so frequently, will be print.
 extern int32_t InitSpawnRemain;
+int32_t DisconnectWhenBadPacket = 1; //Need to be modified by gdb
 
 #ifdef __WASM
 	extern void wasm_login_to_smp(char*, char*, uint8_t*);
@@ -207,7 +208,9 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		//Data length check
 		if(plen != sizeof(np_greeter_t) ) {
 			warn("pkt_recv_handler(): Too short greetings packet.\n");
-			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+			if(DisconnectWhenBadPacket) {
+				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+			}
 			return;
 		}
 		np_greeter_t *p = (np_greeter_t*)pkt;
@@ -240,11 +243,6 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 			c++;
 			p += csiz + 2;
 		}
-		if(c >= MAX_CLIENTS) {
-			warn("pkt_recv_handler(): Bad login response\n");
-			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
-			return;
-		}
 		SMPStatus = NETWORK_LOGGEDIN;
 		info("pkt_recv_handler(): Login successful response.\n");
 	} else if(pkt[0] == NP_EXCHANGE_EVENTS) {
@@ -257,7 +255,9 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 		RXSMPEventLen = plen - 1;
 		//printf("pkt_recv_handler(): GetEvent: RXSMPEventlen: %d\n", RXSMPEventLen);
 	} else {
-		close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+		if(DisconnectWhenBadPacket) {
+			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+		}
 		warn("pkt_recv_handler(): Unknown Packet (%ld): ", plen);
 		for(size_t i = 0; i < plen; i++) {
 			warn("%02x ", pkt[i]);
@@ -425,7 +425,9 @@ void process_smp() {
 			//Parse event record header
 			if(rem < sizeof(event_hdr_t) ) {
 				warn("process_smp(): header read failed, rem:%ld, ptr: %ld\n", rem, ptr);
-				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+				if(DisconnectWhenBadPacket) {
+					close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+				}
 				return;
 			}
 
@@ -436,23 +438,32 @@ void process_smp() {
 			size_t reclen = evlen + sizeof(event_hdr_t);
 			if(!is_range(cid, -1, MAX_CLIENTS) ) {
 				warn("process_smp(): Bad event header\n");
-				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
-				return;
+				if(DisconnectWhenBadPacket) {
+					close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+					return;
+				}
+				break;
 			}
 			if(evlen >= NET_BUFFER_SIZE) {
 				warn("process_smp(): Event chunk too large\n");
-				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
-				return;
+				if(DisconnectWhenBadPacket) {
+					close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR) );
+					return;
+				}
+				break;
 			}
 			if(rem < reclen) {
 				warn("process_smp(): Too short event chunk.\n");
-				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
-				return;
+				if(DisconnectWhenBadPacket) {
+					close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+					return;
+				}
+				break;
 			}	
 		
 			//Process event
 			uint8_t* evhead = &RXSMPEventBuffer[ptr + (int32_t)sizeof(event_hdr_t)];
-			if(process_smp_events(evhead, evlen, cid) == -1) {
+			if(process_smp_events(evhead, evlen, cid) == -1 && DisconnectWhenBadPacket) {
 				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 				return;
 			}
@@ -598,18 +609,18 @@ int32_t process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				warn("process_smp_events(): Too short EV_PLAYABLE_LOCATION packet, decoder will terminate.\n");
 				return -1;
 			}
-			if(evh_playable_location(evbuf, evp, cid) == -1) {
+			if(evh_playable_location(evbuf, evp, cid) == -1 && DisconnectWhenBadPacket) {
 				return -1;
 			}
 			evp += sizeof(ev_playablelocation_t);
 			
-			} if(evbuf[evp] == EV_PLACE_ITEM) {
+		} else if(evbuf[evp] == EV_PLACE_ITEM) {
 			//item placed
 			if(remaining < sizeof(ev_placeitem_t) ) {
 				warn("process_smp_events(): Too short EV_PLACE_ITEM packet, decoder will terminate.\n");
 				return -1;
 			}
-			if(evh_place_item(evbuf, evp, cid) == -1) {
+			if(evh_place_item(evbuf, evp, cid) == -1 && DisconnectWhenBadPacket) {
 				return -1;
 			}
 			evp += sizeof(ev_placeitem_t);
@@ -620,7 +631,7 @@ int32_t process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				warn("process_smp_events(): Too short EV_USE_SKILL packet, decoder will terminate.\n");
 				return -1;
 			}
-			if(evh_use_skill(evbuf, evp, cid) == -1) {
+			if(evh_use_skill(evbuf, evp, cid) == -1 && DisconnectWhenBadPacket) {
 				return -1;
 			}
 			evp += sizeof(ev_useskill_t);
@@ -643,7 +654,7 @@ int32_t process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				warn("process_smp_events(): Too short EV_RESET packet, decoder will terminate.\n");
 				return -1;
 			}
-			if(evh_reset(evbuf, evp, cid) == -1) {
+			if(evh_reset(evbuf, evp, cid) == -1 && DisconnectWhenBadPacket) {
 				return -1;
 			}
 			evp += sizeof(ev_reset_t);
@@ -662,14 +673,14 @@ int32_t process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				warn("process_smp_events(): Too short EV_CHANGE_ATKGAIN packet, decoder will terminate.\n");
 				return -1;
 			}
-			if(evh_change_atkgain(evbuf, evp, cid) == -1) {
+			if(evh_change_atkgain(evbuf, evp, cid) == -1 && DisconnectWhenBadPacket) {
 				return -1;
 			}
 			evp += sizeof(ev_changeatkgain_t);
 
 		} else if(evbuf[evp] == EV_BYE) {
 			//Another client disconnect event
-			if(evh_bye(cid) == -1) {
+			if(evh_bye(cid) == -1 && DisconnectWhenBadPacket) {
 				return -1;
 			}
 			evp += 1;
@@ -680,7 +691,7 @@ int32_t process_smp_events(uint8_t* evbuf, size_t evlen, int32_t cid) {
 				warn("process_smp_events(): Too short EV_CHANGE_PLAYABLE_ID packet, decoder will terminate.\n");
 				return -1;
 			}
-			if(evh_change_playable_id(evbuf, evp, cid) == -1) {
+			if(evh_change_playable_id(evbuf, evp, cid) == -1 && DisconnectWhenBadPacket) {
 				return -1;
 			}
 			evp += sizeof(ev_changeplayableid_t);
@@ -808,7 +819,7 @@ ssize_t evh_chat(uint8_t* evbuffer, size_t eventoff, int32_t cid) {
 			snprintf(chathdr, BUFFER_SIZE, "%s<%s>",w ,SMPPlayerInfo[t].usr);
 		} else {
 			info("unknown user chat: %s\n", ctx);
-			return 0;
+			return clen + sizeof(ev_chat_t) + 1;
 		}
 	}
 	chatf("%s %s", chathdr, ctx);
@@ -859,14 +870,18 @@ int32_t evh_playable_location(uint8_t* eventbuffer, size_t eventoff, int32_t cid
 	
 	//Parameter check
 	if(!is_range_number(tx, 0, MAP_WIDTH) || !is_range_number(ty, 0, MAP_HEIGHT) ) {
-		warn("evh_playable_location(): Bad packet.\n");
+		if(DebugSpam) {
+			warn("evh_playable_location(): Bad packet.\n");
+		}
 		return -1;
 	}
 
 	//Obtain client information
 	int32_t i = lookup_smp_player_from_cid(cid);
 	if(i == -1) {
-		warn("evh_playable_location(): CID%d is not registered yet.\n", cid);
+		if(DebugSpam) {
+			warn("evh_playable_location(): CID%d is not registered yet.\n", cid);
+		}
 		return 0;
 	}
 
@@ -875,7 +890,7 @@ int32_t evh_playable_location(uint8_t* eventbuffer, size_t eventoff, int32_t cid
 	if(is_range(p_objid, 0, MAX_OBJECT_COUNT - 1) ) {
 		Gobjs[p_objid].x = tx;
 		Gobjs[p_objid].y = ty;
-	} else {
+	} else if(DebugSpam) {
 		warn("evh_playable_location: Character of CID%d is not generated yet.\n", cid); //causes logspam, commented out
 	}
 	return 0;
@@ -981,7 +996,10 @@ int32_t evh_change_playable_id(uint8_t* eventbuffer, size_t eventoffset, int32_t
 	int32_t i = lookup_smp_player_from_cid(cid);
 	if(i != -1) {
 		SMPPlayerInfo[i].pid = pid;
+	} else {
+		warn("evh_change_playable_id(): CID%d is not on client list.\n", cid);
 	}
+	return 0;
 }
 
 

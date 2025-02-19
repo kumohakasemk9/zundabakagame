@@ -163,13 +163,13 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 				copyev = 0;
 				Log(cid, "AddEvent(): Request denied, bad op level.\n");
 			}
-		} else if(evhead[0] == EV_PLAYABLE_LOCATION) {
+		}/* else if(evhead[0] == EV_PLAYABLE_LOCATION) {
 			//Update current client's coordinate information, do not stack the packet.
 			ev_playablelocation_t *ev = (ev_playablelocation_t*)evhead;
 			C[cid].playable_x = ev->x;
 			C[cid].playable_y = ev->y;
 			copyev = 0;
-		}
+		}*/
 		if(copyev == 1) {
 			memcpy(&EventBuffer[EBptr + sizeof(event_hdr_t) + pdlen], evhead, evlen);
 			pdlen += evlen;
@@ -227,6 +227,7 @@ void GetEvent(int cid) {
 				copyevent = 0;
 			}
 			if(copyevent) {
+				//Append event chunk header
 				memcpy(&tb[w_ptr + sizeof(event_hdr_t) + w_evclen], evhead, evlen);
 				w_evclen += evlen;
 			}
