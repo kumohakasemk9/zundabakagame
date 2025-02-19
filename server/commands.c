@@ -19,6 +19,8 @@ commands.c: server commands
 
 void stop_command(int);
 void ban_command(char*, int);
+int GetUserOpLevel(int);
+int GetUIDByName(char*);
 
 extern int ProgramExit;
 extern userinfo_t *UserInformations;
@@ -95,5 +97,6 @@ void ban_command(char *p, int cid) {
 		SendPrivateChat(SERVER_EVENT, cid, "Insufficient permission.");
 		Log(cid, "Bad op level.\n");
 	}
-
 }
+
+

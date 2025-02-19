@@ -300,15 +300,6 @@ void INTHwnd(int) {
 	ProgramExit = 1;
 }
 
-int GetUIDByName(char* n) {
-	for(int i = 0; i < UserCount; i++) {
-		if(memcmp(UserInformations[i].usr, n, strlen(n) ) == 0) {
-			return i;
-		}
-	}
-	return -1;
-}
-
 void Log(int cid, const char* ptn, ...) {
 	struct timeval t;
 	double td;
@@ -721,14 +712,6 @@ void SendGreetingsPacket(int cid) {
 	send_packet(&p, sizeof(np_greeter_t), cid);
 }
 
-int GetUserOpLevel(int cid) {
-	int t = C[cid].uid;
-	if(0 <= t && t <= UserCount - 1) {
-		return UserInformations[t].op;
-	}
-	return 0;
-}
-
 ssize_t send_packet(void *pkt, size_t plen, int cid) {
 	uint8_t b[SIZE_NET_BUFFER];
 	size_t hdrlen;
@@ -883,3 +866,19 @@ void DisconnectWithReason(int cid, char* reason) {
 	SendLeavePacket(cid);
 }
 
+int GetUIDByName(char* n) {
+	for(int i = 0; i < UserCount; i++) {
+		if(memcmp(UserInformations[i].usr, n, strlen(n) ) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+int GetUserOpLevel(int cid) {
+	int t = C[cid].uid;
+	if(0 <= t && t <= UserCount - 1) {
+		return UserInformations[t].op;
+	}
+	return 0;
+}

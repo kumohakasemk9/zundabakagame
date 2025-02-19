@@ -36,7 +36,7 @@ uint8_t SMPsalt[SALT_LENGTH]; //Filled when connected
 int32_t SMPcid; //My client id
 int32_t SMPProfCount = 0; //Loaded SMP credential count
 SMPProfile_t *SMPProfs = NULL; //SMP Connection credentials
-int32_t SelectedSMPProf;
+int32_t SelectedSMPProf; //Current SMP profile ID
 SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //Client information (Modified by server)
 uint8_t TempRXBuffer[NET_BUFFER_SIZE];
 size_t TRXBLength;
@@ -46,8 +46,9 @@ int32_t ConnectionTimeoutTimer;
 extern int32_t DifEnemyBaseCount[4];
 extern int32_t DifEnemyBaseDist;
 extern double DifATKGain;
-int32_t DisconnectReasonProvided = 0;
-int32_t DebugSpam = 0;
+int32_t DisconnectReasonProvided = 0; //To avoid erasing disconnect message
+int32_t DebugSpam = 0; //If this set to 1, packets that sent so frequently, will be print.
+extern int32_t InitSpawnRemain;
 
 #ifdef __WASM
 	extern void wasm_login_to_smp(char*, char*, uint8_t*);
@@ -233,6 +234,7 @@ void pkt_recv_handler(uint8_t *pkt, size_t plen) {
 			SMPPlayerInfo[c].cid = cid;
 			SMPPlayerInfo[c].pid = 0;
 			SMPPlayerInfo[c].respawn_timer = -1;
+			SMPPlayerInfo[c].respawn_remain = -1;
 			memcpy(SMPPlayerInfo[c].usr, &pkt[p + 1], csiz);
 			SMPPlayerInfo[c].usr[csiz] = 0;
 			c++;
@@ -407,6 +409,7 @@ void process_smp() {
 			SMPPlayerInfo[i].respawn_timer--;
 			//If timer went to 0, respawn playable character of SMP client
 			if(SMPPlayerInfo[i].respawn_timer == 0) {
+				SMPPlayerInfo[i].respawn_timer = -1;
 				int32_t r = spawn_playable(SMPPlayerInfo[i].pid);
 				SMPPlayerInfo[i].playable_objid = r;
 			}
@@ -535,7 +538,8 @@ void stack_packet(event_type_t etype, ...) {
 			.basecount1 = DifEnemyBaseCount[1],
 			.basecount2 = DifEnemyBaseCount[2],
 			.basecount3 = DifEnemyBaseCount[3],
-			.atkgain = (float)DifATKGain
+			.atkgain = (float)DifATKGain,
+			.spawnlimit = (int8_t)InitSpawnRemain
 		};
 		pktlen = sizeof(ev_reset_t);
 		if(TXSMPEventLen + pktlen < NET_BUFFER_SIZE) {
@@ -817,10 +821,11 @@ int32_t evh_reset(uint8_t* eventbuffer, size_t eventoffset, int32_t cid) {
 	uint32_t _seed = (uint32_t)network2host_fconv_32(ev->level_seed);
 	int32_t basedistance = (int32_t)network2host_fconv_16(ev->basedistance);
 	double atkgain = (double)ev->atkgain;
-	info("evh_reset(): seed=%u basedistance=%d atkgain=%lf BaseCount: %d, %d, %d, %d cid=%d\n", _seed, basedistance, atkgain, ev->basecount0, ev->basecount1, ev->basecount2, ev->basecount3, cid);
+	int8_t spawnlimit = (int8_t)ev->spawnlimit;
+	info("evh_reset(): seed=%u spawnlimit=%d basedistance=%d atkgain=%lf BaseCount: %d, %d, %d, %d cid=%d\n", _seed, spawnlimit, basedistance, atkgain, ev->basecount0, ev->basecount1, ev->basecount2, ev->basecount3, cid);
 
 	//Check paraneter
-	if(!is_range(basedistance, MIN_EBDIST, MAX_EBDIST) || !is_range_number(atkgain, MIN_ATKGAIN, MAX_ATKGAIN) ) {
+	if(!is_range(basedistance, MIN_EBDIST, MAX_EBDIST) || !is_range_number(atkgain, MIN_ATKGAIN, MAX_ATKGAIN) || !is_range(spawnlimit, -1, MAX_SPAWN_COUNT) ) {
 		warn("evh_reset(): bad packet!\n");
 		return -1;
 	} 
@@ -832,6 +837,10 @@ int32_t evh_reset(uint8_t* eventbuffer, size_t eventoffset, int32_t cid) {
 	DifEnemyBaseCount[1] = ev->basecount1;
 	DifEnemyBaseCount[2] = ev->basecount2;
 	DifEnemyBaseCount[3] = ev->basecount3;
+	InitSpawnRemain = spawnlimit;
+	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
+		SMPPlayerInfo[i].respawn_remain = spawnlimit;
+	}
 	srand(_seed);
 	info("evh_reset(): Round reset request\n");
 	reset_game();
@@ -947,6 +956,8 @@ ssize_t evh_hello(uint8_t *eventbuffer, size_t eventoffset, int cid) {
 			SMPPlayerInfo[i].cid = cid;
 			SMPPlayerInfo[i].pid = 0;
 			SMPPlayerInfo[i].playable_objid = OBJID_INVALID;
+			SMPPlayerInfo[i].respawn_timer = -1;
+			SMPPlayerInfo[i].respawn_remain = -1;
 			strcpy(SMPPlayerInfo[i].usr, funame);
 			break;
 		}

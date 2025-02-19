@@ -71,4 +71,5 @@ typedef struct {
 	int32_t pid; //Playable character id
 	int32_t playable_objid; //Client side object id of playable character
 	int32_t respawn_timer; //Client playable character respawn timer, -1 if don't need to respawn.
+	int32_t respawn_remain; //How much can this character respawn? (-1: Infinite)
 } SMPPlayers_t;

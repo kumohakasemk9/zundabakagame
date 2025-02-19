@@ -14,7 +14,6 @@ main.c: linux entry point, X11 funcs.
 
 TODO List
 back to GTK
-fix reset packet, enforce RespawnRemain Gamerule to SMP
 nickname feature in SMP
 chat mute feature in SMP
 Make me ahri

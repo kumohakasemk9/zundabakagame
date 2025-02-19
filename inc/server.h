@@ -56,16 +56,16 @@ typedef struct  {
 void ExecServerCommand(char* ,int);
 
 //server.c
-void SendPrivateChat(int, int, char*);
 void Log(int, const char*, ...);
-int GetUserOpLevel(int);
-int GetUIDByName(char*);
 void DisconnectWithReason(int, char*);
 ssize_t send_packet(void*, size_t, int);
 int AddUser(char*);
+int GetUserOpLevel(int);
+int GetUIDByName(char*);
 
 //events.c
 void EventBufferGC();
+void SendPrivateChat(int, int, char*);
 void AddEventCmd(uint8_t*, int, int);
 void GetEvent(int);
 void SendJoinPacket(int);

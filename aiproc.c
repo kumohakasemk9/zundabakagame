@@ -71,17 +71,24 @@ void procai() {
 					GameState = GAMESTATE_DEAD;
 					StateChangeTimer = 1000;
 				} else {
-					//Orelse game over
-					GameState = GAMESTATE_GAMEOVER;
+					//Orelse game over (if local, in multiplay all playables need to be dead)
+					if(SMPStatus != NETWORK_LOGGEDIN) {
+						GameState = GAMESTATE_GAMEOVER;
+					}
 				}
 			} else {
 				//If SMP remote player is dead, respawn after several times
 				if(SMPStatus == NETWORK_LOGGEDIN && is_playable_character(tid) ) {
 					for(int32_t j = 0; j < MAX_CLIENTS; j++) {
 						if(SMPPlayerInfo[j].playable_objid == i) {
-							//Set specific player's SMP character respawn timer.
-							SMPPlayerInfo[j].respawn_timer = 1000;
-							SMPPlayerInfo[j].playable_objid = -1;
+							//Set specific player's SMP character respawn timer if their respawn_remain is not 0 or -1.
+							if(SMPPlayerInfo[j].respawn_remain > 0 || SMPPlayerInfo[j].respawn_remain == -1) {
+								if(SMPPlayerInfo[j].respawn_remain > 0) {
+									SMPPlayerInfo[j].respawn_remain--;
+								}
+								SMPPlayerInfo[j].respawn_timer = 1000;
+								SMPPlayerInfo[j].playable_objid = -1;
+							}
 							break;
 						}
 					}
