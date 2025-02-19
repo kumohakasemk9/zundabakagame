@@ -20,6 +20,8 @@ zundagame-gtk3.c: gtk3 entry point, funcs.
 
 #include <gtk/gtk.h>
 
+void activate(GtkApplication*, gpointer);
+
 extern cairo_surface_t *Gsfc; //game screen
 int ConnectionSocket = -1;
 extern int32_t ProgramExiting;
@@ -93,8 +95,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	//Set timer
-	pthread_t pth1;
-	pthread_create(&pth1, NULL, thread_cb, NULL);
+	//pthread_t pth1;
+	//pthread_create(&pth1, NULL, thread_cb, NULL);
 
 	//Init game
 	if(gameinit(fn) == -1) {
@@ -113,14 +115,14 @@ int main(int argc, char *argv[]) {
 	g_object_unref(app);
 	
 	//Create and show window
-	Window r = DefaultRootWindow(Disp);
+	/*Window r = DefaultRootWindow(Disp);
 	Win = XCreateSimpleWindow(Disp, r, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, 0);
 	XStoreName(Disp, Win, "Zundamon game");
 	XMapWindow(Disp, Win);
-	info("Window opened.\n");
+	info("Window opened.\n");*/
 
 	//Make game screen drawer and its graphic context
-	int s = DefaultScreen(Disp);
+	/*int s = DefaultScreen(Disp);
 	Visual *v = DefaultVisual(Disp, s);
 	GSsfc = cairo_xlib_surface_create(Disp, Win, v, WINDOW_WIDTH, WINDOW_HEIGHT);
 	GS = cairo_create(GSsfc);
@@ -132,20 +134,20 @@ int main(int argc, char *argv[]) {
 		XCloseDisplay(Disp);
 		do_finalize();
 	}
-	info("Image buffer and Graphics context created.\n");
+	info("Image buffer and Graphics context created.\n");*/
 	
 	//Fix window size
-	XSizeHints sh = {
+	/*XSizeHints sh = {
 		.flags = PMinSize | PMaxSize,
 		.min_width = WINDOW_WIDTH,
 		.min_height = WINDOW_HEIGHT,
 		.max_width = WINDOW_WIDTH,
 		.max_height = WINDOW_HEIGHT
 	};
-	XSetWMNormalHints(Disp, Win, &sh);
+	XSetWMNormalHints(Disp, Win, &sh);*/
 
 	//Select event and message loop
-	Atom WM_DELETE_WINDOW = XInternAtom(Disp, "WM_DELETE_WINDOW", False);
+	/*Atom WM_DELETE_WINDOW = XInternAtom(Disp, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(Disp, Win, &WM_DELETE_WINDOW, 1);
 	XSelectInput(Disp, Win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ExposureMask | PointerMotionMask);
 	info("Starting message loop.\n");
@@ -163,36 +165,44 @@ int main(int argc, char *argv[]) {
 			}
 			usleep(100);
 		}
-	}
+	}*/
 	
 	//Finalize
 	do_finalize();
-	XDestroyWindow(Disp, Win);
+	/*XDestroyWindow(Disp, Win);
 	XCloseDisplay(Disp);
 	cairo_destroy(GS);
-	cairo_surface_destroy(GSsfc);
+	cairo_surface_destroy(GSsfc);*/
 	return 0;
 }
 
+void activate(GtkApplication *app, gpointer data) {
+	GtkWidget *win;
+	win = gtk_application_window_new(app);
+	gtk_window_set_title(GTK_WINDOW(win), "Zundagame GTK");
+	gtk_window_set_default_size(GTK_WINDOW(win), 200, 200);
+	gtk_widget_show_all(win);
+}
+
 uint16_t host2network_fconv_16(int16_t d) {
-	return htons( (uint16_t)d);
+	return 0; //return htons( (uint16_t)d);
 }
 
 int16_t network2host_fconv_16(uint16_t d) {
-	return (int16_t)ntohs(d);
+	return 0; //(int16_t)ntohs(d);
 }
 
 int32_t network2host_fconv_32(uint32_t d) {
-	return (int32_t)htonl(d);
+	return 0; //(int32_t)htonl(d);
 }
 
 uint32_t host2network_fconv_32(int32_t d) {
-	return ntohl( (uint32_t)d);
+	return 0; //ntohl( (uint32_t)d);
 }
 
 //Calculate linux hash of uname + password + salt string. Max input size is UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH + 1 and store to output, output should pre-allocated 512 bit buffer. returns 0 when success, -1 when fail.
 int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *output) {
-	EVP_MD_CTX *evp = EVP_MD_CTX_new();
+/*	EVP_MD_CTX *evp = EVP_MD_CTX_new();
 	EVP_DigestInit_ex(evp, EVP_sha512(), NULL);
 	if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
 		EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
@@ -213,7 +223,8 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 		return -1;
 	}
 	EVP_MD_CTX_free(evp);
-	return 0;
+	return 0;*/
+	return -1;
 }
 
 //Sub thread handler
@@ -261,7 +272,7 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 //Open and connect tcp socket to hostname and port
 int32_t make_tcp_socket(char* hostname, char* port) {
 	//If already connected, this function will fail.
-	if(ConnectionSocket != -1) {
+	/*if(ConnectionSocket != -1) {
 		warn("make_tcp_socket(): already connected.\n");
 		return -1;
 	}
@@ -308,24 +319,26 @@ int32_t make_tcp_socket(char* hostname, char* port) {
 		return -1;
 	}
 	freeaddrinfo(addr);
-	return 0;
+	return 0;*/
+	return -1;
 }
 
 //Close current connection
 int32_t close_tcp_socket() {
-	if(ConnectionSocket == -1) {
+	/*if(ConnectionSocket == -1) {
 		warn("close_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	info("closing remote connection\n");
 	close(ConnectionSocket);
 	ConnectionSocket = -1;
-	return 0;
+	return 0;*/
+	return -1;
 }
 
 //Send bytes to connected server
 ssize_t send_tcp_socket(void* ctx, size_t ctxlen) {
-	if(ConnectionSocket == -1) {
+	/*if(ConnectionSocket == -1) {
 		warn("send_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
@@ -337,12 +350,12 @@ ssize_t send_tcp_socket(void* ctx, size_t ctxlen) {
 		warn("send_tcp_socket(): send failed. incomplete data send.\n");
 		return -1;
 	}
-	return r;
+	return r;*/
 }
 
 //Receive bytes from connected server, returns read bytes
 ssize_t recv_tcp_socket(void* ctx, size_t ctxlen) {
-	if(ConnectionSocket == -1) {
+	/*if(ConnectionSocket == -1) {
 		warn("recv_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
@@ -357,12 +370,13 @@ ssize_t recv_tcp_socket(void* ctx, size_t ctxlen) {
 			return -2;
 		}
 	}
-	return r;
+	return r;*/
+	return -1;
 }
 
 //Check if socket output is available
 int32_t isconnected_tcp_socket() {
-	if(ConnectionSocket == -1) {
+	/*if(ConnectionSocket == -1) {
 		warn("isconnected(): socket is not open!\n");
 		return 0;
 	}
@@ -370,20 +384,21 @@ int32_t isconnected_tcp_socket() {
 		.fd = ConnectionSocket,
 		.events = POLLOUT
 	};
-	return poll(&pfd, 1, 0);
+	return poll(&pfd, 1, 0);*/
+	return 0;
 }
 
 void warn(const char* c, ...) {
 	va_list varg;
 	va_start(varg, c);
-	vfprintf(stderr, c, varg);
+	//vfprintf(stderr, c, varg);
 	va_end(varg);
 }
 
 void info(const char* c, ...) {
 	va_list varg;
 	va_start(varg, c);
-	vprintf(c, varg);
+	//vprintf(c, varg);
 	va_end(varg);
 }
 
@@ -395,11 +410,11 @@ void fail(const char* c, ...) {
 }
 
 void vfail(const char*c , va_list varg) {
-	vfprintf(stderr, c, varg);
+	//vfprintf(stderr, c, varg);
 }
 
 void detect_syslang() {
-	const char *LOCALEENVS[] = {"LANG", "LANGUAGE", "LC_ALL"};
+	/*const char *LOCALEENVS[] = {"LANG", "LANGUAGE", "LC_ALL"};
 	for(int i = 0; i < 3; i++) {
 		char *t = getenv(LOCALEENVS[i]);
 		if(t != NULL && memcmp(t, "ja", 2) == 0) {
@@ -407,5 +422,5 @@ void detect_syslang() {
 			LangID = LANGID_JP;
 			return;
 		}
-	}
+	}*/
 }

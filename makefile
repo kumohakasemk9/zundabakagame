@@ -26,6 +26,12 @@ ifeq ($(TARGET),WIN32)
 	LDFLAGS=-lbcrypt -lws2_32 -lm -lpangocairo-1.0 -lpango-1.0 -lgobject-2.0 -lglib-2.0 -lharfbuzz -lcairo
 endif
 
+ifeq ($(TARGET),GTK)
+	OBJS=$(COMOBJS) graphics.o zundagame-gtk3.o
+	CFLAGS=$(COMCFLAGS) `pkg-config gtk+-3.0 --cflags`
+	LDFLAGS=`pkg-config gtk+-3.0 --libs` -lm
+endif
+
 ifeq ($(TARGET),WASM)
 	CC=emcc
 	OBJS=wasm/zundagame-wasm.o $(COMOBJS)
