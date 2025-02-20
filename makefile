@@ -11,25 +11,26 @@
 #
 #makefile: build script
 
-CC=gcc
-COMCFLAGS=-Wall -Wconversion -Wextra -g3
-PKGCONF=pkg-config cairo pangocairo openssl
-CFLAGS=$(COMCFLAGS) `$(PKGCONF) --cflags` -I/usr/X11R6/include -I/usr/X11R6/include/X11
-LDFLAGS=`$(PKGCONF) --libs` -lX11 -lm -L/usr/X11R6/lib -L/usr/X11R6/lib/X11
-COMOBJS=util.o info.o gamesys.o aiproc.o network.o ui.o
-OBJS=$(COMOBJS) zundagame.o graphics.o
-OUTNAME=zundagame
+CC = gcc
+COMCFLAGS = -Wall -Wconversion -Wextra -g3
+CFLAGS = $(COMCFLAGS) `pkg-config cairo pangocairo openssl --cflags` -I/usr/X11R6/include -I/usr/X11R6/include/X11
+LDFLAGS = `pkg-config cairo pangocairo openssl --libs` -lX11 -lm -L/usr/X11R6/lib -L/usr/X11R6/lib/X11
+COMOBJS = util.o info.o gamesys.o aiproc.o network.o ui.o
+OBJS = $(COMOBJS) zundagame.o graphics.o
+OUTNAME = zundagame
+PKGCFG ?= pkg-config
 
 ifeq ($(TARGET),WIN32)
 	OBJS=$(COMOBJS) graphics.o zundagame-win32.o
-	CFLAGS=$(COMCFLAGS) -I../gvsbuild/include/pango-1.0 -I../gvsbuild/include/cairo -I../gvsbuild/include/pixman-1 -I../gvsbuild/include/libmount -I../gvsbuild/include/blkid -I../gvsbuild/include/fribidi -I../gvsbuild/include/harfbuzz -I../gvsbuild/include/freetype2 -I../gvsbuild/include/libpng16 -I../gvsbuild/include/glib-2.0 -I../gvsbuild/lib/glib-2.0/include -I../gvsbuild/include/sysprof-6 -pthread
-	LDFLAGS=-lbcrypt -lws2_32 -lm -lpangocairo-1.0 -lpango-1.0 -lgobject-2.0 -lglib-2.0 -lharfbuzz -lcairo
+	CFLAGS=$(COMCFLAGS) `$(PKGCFG) cairo pangocairo --cflags`
+	LDFLAGS=-lbcrypt -lws2_32 -lm `$(PKGCFG) cairo pangocairo --libs`
 endif
 
 ifeq ($(TARGET),GTK)
 	OBJS=$(COMOBJS) graphics.o zundagame-gtk3.o
-	CFLAGS=$(COMCFLAGS) `pkg-config gtk+-3.0 --cflags`
-	LDFLAGS=`pkg-config gtk+-3.0 --libs` -lm
+	CFLAGS=$(COMCFLAGS) `$(PKGCFG) gtk+-3.0 --cflags`
+	LDFLAGS=`$(PKGCFG) gtk+-3.0 --libs` -lm
+	OUTNAME=zundagame-gtk3
 endif
 
 ifeq ($(TARGET),WASM)
