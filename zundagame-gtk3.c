@@ -19,9 +19,13 @@ zundagame-gtk3.c: gtk3 entry point, funcs.
 #include <string.h>
 
 #include <gtk/gtk.h>
+#include <gio/gio.h>
 
 extern cairo_surface_t *Gsfc; //game screen
-int ConnectionSocket = -1;
+GSocketClient *TCPClient = NULL; //TCP socket connector
+GCancellable *TCPClientCanceller = NULL; //TCP socket connector canceller
+GSocketConnection *TCPSockConnObj = NULL; //TCP Socket
+GSocket *TCPSock = NULL; //TCP Socket (basic)
 extern int32_t ProgramExiting;
 extern langid_t LangID;
 GtkApplication *App; //Gtk session
@@ -29,12 +33,12 @@ GtkWidget *ImgW; //Image screen
 
 gboolean mouse_scroll(GtkWidget*, GdkEventScroll*, gpointer);
 gboolean mouse_move(GtkWidget*, GdkEventMotion*, gpointer);
-gboolean key_release(GtkWidget*, GdkEventKey*, gpointer);
+gboolean key_event(GtkWidget*, GdkEventKey*, gpointer);
 gboolean button_press(GtkWidget*, GdkEventButton*, gpointer);
-void evcm_mouse_motion(GtkEventControllerMotion*, gdouble, gdouble, gpointer);
 void activate(GtkApplication*, gpointer);
 gboolean gametick_wrapper(gpointer);
 gboolean redraw_win(gpointer);
+void socket_hwnd(GObject*, GAsyncResult*, gpointer);
 
 int main(int argc, char *argv[]) {
 	char *fn = "credentials.txt";
@@ -74,7 +78,7 @@ void activate(GtkApplication *app, gpointer data) {
 	gtk_window_set_default_size(GTK_WINDOW(win), WINDOW_WIDTH, WINDOW_HEIGHT);
 	gtk_window_set_resizable(GTK_WINDOW(win), FALSE);
 	gtk_container_add(GTK_CONTAINER(win), ImgW);
-	//gtk_widget_set_events(win, GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_SCROLL_MASK);
+	gtk_widget_add_events(win, GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_SCROLL_MASK | GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK);
 	gtk_widget_show_all(win);
 
 	//Start timer
@@ -82,14 +86,12 @@ void activate(GtkApplication *app, gpointer data) {
 	info("Gametick thread is running now.\n");
 	g_timeout_add(30, redraw_win, NULL);
 
-	//Prepare event Catcher
-	GtkEventController* evcm = gtk_event_controller_motion_new(win);
-	g_signal_connect(evcm, "motion", G_CALLBACK(evcm_mouse_motion), NULL);
-
 	//Connect event
-	//g_signal_connect(win, "button-press-event", G_CALLBACK(button_press), NULL);
-	//g_signal_connect(win, "scroll-event", G_CALLBACK(mouse_scroll), NULL);
-	//g_signal_connect(win, "motion-notify-event", G_CALLBACK(mouse_move), NULL);
+	g_signal_connect(win, "button-press-event", G_CALLBACK(button_press), NULL);
+	g_signal_connect(win, "scroll-event", G_CALLBACK(mouse_scroll), NULL);
+	g_signal_connect(win, "motion-notify-event", G_CALLBACK(mouse_move), NULL);
+	g_signal_connect(win, "key-press-event", G_CALLBACK(key_event), NULL);
+	g_signal_connect(win, "key-release-event", G_CALLBACK(key_event), NULL);
 }
 
 //Called every 10mS
@@ -102,13 +104,15 @@ gboolean gametick_wrapper(gpointer data) {
 	return TRUE;
 }
 
-void evcm_mouse_motion(GtkEventControllerMotion* self, gdouble x, gdouble y, gpointer data) {
-	info("MouseMove: %lf, %lf\n", x, y);
-}
-
-//Mouse scroll handler (it has bug that called twice)
+//Mouse scroll handler
 gboolean mouse_scroll(GtkWidget *self, GdkEventScroll* evt, gpointer data) {
 	//info("Scroll\n");
+	static glong t = 0;
+	if(t != evt->time) {
+		t = evt->time;
+	} else {
+		return FALSE;
+	}
 	if(evt->delta_y > 0) {
 		mousepressed_handler(MB_UP);
 	} else {
@@ -125,43 +129,53 @@ gboolean mouse_move(GtkWidget *self, GdkEventMotion *evt, gpointer data) {
 }
 
 //Keyboard release handler
-gboolean key_release(GtkWidget *self, GdkEventKey *event, gpointer data) {
-	info("key release\n");	
-/*
-} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
-		//Get key char andd sym
-		char r;
-		KeySym ks;
-		XLookupString(&ev.xkey, &r, sizeof(r), &ks, NULL);
+gboolean key_event(GtkWidget *self, GdkEventKey *event, gpointer data) {
+	/*if(event->type == GDK_KEY_PRESS) {
+		info("press %s\n", event->string);
+	} else if(event->type == GDK_KEY_RELEASE) {
+		info("release %s\n", event->string);
+	}
+	
+	info("key: %02x\n", event->string[0]);	*/
+	char r = (char)event->string[0];
+
+	//translate keyval to original data
+	specialkey_t k = SPK_NONE;
+	if(r == '\r') {
+		k = SPK_ENTER;
+	} else if(r == '\b') {
+		k = SPK_BS;
+	} else if(event->keyval == GDK_KEY_Left) {
+		k = SPK_LEFT;
+	} else if(event->keyval == GDK_KEY_Right) {
+		k = SPK_RIGHT;
+	} else if(r == 0x1b) {
+		k = SPK_ESC;
+	} else if(event->keyval == GDK_KEY_F3) {
+		k = SPK_F3;
+	}
+	if(k == SPK_NONE && !(0x20 <= r && r <= 0x7e) || event->length > 1) {
+		return FALSE; //Do not process except ascii and specified controls
+	}
 		
-		//translate XKeySym to original data
-		specialkey_t k = SPK_NONE;
-		if(ks == XK_Return || ks == XK_KP_Enter) {
-			k = SPK_ENTER;
-		} else if(ks == XK_BackSpace) {
-			k = SPK_BS;
-		} else if(ks == XK_Left) {
-			k = SPK_LEFT;
-		} else if(ks == XK_Right) {
-			k = SPK_RIGHT;
-		} else if(ks == XK_Escape) {
-			k = SPK_ESC;
-		} else if(ks == XK_F3) {
-			k = SPK_F3;
-		}
-		
-		//Pass it to wrapper
-		if(ev.type == KeyPress) {
-			keypress_handler(r, k);
-		} else {
-			keyrelease_handler(r);
-		}
-	*/
+	//Pass it to wrapper
+	if(event->type == GDK_KEY_PRESS) {
+		keypress_handler(r, k);
+	} else {
+		keyrelease_handler(r);
+	}
 	return FALSE;
 }
 
-//Button press handler (it has bug that called twice)
+//Button press handler
 gboolean button_press(GtkWidget *self, GdkEventButton *event, gpointer data) {
+	static guint32 pt = 0;
+	//Supress duplicate event call
+	if(pt != event->time) {
+		pt = event->time;
+	} else {
+		return FALSE;
+	}
 	//translate
 	unsigned int b = event->button;
 	//info("click: %d\n", b);
@@ -206,7 +220,7 @@ uint32_t host2network_fconv_32(int32_t d) {
 //Calculate linux hash of uname + password + salt string. Max input size is UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH + 1 and store to output, output should pre-allocated 512 bit buffer. returns 0 when success, -1 when fail.
 int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *output) {
 	GChecksum *cs = g_checksum_new(G_CHECKSUM_SHA512);
-	gsize l;
+	gsize l = SHA512_LENGTH;
 	g_checksum_update(cs, (const guchar*)uname, strlen(uname) );
 	g_checksum_update(cs, (const guchar*)password, strlen(password) );
 	g_checksum_update(cs, (const guchar*)salt, SALT_LENGTH);
@@ -253,119 +267,129 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 //Open and connect tcp socket to hostname and port
 int32_t make_tcp_socket(char* hostname, char* port) {
 	//If already connected, this function will fail.
-	/*if(ConnectionSocket != -1) {
+	if(TCPClient != NULL || TCPSock != NULL) {
 		warn("make_tcp_socket(): already connected.\n");
 		return -1;
 	}
-	
-	//Name Resolution
-	struct addrinfo *addr, hint;
-	memset(&hint, 0, sizeof(hint) );
-	hint.ai_flags = AF_INET;
-	hint.ai_socktype = SOCK_STREAM;
-	int32_t r = getaddrinfo(hostname, port, &hint, &addr);
-	if(r != 0) {
-		//getaddrinfo error
-		warn("make_tcp_socket(): getaddrinfo failed. (%d)\n", r);
-		return -1;
-	}
-	
-	//Make socket
-	ConnectionSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if(ConnectionSocket < 0) {
-		//Socket error
-		warn("make_tcp_socket(): socket creation failed.\n");
-		freeaddrinfo(addr);
-		return -1;
-	}
-	
-	int opt = 1;
-	setsockopt(ConnectionSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt) );
 
-	//Make socket nonblock.
-	if(fcntl(ConnectionSocket, F_SETFL, O_NONBLOCK) == -1) {
-		warn("make_tcp_socket(): setting socket option failed.\n");
-		close(ConnectionSocket);
-		ConnectionSocket = -1;
-		freeaddrinfo(addr);
+	//Convert port
+	int p = atoi(port);
+	if(!is_range(p, 1, 65535) ) {
+		warn("make_tcp_socket(): bad port number!");
 		return -1;
 	}
-	
-	//Connect to node
-	if(connect(ConnectionSocket, addr->ai_addr, addr->ai_addrlen) != 0 && errno != EINPROGRESS) {
-		warn("make_tcp_socket(): connect failed. %s.\n", strerror(errno) );
-		close(ConnectionSocket);
-		ConnectionSocket = -1;
-		freeaddrinfo(addr);
-		return -1;
+
+	//Address resolution and try to connect
+	TCPClient = g_socket_client_new();
+	TCPClientCanceller = g_cancellable_new();
+	g_socket_client_connect_to_host_async(TCPClient, hostname, p, TCPClientCanceller, socket_hwnd, NULL);
+	return 0;
+}
+
+//socket connect callback
+void socket_hwnd(GObject* src, GAsyncResult* ret, gpointer data) {
+	info("socket_hwnd(): socket callback\n");
+	if(TCPClient == NULL) {
+		warn("socket_hwnd(): GSocketClient is freed.\n");
+		return;
 	}
-	freeaddrinfo(addr);
-	return 0;*/
-	return -1;
+	GError* err = NULL;
+	TCPSockConnObj = g_socket_client_connect_to_host_finish(TCPClient, ret, &err);
+	g_object_unref(TCPClient);
+	TCPClient = NULL;
+	if(err != NULL) {
+		warn("socket_hwnd(): %s\n", err->message);
+		free(err);
+	}
+	if(TCPClientCanceller != NULL) {
+		g_object_unref(TCPClientCanceller);
+		TCPClientCanceller = NULL;
+	}
+	if(TCPSockConnObj != NULL) {
+		TCPSock = g_socket_connection_get_socket(TCPSockConnObj);
+		if(TCPSock != NULL) {
+			g_socket_set_blocking(TCPSock, FALSE);
+		}
+	}
 }
 
 //Close current connection
 int32_t close_tcp_socket() {
-	/*if(ConnectionSocket == -1) {
+	if(TCPClientCanceller != NULL) {
+		g_cancellable_cancel(TCPClientCanceller);
+		g_object_unref(TCPClientCanceller);
+		TCPClientCanceller = NULL;
+	}
+	if(TCPSockConnObj == NULL && TCPClient == NULL) {
 		warn("close_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
 	info("closing remote connection\n");
-	close(ConnectionSocket);
-	ConnectionSocket = -1;
-	return 0;*/
-	return -1;
+	if(TCPSockConnObj != NULL) {
+		g_io_stream_close(G_IO_STREAM(TCPSockConnObj), NULL, NULL);
+		g_object_unref(TCPSockConnObj);
+		TCPSock = NULL;
+	}
+	if(TCPClient != NULL) {
+		g_object_unref(TCPClient);
+		TCPClient = NULL;
+	}
+	return 0;
 }
 
 //Send bytes to connected server
 ssize_t send_tcp_socket(void* ctx, size_t ctxlen) {
-	/*if(ConnectionSocket == -1) {
+	if(TCPSock == NULL) {
 		warn("send_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
-	ssize_t r = send(ConnectionSocket, ctx, ctxlen, MSG_NOSIGNAL);
+	GError *err = NULL;
+	ssize_t r = (ssize_t)g_socket_send(TCPSock, (const gchar*)ctx, (gsize)ctxlen, NULL, &err);
 	if(r < 0) {
-		warn("send_tcp_socket(): send failed: %d\n", errno);
+		if(err != NULL) {
+			warn("send_tcp_socket(): send failed: %s\n", err->message);
+			free(err);
+		} else {
+			warn("send_tcp_socket(): send failed\n");
+		}
 		return -1;
 	} else if(r != ctxlen) {
 		warn("send_tcp_socket(): send failed. incomplete data send.\n");
 		return -1;
 	}
-	return r;*/
+	return r;
 }
 
 //Receive bytes from connected server, returns read bytes
 ssize_t recv_tcp_socket(void* ctx, size_t ctxlen) {
-	/*if(ConnectionSocket == -1) {
+	if(TCPSock == NULL) {
 		warn("recv_tcp_socket(): socket is not open!\n");
 		return -1;
 	}
-	ssize_t r = recv(ConnectionSocket, ctx, ctxlen, 0);
+	GError *err = NULL;
+	ssize_t r = (ssize_t)g_socket_receive(TCPSock, (gchar*)ctx, (gsize)ctxlen, NULL, &err);
 	if(r == 0) {
 		return 0;
 	} else if(r < 0) {
-		if(errno == EAGAIN || errno == EWOULDBLOCK) {
-			return -1;
+		if(err != NULL) {
+			if(err->code == G_IO_ERROR_WOULD_BLOCK) {
+				return -1;
+			}
+			warn("recv_tcp_socket(): recv() failed: %s\n", err->message);
+			free(err);
 		} else {
-			warn("recv_tcp_socket(): recv() failed: %d\n", errno);
-			return -2;
+			warn("recv_tcp_socket(): recv() failed\n");
 		}
+		return -2;
 	}
-	return r;*/
-	return -1;
+	return r;
 }
 
 //Check if socket output is available
 int32_t isconnected_tcp_socket() {
-	/*if(ConnectionSocket == -1) {
-		warn("isconnected(): socket is not open!\n");
-		return 0;
+	if(TCPSockConnObj != NULL && TCPSock != NULL) {
+		return 1;
 	}
-	struct pollfd pfd = {
-		.fd = ConnectionSocket,
-		.events = POLLOUT
-	};
-	return poll(&pfd, 1, 0);*/
 	return 0;
 }
 
