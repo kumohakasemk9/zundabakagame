@@ -220,10 +220,10 @@ int16_t network2host_fconv_16(uint16_t d) {
 	return (int16_t)ntohs(d);
 }
 int32_t network2host_fconv_32(uint32_t d) {
-	return (int32_t)htonl(d);
+	return (int32_t)ntohl(d);
 }
 uint32_t host2network_fconv_32(int32_t d) {
-	return ntohl( (uint32_t)d);
+	return htonl( (uint32_t)d);
 }
 //Calculate linux hash of uname + password + salt string. Max input size is UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH + 1 and store to output, output should pre-allocated 512 bit buffer. returns 0 when success, -1 when fail.
 int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *output) {

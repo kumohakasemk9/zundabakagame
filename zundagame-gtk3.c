@@ -20,26 +20,115 @@ zundagame-gtk3.c: gtk3 entry point, funcs.
 
 #include <gtk/gtk.h>
 
-void activate(GtkApplication*, gpointer);
-
 extern cairo_surface_t *Gsfc; //game screen
 int ConnectionSocket = -1;
 extern int32_t ProgramExiting;
 extern langid_t LangID;
+GtkApplication *App; //Gtk session
+GtkWidget *ImgW; //Image screen
 
-/*
-void redraw_win() {
-	game_paint();
-	//Apply game screen
-	cairo_set_source_surface(GS, Gsfc, 0, 0);
-	cairo_paint(GS);
+gboolean mouse_scroll(GtkWidget*, GdkEventScroll*, gpointer);
+gboolean mouse_move(GtkWidget*, GdkEventMotion*, gpointer);
+gboolean key_release(GtkWidget*, GdkEventKey*, gpointer);
+gboolean button_press(GtkWidget*, GdkEventButton*, gpointer);
+void evcm_mouse_motion(GtkEventControllerMotion*, gdouble, gdouble, gpointer);
+void activate(GtkApplication*, gpointer);
+gboolean gametick_wrapper(gpointer);
+gboolean redraw_win(gpointer);
+
+int main(int argc, char *argv[]) {
+	char *fn = "credentials.txt";
+	if(argc > 1) {
+		fn = argv[1];
+	}
+
+	//Init game
+	if(gameinit(fn) == -1) {
+		fail("main(): gameinit() failed\n");
+		do_finalize();
+		return 1;
+	}
+	info("gameinit(): OK\n");
+	
+	//Gtk main routine
+	int s;
+	App = gtk_application_new(NULL, G_APPLICATION_DEFAULT_FLAGS);
+	g_signal_connect(App, "activate", G_CALLBACK(activate), NULL);
+	s = g_application_run(G_APPLICATION(App), argc, argv);
+	g_object_unref(App);
+	
+	//Finalize
+	do_finalize();
+	return s;
 }
 
-//X11 window event catcher
-void xwindowevent_handler(XEvent ev, Atom wmdel) {
-	if(ev.type == ClientMessage && (Atom)ev.xclient.data.l[0] == wmdel) { //Alt+F4
-		ProgramExiting = 1;
-	} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
+//Called when app run
+void activate(GtkApplication *app, gpointer data) {
+	//Prepare widget to show image
+	ImgW = gtk_image_new_from_surface(Gsfc);
+
+	//Make window
+	GtkWidget *win;
+	win = gtk_application_window_new(app);
+	gtk_window_set_title(GTK_WINDOW(win), "Zundagame GTK");
+	gtk_window_set_default_size(GTK_WINDOW(win), WINDOW_WIDTH, WINDOW_HEIGHT);
+	gtk_window_set_resizable(GTK_WINDOW(win), FALSE);
+	gtk_container_add(GTK_CONTAINER(win), ImgW);
+	//gtk_widget_set_events(win, GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_SCROLL_MASK);
+	gtk_widget_show_all(win);
+
+	//Start timer
+	g_timeout_add(10, gametick_wrapper, NULL);
+	info("Gametick thread is running now.\n");
+	g_timeout_add(30, redraw_win, NULL);
+
+	//Prepare event Catcher
+	GtkEventController* evcm = gtk_event_controller_motion_new(win);
+	g_signal_connect(evcm, "motion", G_CALLBACK(evcm_mouse_motion), NULL);
+
+	//Connect event
+	//g_signal_connect(win, "button-press-event", G_CALLBACK(button_press), NULL);
+	//g_signal_connect(win, "scroll-event", G_CALLBACK(mouse_scroll), NULL);
+	//g_signal_connect(win, "motion-notify-event", G_CALLBACK(mouse_move), NULL);
+}
+
+//Called every 10mS
+gboolean gametick_wrapper(gpointer data) {
+	gametick();
+	if(ProgramExiting) {
+		g_application_quit(G_APPLICATION(App) );
+		return FALSE;
+	}
+	return TRUE;
+}
+
+void evcm_mouse_motion(GtkEventControllerMotion* self, gdouble x, gdouble y, gpointer data) {
+	info("MouseMove: %lf, %lf\n", x, y);
+}
+
+//Mouse scroll handler (it has bug that called twice)
+gboolean mouse_scroll(GtkWidget *self, GdkEventScroll* evt, gpointer data) {
+	//info("Scroll\n");
+	if(evt->delta_y > 0) {
+		mousepressed_handler(MB_UP);
+	} else {
+		mousepressed_handler(MB_DOWN);
+	}
+	return FALSE;
+}
+
+//Mouse move handler
+gboolean mouse_move(GtkWidget *self, GdkEventMotion *evt, gpointer data) {
+	//info("Mouse: %lf, %lf\n", evt->x, evt->y);
+	mousemotion_handler( (int32_t)evt->x, (int32_t)evt->y);
+	return FALSE;
+}
+
+//Keyboard release handler
+gboolean key_release(GtkWidget *self, GdkEventKey *event, gpointer data) {
+	info("key release\n");	
+/*
+} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
 		//Get key char andd sym
 		char r;
 		KeySym ks;
@@ -67,178 +156,70 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 		} else {
 			keyrelease_handler(r);
 		}
-	} else if(ev.type == MotionNotify) { //Mouse move
-		mousemotion_handler( (int32_t)ev.xmotion.x, (int32_t)ev.xmotion.y);
-	} else if(ev.type == ButtonPress) { //Mouse button press or wheel
-		//translate
-		unsigned int b = ev.xbutton.button;
-		mousebutton_t t = MB_NONE;
-		if(b == Button1) {
-			t = MB_LEFT;
-		} else if(b == Button3) {
-			t = MB_RIGHT;
-		} else if(b == Button4) {
-			t = MB_UP;
-		} else if(b == Button5) {
-			t = MB_DOWN;
-		}
-		
-		mousepressed_handler(t);
-	}
-}
-*/
-
-int main(int argc, char *argv[]) {
-	char *fn = "credentials.txt";
-	if(argc > 1) {
-		fn = argv[1];
-	}
-
-	//Set timer
-	//pthread_t pth1;
-	//pthread_create(&pth1, NULL, thread_cb, NULL);
-
-	//Init game
-	if(gameinit(fn) == -1) {
-		fail("main(): gameinit() failed\n");
-		do_finalize();
-		return 1;
-	}
-	info("gameinit(): OK\n");
-	
-	//Init GTK
-	GtkApplication *app;
-	int s;
-	app = gtk_application_new(NULL, G_APPLICATION_DEFAULT_FLAGS);
-	g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
-	s = g_application_run(G_APPLICATION(app), argc, argv);
-	g_object_unref(app);
-	
-	//Create and show window
-	/*Window r = DefaultRootWindow(Disp);
-	Win = XCreateSimpleWindow(Disp, r, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, 0);
-	XStoreName(Disp, Win, "Zundamon game");
-	XMapWindow(Disp, Win);
-	info("Window opened.\n");*/
-
-	//Make game screen drawer and its graphic context
-	/*int s = DefaultScreen(Disp);
-	Visual *v = DefaultVisual(Disp, s);
-	GSsfc = cairo_xlib_surface_create(Disp, Win, v, WINDOW_WIDTH, WINDOW_HEIGHT);
-	GS = cairo_create(GSsfc);
-	if(cairo_status(GS) != CAIRO_STATUS_SUCCESS) {
-		fail("main(): Failed to create game screen drawer.\n");
-		cairo_destroy(GS);
-		cairo_surface_destroy(GSsfc);
-		XDestroyWindow(Disp, Win);
-		XCloseDisplay(Disp);
-		do_finalize();
-	}
-	info("Image buffer and Graphics context created.\n");*/
-	
-	//Fix window size
-	/*XSizeHints sh = {
-		.flags = PMinSize | PMaxSize,
-		.min_width = WINDOW_WIDTH,
-		.min_height = WINDOW_HEIGHT,
-		.max_width = WINDOW_WIDTH,
-		.max_height = WINDOW_HEIGHT
-	};
-	XSetWMNormalHints(Disp, Win, &sh);*/
-
-	//Select event and message loop
-	/*Atom WM_DELETE_WINDOW = XInternAtom(Disp, "WM_DELETE_WINDOW", False);
-	XSetWMProtocols(Disp, Win, &WM_DELETE_WINDOW, 1);
-	XSelectInput(Disp, Win, KeyPressMask | KeyReleaseMask | ButtonPressMask | ExposureMask | PointerMotionMask);
-	info("Starting message loop.\n");
-	double tbefore = get_current_time_ms();
-	while(ProgramExiting == 0) {
-		XEvent e;
-		if(XPending(Disp) ) {
-			XNextEvent(Disp, &e);
-			xwindowevent_handler(e, WM_DELETE_WINDOW);
-		} else {
-			//redraw every 30mS
-			if(get_current_time_ms() > tbefore + 30) {
-				redraw_win();
-				tbefore = get_current_time_ms();
-			}
-			usleep(100);
-		}
-	}*/
-	
-	//Finalize
-	do_finalize();
-	/*XDestroyWindow(Disp, Win);
-	XCloseDisplay(Disp);
-	cairo_destroy(GS);
-	cairo_surface_destroy(GSsfc);*/
-	return 0;
+	*/
+	return FALSE;
 }
 
-void activate(GtkApplication *app, gpointer data) {
-	GtkWidget *win;
-	win = gtk_application_window_new(app);
-	gtk_window_set_title(GTK_WINDOW(win), "Zundagame GTK");
-	gtk_window_set_default_size(GTK_WINDOW(win), 200, 200);
-	gtk_widget_show_all(win);
+//Button press handler (it has bug that called twice)
+gboolean button_press(GtkWidget *self, GdkEventButton *event, gpointer data) {
+	//translate
+	unsigned int b = event->button;
+	//info("click: %d\n", b);
+	mousebutton_t t = MB_NONE;
+	if(b == 1) {
+		t = MB_LEFT;
+	} else if(b == 3) {
+		t = MB_RIGHT;
+	}
+	mousepressed_handler(t);
+	return FALSE;
+}
+
+//Called every 30mS
+gboolean redraw_win(gpointer data) {
+	game_paint();
+	//Apply game screen
+	gtk_widget_queue_draw(ImgW);
+	if(ProgramExiting) {
+		g_application_quit(G_APPLICATION(App) );
+		return FALSE;
+	}
+	return TRUE;
 }
 
 uint16_t host2network_fconv_16(int16_t d) {
-	return 0; //return htons( (uint16_t)d);
+	return g_htons( (uint16_t)d);
 }
 
 int16_t network2host_fconv_16(uint16_t d) {
-	return 0; //(int16_t)ntohs(d);
+	return (int16_t)g_ntohs(d);
 }
 
 int32_t network2host_fconv_32(uint32_t d) {
-	return 0; //(int32_t)htonl(d);
+	return (int32_t)g_htonl(d);
 }
 
 uint32_t host2network_fconv_32(int32_t d) {
-	return 0; //ntohl( (uint32_t)d);
+	return g_ntohl( (uint32_t)d);
 }
 
 //Calculate linux hash of uname + password + salt string. Max input size is UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH + 1 and store to output, output should pre-allocated 512 bit buffer. returns 0 when success, -1 when fail.
 int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *output) {
-/*	EVP_MD_CTX *evp = EVP_MD_CTX_new();
-	EVP_DigestInit_ex(evp, EVP_sha512(), NULL);
-	if(EVP_DigestUpdate(evp, uname, strlen(uname) ) != 1 ||
-		EVP_DigestUpdate(evp, password, strlen(password) ) != 1 ||
-		EVP_DigestUpdate(evp, salt, SALT_LENGTH) != 1) {
-		warn("compute_passhash: Feeding data to SHA512 generator failed.\n");
-		EVP_MD_CTX_free(evp);
-		return -1;	
-	}
-	unsigned int l = 0;
-	if(EVP_DigestFinal_ex(evp, output, &l) != 1) {
-		warn("compute_passhash: SHA512 get digest failed.\n");
-		EVP_MD_CTX_free(evp);
-		return -1;
-	}
+	GChecksum *cs = g_checksum_new(G_CHECKSUM_SHA512);
+	gsize l;
+	g_checksum_update(cs, (const guchar*)uname, strlen(uname) );
+	g_checksum_update(cs, (const guchar*)password, strlen(password) );
+	g_checksum_update(cs, (const guchar*)salt, SALT_LENGTH);
+	g_checksum_get_digest(cs, (guint8*)output, &l);
+	g_checksum_free(cs);
+
 	if(l != SHA512_LENGTH) {
 		warn("compute_passhash: Desired length != Actual wrote length.\n");
-		EVP_MD_CTX_free(evp);
 		return -1;
 	}
-	EVP_MD_CTX_free(evp);
-	return 0;*/
-	return -1;
+	return 0;
 }
 
-//Sub thread handler
-/*void *thread_cb(void* p) {
-	info("Gametick thread is running now.\n");
-	double tbefore = get_current_time_ms();
-	while(1) {
-		if(get_current_time_ms() > 10 + tbefore) { //10mS Timer
-			gametick();
-			tbefore = get_current_time_ms();
-		}
-		usleep(100);
-	}
-}*/
 
 /*
 void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
@@ -391,14 +372,14 @@ int32_t isconnected_tcp_socket() {
 void warn(const char* c, ...) {
 	va_list varg;
 	va_start(varg, c);
-	//vfprintf(stderr, c, varg);
+	vfprintf(stderr, c, varg);
 	va_end(varg);
 }
 
 void info(const char* c, ...) {
 	va_list varg;
 	va_start(varg, c);
-	//vprintf(c, varg);
+	vprintf(c, varg);
 	va_end(varg);
 }
 
@@ -410,7 +391,7 @@ void fail(const char* c, ...) {
 }
 
 void vfail(const char*c , va_list varg) {
-	//vfprintf(stderr, c, varg);
+	vfprintf(stderr, c, varg);
 }
 
 void detect_syslang() {

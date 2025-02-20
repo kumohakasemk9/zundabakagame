@@ -386,7 +386,7 @@ void net_server_send_cmd(server_command_t cmd) {
 		} else if(is_range( (int32_t)ctxlen, 0xfe, 0xffff) ) {
 			uint16_t *p = (uint16_t*)&cmdbuf[1];
 			buf[0] = 0xfe;
-			*p = (uint16_t)network2host_fconv_16( (uint16_t)ctxlen);
+			*p = (uint16_t)host2network_fconv_16( (uint16_t)ctxlen);
 			hdrlen = 3;
 		} else {
 			warn("net_server_send_cmd(): incompatible packet size, not sending packet.\n");
