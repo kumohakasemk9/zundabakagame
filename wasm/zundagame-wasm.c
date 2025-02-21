@@ -13,11 +13,10 @@ Zundamon is from https://zunko.jp/
 main-emscripten.c: wasm functions
 
 */
-
+#include <stddef.h>
 #include "../inc/zundagame.h"
-#include <stdarg.h>
 #include <string.h>
-
+#include <stdio.h>
 #include <arpa/inet.h>
 
 extern void console_put(char*, int); //imported function, print str on console (0: info, 1: warn, 2: err)
