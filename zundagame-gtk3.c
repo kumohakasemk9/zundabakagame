@@ -431,13 +431,13 @@ void vfail(const char*c , va_list varg) {
 }
 
 void detect_syslang() {
-	/*const char *LOCALEENVS[] = {"LANG", "LANGUAGE", "LC_ALL"};
-	for(int i = 0; i < 3; i++) {
-		char *t = getenv(LOCALEENVS[i]);
-		if(t != NULL && memcmp(t, "ja", 2) == 0) {
-			info("Japanese locale detected.\n");
-			LangID = LANGID_JP;
-			return;
-		}
-	}*/
+	PangoLanguage* lang = pango_language_get_default();
+	const char* lang_c = pango_language_to_string(lang);
+	if(strcmp(lang_c, "ja-jp") == 0) {
+		info("Japanese locale detected. Changing language.\n");
+		LangID = LANGID_JP;
+	} else {
+		info("Changed to English mode because of your locale setting: %s\n", lang_c);
+		LangID = LANGID_EN;
+	}
 }
