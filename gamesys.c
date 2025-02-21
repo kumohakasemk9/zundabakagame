@@ -110,6 +110,8 @@ int32_t DebugStatType = 0; //Shows information if nonzero 0: No debug, 1: System
 extern int32_t NetworkTimeout; //If there's period that has no packet longer than this value, assumed as disconnected. 0: disable timeout
 int32_t SpawnRemain; //playable character can not respawn if it is 0.
 int32_t InitSpawnRemain = -1; //how many times can playable character respawn?
+extern int32_t BlockedUsersCount;
+extern char** BlockedUsers;
 
 //Translate local coordinate into global coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -677,6 +679,24 @@ void start_command_mode(int32_t c) {
 	}
 }
 
+int32_t insert_cmdbuf(char* data) {
+	int32_t f = 1;
+	if(CommandBufferMutex == 1 || CommandCursor == -1) {
+		warn("insert_cmdbuf(): not available.\n");
+		return -1;
+	}
+	CommandBufferMutex = 1;
+	if(utf8_insertstring(CommandBuffer, data, CommandCursor, sizeof(CommandBuffer) ) == 0) {
+		CommandCursor += utf8_strlen(data);
+	} else {
+		warn("insert_cmdbuf(): insert failed.\n");
+		f = -1;
+	}
+	CommandBufferMutex = 0;
+	return f;
+}
+
+
 void switch_character_move() {
 	//M key handler
 	if(GameState == GAMESTATE_PLAYING) {
@@ -1046,6 +1066,17 @@ void do_finalize() {
 		//Clean SMP profiles
 		if(SMPProfs != NULL) {
 			free(SMPProfs);
+		}
+
+		//Clean blocked user list
+		if(BlockedUsers != NULL) {
+			for(int32_t i = 0; i < BlockedUsersCount; i++) {
+				char *e = BlockedUsers[i];
+				if(i != NULL) {
+					free(e);
+				}
+			}
+			free(BlockedUsers);
 		}
 		
 		//Close Network Connection

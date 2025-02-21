@@ -64,6 +64,7 @@ int32_t spawn_playable(int32_t);
 void reset_game();
 void use_skill(int32_t, int32_t, PlayableInfo_t);
 void getlocalcoord(int32_t, double*, double*);
+int32_t insert_cmdbuf(char*);
 
 //util.c
 double scale_number(double, double, double);

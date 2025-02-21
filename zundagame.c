@@ -15,7 +15,6 @@ zundagame.c: linux entry point, X11 funcs.
 TODO List
 restrict from changing difficulty parameter by non oped user when SMP
 add sync packet (stop sending server buffer -> sync -> upload map data -> sync -> all client download map data -> start sending buffer again)
-back to GTK
 Make me ahri
 Enable CtrlV
 */

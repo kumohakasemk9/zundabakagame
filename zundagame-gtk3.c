@@ -31,6 +31,7 @@ extern langid_t LangID;
 GtkApplication *App; //Gtk session
 GtkWidget *ImgW; //Image screen
 GtkIMContext *IMCtx; //gtk IM context
+GtkClipboard *Gclipboard;
 extern int32_t CommandCursor;
 extern char CommandBuffer[BUFFER_SIZE];
 extern int32_t CommandBufferMutex;
@@ -45,6 +46,7 @@ gboolean redraw_win(gpointer);
 void socket_hwnd(GObject*, GAsyncResult*, gpointer);
 void im_commit(GtkIMContext*, gchar*, gpointer);
 void insert_to_cmdbuf(gchar*);
+void paste_start();
 
 int main(int argc, char *argv[]) {
 	char *fn = "credentials.txt";
@@ -90,10 +92,12 @@ void activate(GtkApplication *app, gpointer data) {
 
 	//Prepare im
 	IMCtx = gtk_im_multicontext_new();
-	//gtk_im_context_set_client_window(IMCtx, gtk_widget_get_window(win) );
+	gtk_im_context_set_client_window(IMCtx, gtk_widget_get_window(win) );
 	gtk_im_context_focus_in(IMCtx);
 	gtk_im_context_set_use_preedit(IMCtx, FALSE);
 	g_signal_connect(IMCtx, "commit", G_CALLBACK(im_commit), NULL);
+
+	Gclipboard = gtk_widget_get_clipboard(win, GDK_SELECTION_CLIPBOARD);
 
 	//Start timer
 	g_timeout_add(10, gametick_wrapper, NULL);
@@ -118,8 +122,19 @@ gboolean gametick_wrapper(gpointer data) {
 	return TRUE;
 }
 
+void paste_start() {
+	//Paste request
+	if(CommandBuffer != -1) {
+		char* r = (char*)gtk_clipboard_wait_for_text(Gclipboard);
+		if(r != NULL) {
+			insert_cmdbuf(r);
+			g_free(r);
+		}
+	}
+}
+
 void im_commit(GtkIMContext *self, gchar *ctx, gpointer data) {
-	insert_to_cmdbuf(ctx);
+	insert_cmdbuf( (char*)ctx);
 }
 
 //Mouse scroll handler
@@ -146,12 +161,8 @@ gboolean mouse_move(GtkWidget *self, GdkEventMotion *evt, gpointer data) {
 	return FALSE;
 }
 
-//Keyboard release handler
+//Keyboard press/release handler
 gboolean key_event(GtkWidget *self, GdkEventKey *event, gpointer data) {
-	//If command mode, pass key event to im
-	if(CommandCursor != -1) {
-		gtk_im_context_filter_keypress(IMCtx, event);
-	}
 	
 	char r = (char)event->string[0];
 
@@ -167,13 +178,22 @@ gboolean key_event(GtkWidget *self, GdkEventKey *event, gpointer data) {
 		k = SPK_RIGHT;
 	} else if(r == 0x1b) {
 		k = SPK_ESC;
+	} else if(r == 0x16) {
+		//Paste (Ctrl+V)
+		if(event->type == GDK_KEY_PRESS) {
+			paste_start();
+		}
 	} else if(event->keyval == GDK_KEY_F3) {
 		k = SPK_F3;
 	}
 
-	if(CommandCursor != -1 && k == SPK_NONE) {
-		return FALSE; //Accept only for special keys during command mode
+	if(CommandCursor != -1) {
+		gtk_im_context_filter_keypress(IMCtx, event);
+		if(k == SPK_NONE) {
+			return FALSE; //Accept only for special keys during command mode
+		}
 	}
+
 	if(k == SPK_NONE && !(0x20 <= r && r <= 0x7e) || event->length > 1) {
 		return FALSE; //Do not process except ascii and specified controls
 	}
@@ -254,37 +274,6 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 	return 0;
 }
 
-void insert_to_cmdbuf(gchar* data) {
-	CommandBufferMutex = TRUE;
-	if(utf8_insertstring(CommandBuffer, (char*)data, CommandCursor, sizeof(CommandBuffer) ) == 0) {
-		CommandCursor += (int32_t)g_utf8_strlen(data, 65535);
-	} else {
-		g_print("insert_to_cmdbuf(): insert failed.\n");
-	}
-	CommandBufferMutex = FALSE;
-}
-
-/*
-void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
-	//Data type check
-	const GdkContentFormats* f = gdk_clipboard_get_formats(GClipBoard);
-	gsize i;
-	const GType* t = gdk_content_formats_get_gtypes(f, &i);
-	if(t == NULL) {
-		g_print("main.c: clipboard_read_handler(): gdk_content_formats_get_gtypes() failed.\n");
-		return;
-	}
-	if(i != 1 || t[0] != G_TYPE_STRING) {
-		g_print("main.c: clipboard_read_handler(): Data type missmatch.\n");
-		return;
-	}
-	//Get text and insert into CommandBuffer
-	char *cb = gdk_clipboard_read_text_finish(GClipBoard, res, NULL);
-	//g_print("Clipboard string size: %d\nCommandBuffer length: %d\n", l, (uint32_t)strlen(CommandBuffer));
-	free(cb);
-}
-
-*/
 
 //Open and connect tcp socket to hostname and port
 int32_t make_tcp_socket(char* hostname, char* port) {
