@@ -46,6 +46,7 @@ ui.c: gamescreen drawing
 #include <string.h>
 #include <stdarg.h>
 #include <time.h>
+#include <math.h>
 
 void draw_game_main();
 void draw_cui();
@@ -113,17 +114,7 @@ void game_paint() {
 	draw_cui(); //draw minecraft like cui
 	draw_hotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
 	draw_info(); //draw game information
-
-	//Show help during help key pressed
-	if(KeyFlags & KEY_HELP) {
-		//Get image size
-		int32_t himg = getlocalizedhelpimgid();
-		//Calculate img offset to show
-		double iw, ih;
-		get_image_size(himg, &iw, &ih);
-		drawimage( (WINDOW_WIDTH / 2) - (iw / 2), (WINDOW_HEIGHT / 2) - (ih / 2), himg);
-	}
-
+	
 	#ifndef __WASM
 		//Calculate draw time (AVG)
 		static int32_t dtmc = 0;
@@ -147,6 +138,33 @@ void draw_game_main() {
 		chcolor(0x600000ff, 1);
 		fillcircle(x, y, get_skillrange(Gobjs[PlayingCharacterID].tid, SkillKeyState) );
 	}
+
+	//draw ruler or grid
+	//x-grid (show lines where x is double of 100, do not show first one)
+	chcolor(0x4000ff00, 1);
+	double tx = (floor(CameraX / 100.0) + 1) * 100;
+	int32_t cx = floor(CameraX / 100.0) + 1;
+	while(tx < CameraX + WINDOW_WIDTH) {
+		double lx, tt;
+		map2local(tx, 0, &lx, &tt);
+		drawline(lx, 0, lx, WINDOW_HEIGHT, 1);
+		drawstringf(lx, 0, "%d", cx);
+		tx += 100;
+		cx++;
+	}
+	//y-grid (show lines where y is double of 100, do not show first one)
+	double ty = (floor(CameraX / 100.0) + 1) * 100;
+	int32_t cy = floor(CameraY / 100.0) + 1;
+	while(ty < CameraY + WINDOW_HEIGHT) {
+		double ly, tt;
+		map2local(0, ty, &tt, &ly);
+		drawline(0, ly, WINDOW_WIDTH, ly, 1);
+		drawstringf(0, ly, "%d", cy);
+		ty += 100;
+		cy++;
+	}
+
+
 	//draw characters
 	for(uint8_t z = 0; z < MAX_ZINDEX; z++) {
 		for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
@@ -469,6 +487,16 @@ void draw_info() {
 	} else {
 		chcolor(COLOR_TEXTERROR, 1);
 		drawstringf(STATUS_XOFF + 96, STATUS_YOFF + 16, "%d", StateChangeTimer);
+	}
+
+	//Show help during help key pressed
+	if(KeyFlags & KEY_HELP) {
+		//Get image size
+		int32_t himg = getlocalizedhelpimgid();
+		//Calculate img offset to show
+		double iw, ih;
+		get_image_size(himg, &iw, &ih);
+		drawimage( (WINDOW_WIDTH / 2) - (iw / 2), (WINDOW_HEIGHT / 2) - (ih / 2), himg);
 	}
 }
 

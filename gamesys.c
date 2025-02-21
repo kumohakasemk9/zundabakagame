@@ -115,12 +115,19 @@ int32_t InitSpawnRemain = -1; //how many times can playable character respawn?
 extern int32_t BlockedUsersCount;
 extern char** BlockedUsers;
 
-//Translate local coordinate into global coordinate
+//Translate window coordinate into map coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
 	*mapx = CameraX + localx;
 	*mapy = CameraY + (WINDOW_HEIGHT - localy);
 }
 
+//Translate map coordinate to window coordinate
+void map2local(double mapx, double mapy, double *localx, double *localy) {
+	*localx = mapx - CameraX;
+	*localy = WINDOW_HEIGHT - (mapy - CameraY);
+}
+
+//Get local (window) coordinate of character
 void getlocalcoord(int32_t i, double *x, double *y) {
 	if(!is_range(i, 0, MAX_OBJECT_COUNT - 1)){
 		die("getlocalcoord(): bad parameter passed!\n");
