@@ -15,6 +15,7 @@ zundagame-gtk3.c: gtk3 entry point, funcs.
 
 #include "inc/zundagame.h"
 
+#include <stdio.h>
 #include <errno.h>
 #include <string.h>
 
@@ -124,7 +125,7 @@ gboolean gametick_wrapper(gpointer data) {
 
 void paste_start() {
 	//Paste request
-	if(CommandBuffer != -1) {
+	if(CommandCursor != -1) {
 		char* r = (char*)gtk_clipboard_wait_for_text(Gclipboard);
 		if(r != NULL) {
 			insert_cmdbuf(r);

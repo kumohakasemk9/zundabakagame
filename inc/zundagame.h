@@ -13,9 +13,9 @@ Zundamon is from https://zunko.jp/
 main.h: integrated header file
 */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 #include "zunda-defs.h"
 #include "network.h"

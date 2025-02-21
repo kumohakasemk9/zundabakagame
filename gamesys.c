@@ -27,6 +27,7 @@ gamesys.c: game process and related functions
 
 #include "inc/zundagame.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <math.h>
@@ -1072,7 +1073,7 @@ void do_finalize() {
 		if(BlockedUsers != NULL) {
 			for(int32_t i = 0; i < BlockedUsersCount; i++) {
 				char *e = BlockedUsers[i];
-				if(i != NULL) {
+				if(e != NULL) {
 					free(e);
 				}
 			}
