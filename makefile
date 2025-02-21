@@ -13,24 +13,24 @@
 
 CC = gcc
 COMCFLAGS = -Wall -Wconversion -Wextra -g3
-CFLAGS = $(COMCFLAGS) `pkg-config cairo pangocairo openssl --cflags` -I/usr/X11R6/include -I/usr/X11R6/include/X11
-LDFLAGS = `pkg-config cairo pangocairo openssl --libs` -lX11 -lm -L/usr/X11R6/lib -L/usr/X11R6/lib/X11
+CFLAGS = $(COMCFLAGS) `pkg-config gtk+-3.0 --cflags`
+LDFLAGS = `pkg-config gtk+-3.0 --libs` -lm
 COMOBJS = util.o info.o gamesys.o aiproc.o network.o ui.o
-OBJS = $(COMOBJS) zundagame.o graphics.o
-OUTNAME = zundagame
-PKGCFG ?= pkg-config
+OBJS = $(COMOBJS) zundagame-gtk3.o graphics.o
+OUTNAME = zundagame-gtk3
+
+ifeq ($(TARGET),X11)
+	OBJS = $(COMOBJS) zundagame-x11.o graphics.o
+	CFLAGS = $(COMCFLAGS) `pkg-config cairo pangocairo openssl --cflags` -I/usr/X11R6/include -I/usr/X11R6/include/X11
+	LDFLAGS = `pkg-config cairo pangocairo openssl --libs` -lX11 -lm -L/usr/X11R6/lib -L/usr/X11R6/lib/X11
+	OUTNAME=zundagame-x11
+endif
 
 ifeq ($(TARGET),WIN32)
 	OBJS=$(COMOBJS) graphics.o zundagame-win32.o
 	CFLAGS=$(COMCFLAGS) `$(PKGCFG) cairo pangocairo --cflags`
 	LDFLAGS=-lbcrypt -lws2_32 -lm `$(PKGCFG) cairo pangocairo --libs`
-endif
-
-ifeq ($(TARGET),GTK)
-	OBJS=$(COMOBJS) graphics.o zundagame-gtk3.o
-	CFLAGS=$(COMCFLAGS) `$(PKGCFG) gtk+-3.0 --cflags`
-	LDFLAGS=`$(PKGCFG) gtk+-3.0 --libs` -lm
-	OUTNAME=zundagame-gtk3
+	OUTNAME=zundagame-win32
 endif
 
 ifeq ($(TARGET),WASM)

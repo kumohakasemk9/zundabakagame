@@ -10,7 +10,7 @@ Zundamon bakage powered by cairo, X11.
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
 
-zundagame.c: linux entry point, X11 funcs.
+zundagame-x11.c: linux (and mac) entry point, X11 funcs.
 
 TODO List
 restrict from changing difficulty parameter by non oped user when SMP
