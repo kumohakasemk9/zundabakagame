@@ -253,7 +253,9 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"adwaitalegacy/battery-caution.png", //32 Insufficient energy level icon
 	"img/kumo9-x24/kumolaser.png", //33 Kumo x24 laser icon (hotbar)
 	"img/kumo9-x24/positron.png", //34 Kumo x24 positron icon (hotbar)
-	"adwaitalegacy/input-keyboard.png" //35 keyboard input icon (status bar)
+	"adwaitalegacy/input-keyboard.png", //35 keyboard input icon (status bar)
+	"img/help-en.png", //36 English instruction manual image
+	"img/help-jp.png", //37 Japanese instruction manual image
 };
 
 //InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout, requirepowerlevel
@@ -311,6 +313,14 @@ const double DBLINFO[MAX_TID] = {
 	0,   //22
 	0    //23
 };
+
+int32_t getlocalizedhelpimgid() {
+	if(LangID == LANGID_JP) {
+		return 37;
+	} else {
+		return 36;
+	}
+}
 
 const char* getlocalizedstring(int32_t stringid) {
 	if(!is_range(stringid, 0, MAX_STRINGS - 1) ) {

@@ -61,6 +61,7 @@ void drawstringf(double, double, const char*, ...);
 int32_t get_substring_width(char*, int32_t, int32_t);
 int32_t shrink_substring(char*, int32_t, int32_t, int32_t, int32_t*);
 
+extern langid_t LangID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game Objects
 extern int32_t CameraX, CameraY; //Camera Position
 extern int32_t CommandCursor; //Command System Related
@@ -112,6 +113,17 @@ void game_paint() {
 	draw_cui(); //draw minecraft like cui
 	draw_hotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
 	draw_info(); //draw game information
+
+	//Show help during help key pressed
+	if(KeyFlags & KEY_HELP) {
+		//Get image size
+		int32_t himg = getlocalizedhelpimgid();
+		//Calculate img offset to show
+		double iw, ih;
+		get_image_size(himg, &iw, &ih);
+		drawimage( (WINDOW_WIDTH / 2) - (iw / 2), (WINDOW_HEIGHT / 2) - (ih / 2), himg);
+	}
+
 	#ifndef __WASM
 		//Calculate draw time (AVG)
 		static int32_t dtmc = 0;
@@ -346,6 +358,7 @@ void draw_cui() {
 		drawstringf(0, 0, "Network: %d %d", SMPStatus, SelectedSMPProf);
 	}
 
+	
 	//Show command input window if command mode
 	if(CommandCursor != -1) {
 		//Shrink string to fit in screen

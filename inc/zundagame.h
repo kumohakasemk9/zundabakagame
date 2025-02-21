@@ -92,6 +92,7 @@ const char *getlocalizeditemdesc(int32_t);
 int32_t get_skillcooldown(obj_type_t, int32_t);
 int32_t get_skillinittimer(obj_type_t, int32_t);
 int32_t get_skillrange(obj_type_t, int32_t);
+int32_t getlocalizedhelpimgid();
 
 //network.c
 void network_recv_task();

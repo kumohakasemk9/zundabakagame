@@ -14,7 +14,7 @@ zunda-defs.h: definitions
 */
 
 //Data storage sizes
-#define IMAGE_COUNT 36 //Preload image count
+#define IMAGE_COUNT 38 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define BUFFER_SIZE 1024 //Command, message buffer size
 #define MAX_STRINGS 28 // Max string count
@@ -158,5 +158,6 @@ typedef enum {
 	KEY_UP = 0x10,
 	KEY_DOWN = 0x20,
 	KEY_LEFT = 0x40,
-	KEY_RIGHT = 0x80
+	KEY_RIGHT = 0x80,
+	KEY_HELP = 0x100
 } keyflags_t;

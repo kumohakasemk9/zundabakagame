@@ -1255,6 +1255,10 @@ void keypress_handler(char kc, specialkey_t ks) {
 			//I
 			if( (KeyFlags & KEY_UP) == 0) { KeyFlags += KEY_UP; }
 			break;
+		case 'h':
+		case 'H':
+			//H
+			if( (KeyFlags & KEY_HELP) == 0 ) { KeyFlags += KEY_HELP; }
 		default:
 			if(ks == SPK_F3) {
 				//F3 Key
@@ -1328,6 +1332,11 @@ void keyrelease_handler(char kc) {
 		case 'I':
 			//I
 			if(KeyFlags & KEY_UP) { KeyFlags -= KEY_UP; }
+			break;
+		case 'H':
+		case 'h':
+			//H
+			if(KeyFlags & KEY_HELP) { KeyFlags -= KEY_HELP; }
 			break;
 		}
 	}
