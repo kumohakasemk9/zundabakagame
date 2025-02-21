@@ -229,6 +229,8 @@ function keydown_cb(evt) {
 			ZundaGame.modifyKeyFlags(0x100, true);
 		} else if(evt.key == "d" || evt.key == "D") {
 			ZundaGame.use_item();
+		} else if(evt.key == "u" || evt.key == "U") {
+			ZundaGame.switch_locator();
 		} else if(evt.key == "t" || evt.key == "T") {
 			ZundaGame.start_command_mode(0);
 		} else if(evt.key == "/") {

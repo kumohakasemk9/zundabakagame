@@ -114,6 +114,7 @@ int32_t SpawnRemain; //playable character can not respawn if it is 0.
 int32_t InitSpawnRemain = -1; //how many times can playable character respawn?
 extern int32_t BlockedUsersCount;
 extern char** BlockedUsers;
+int32_t LocatorType = 0; //Game background type
 
 //Translate window coordinate into map coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -1169,6 +1170,11 @@ void cmd_putch(char c) {
 	}
 }
 
+void switch_locator() {
+	LocatorType++;
+	if(LocatorType > 2) { LocatorType = 0; }
+}
+
 //Set or reset bit of KeyFlags, s 1: set, 0: reset; f: bitmask
 void modifyKeyFlags(keyflags_t f, int32_t s) {
 	if(s == 0) {
@@ -1266,6 +1272,10 @@ void keypress_handler(char kc, specialkey_t ks) {
 		case 'H':
 			//H
 			if( (KeyFlags & KEY_HELP) == 0 ) { KeyFlags += KEY_HELP; }
+		case 'u':
+		case 'U':
+			switch_locator();
+			break;
 		default:
 			if(ks == SPK_F3) {
 				//F3 Key

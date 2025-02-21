@@ -99,6 +99,7 @@ extern int32_t DebugStatType;
 extern SMPProfile_t SMPProfs[];
 extern int32_t SelectedSMPProf;
 extern int32_t SpawnRemain;
+extern int32_t LocatorType; //Ruler type id
 
 //Paint event of window client, called for every 30mS
 void game_paint() {
@@ -140,28 +141,49 @@ void draw_game_main() {
 	}
 
 	//draw ruler or grid
-	//x-grid (show lines where x is double of 100, do not show first one)
-	chcolor(0x4000ff00, 1);
-	double tx = (floor(CameraX / 100.0) + 1) * 100;
-	int32_t cx = floor(CameraX / 100.0) + 1;
-	while(tx < CameraX + WINDOW_WIDTH) {
-		double lx, tt;
-		map2local(tx, 0, &lx, &tt);
-		drawline(lx, 0, lx, WINDOW_HEIGHT, 1);
-		drawstringf(lx, 0, "%d", cx);
-		tx += 100;
-		cx++;
-	}
-	//y-grid (show lines where y is double of 100, do not show first one)
-	double ty = (floor(CameraX / 100.0) + 1) * 100;
-	int32_t cy = floor(CameraY / 100.0) + 1;
-	while(ty < CameraY + WINDOW_HEIGHT) {
-		double ly, tt;
-		map2local(0, ty, &tt, &ly);
-		drawline(0, ly, WINDOW_WIDTH, ly, 1);
-		drawstringf(0, ly, "%d", cy);
-		ty += 100;
-		cy++;
+	if(LocatorType == 1) {
+		//x-grid (show lines where x is double of 100, do not show first one)
+		chcolor(0x4000ff00, 1);
+		double tx = (floor(CameraX / 100.0) + 1) * 100;
+		int32_t cx = floor(CameraX / 100.0) + 1;
+		while(tx < CameraX + WINDOW_WIDTH) {
+			double lx, tt;
+			map2local(tx, 0, &lx, &tt);
+			drawline(lx, 0, lx, WINDOW_HEIGHT, 1);
+			drawstringf(lx, 0, "%d", cx);
+			tx += 100;
+			cx++;
+		}
+		//y-grid (show lines where y is double of 100, do not show first one)
+		double ty = (floor(CameraX / 100.0) + 1) * 100;
+		int32_t cy = floor(CameraY / 100.0) + 1;
+		while(ty < CameraY + WINDOW_HEIGHT) {
+			double ly, tt;
+			map2local(0, ty, &tt, &ly);
+			drawline(0, ly, WINDOW_WIDTH, ly, 1);
+			drawstringf(0, ly, "%d", cy);
+			ty += 100;
+			cy++;
+		}
+	} else if(LocatorType == 2) {
+		//x-ruler (show lines where x is double of 10, make line longer if it is double of 50)
+		chcolor(0x4000ff00, 1);
+		double tx = floor( (CameraX + (WINDOW_WIDTH * 0.25) ) / 10.0) * 10;
+		while(tx < CameraX + (WINDOW_WIDTH * 0.75) ) {
+			double lx, tt, ll = 5;
+			map2local(tx, 0, &lx, &tt);
+			drawline(lx, 20, lx, ll + 20, 1);
+			tx += 10;
+		}
+		//y-ruler
+		double ty = floor( (CameraY + (WINDOW_HEIGHT * 0.25) ) / 10.0) * 10;
+		while(ty < CameraY + (WINDOW_HEIGHT * 0.75) ) {
+			double ly, tt, ll = 5;
+			map2local(0, ty, &tt, &ly);
+			drawline(20, ly, ll + 20, ly, 1);
+			ty += 10;
+		}
+
 	}
 
 
