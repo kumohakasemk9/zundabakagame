@@ -13,6 +13,8 @@ Kumohakase won't be responsible for any data loss/error by using this software p
 - `d`       : use item
 - `space`   : switch movement
 - `q/w/e`   : skill
+- `h`       : show help
+- `u`       : toggle background
    
 (1) You can cycle items also by mouse wheel.   
 (2) You can use item also by right click.   
