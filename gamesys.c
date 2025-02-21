@@ -28,6 +28,7 @@ gamesys.c: game process and related functions
 #include "inc/zundagame.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <math.h>

@@ -195,7 +195,7 @@ gboolean key_event(GtkWidget *self, GdkEventKey *event, gpointer data) {
 		}
 	}
 
-	if(k == SPK_NONE && !(0x20 <= r && r <= 0x7e) || event->length > 1) {
+	if( (k == SPK_NONE && !(0x20 <= r && r <= 0x7e) ) || event->length > 1) {
 		return FALSE; //Do not process except ascii and specified controls
 	}
 		

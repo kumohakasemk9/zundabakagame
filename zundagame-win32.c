@@ -7,7 +7,7 @@ https://www.patreon.com/kumohakasemk8
 Zundamon bakage powered by cairo, X11.
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
-windows-zunda-main.c: windows entry point, windows apis, socket wrapper.
+zundagame-win32.c: windows entry point, windows apis, socket wrapper.
 */
 #include "inc/zundagame.h"
 #include <stdio.h>
@@ -257,33 +257,6 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 	BCryptDestroyHash(hashhwnd);
 	return 0;
 }
-/*
-void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
-	//Data type check
-	const GdkContentFormats* f = gdk_clipboard_get_formats(GClipBoard);
-	gsize i;
-	const GType* t = gdk_content_formats_get_gtypes(f, &i);
-	if(t == NULL) {
-		g_print("main.c: clipboard_read_handler(): gdk_content_formats_get_gtypes() failed.\n");
-		return;
-	}
-	if(i != 1 || t[0] != G_TYPE_STRING) {
-		g_print("main.c: clipboard_read_handler(): Data type missmatch.\n");
-		return;
-	}
-	//Get text and insert into CommandBuffer
-	char *cb = gdk_clipboard_read_text_finish(GClipBoard, res, NULL);
-	//g_print("Clipboard string size: %d\nCommandBuffer length: %d\n", l, (uint32_t)strlen(CommandBuffer));
-	CommandBufferMutex = TRUE;
-	if(utf8_insertstring(CommandBuffer, cb, CommandCursor, sizeof(CommandBuffer) ) == 0) {
-		CommandCursor += (int32_t)g_utf8_strlen(cb, 65535);
-	} else {
-		g_print("main.c: clipboard_read_handler(): insert failed.\n");
-	}
-	CommandBufferMutex = FALSE;
-	free(cb);
-}
-*/
 //Open and connect tcp socket to hostname and port
 int32_t make_tcp_socket(char* hostname, char* port) {
 	if(Sock != INVALID_SOCKET) {

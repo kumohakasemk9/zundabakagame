@@ -15,6 +15,7 @@ util.c: utility functions
 
 #include "inc/zundagame.h"
 
+#include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 #include <time.h> //Do not include with windows.h, it will break windows compatibility

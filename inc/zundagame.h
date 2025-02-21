@@ -15,7 +15,8 @@ main.h: integrated header file
 
 #include <stdint.h>
 #include <stdarg.h>
-#include <stdlib.h>
+#include <sys/types.h>
+#include <stddef.h>
 
 #include "zunda-defs.h"
 #include "network.h"
