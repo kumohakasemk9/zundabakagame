@@ -30,6 +30,10 @@ extern int32_t ProgramExiting;
 extern langid_t LangID;
 GtkApplication *App; //Gtk session
 GtkWidget *ImgW; //Image screen
+GtkIMContext *IMCtx; //gtk IM context
+extern int32_t CommandCursor;
+extern char CommandBuffer[BUFFER_SIZE];
+extern int32_t CommandBufferMutex;
 
 gboolean mouse_scroll(GtkWidget*, GdkEventScroll*, gpointer);
 gboolean mouse_move(GtkWidget*, GdkEventMotion*, gpointer);
@@ -39,6 +43,8 @@ void activate(GtkApplication*, gpointer);
 gboolean gametick_wrapper(gpointer);
 gboolean redraw_win(gpointer);
 void socket_hwnd(GObject*, GAsyncResult*, gpointer);
+void im_commit(GtkIMContext*, gchar*, gpointer);
+void insert_to_cmdbuf(gchar*);
 
 int main(int argc, char *argv[]) {
 	char *fn = "credentials.txt";
@@ -60,7 +66,8 @@ int main(int argc, char *argv[]) {
 	g_signal_connect(App, "activate", G_CALLBACK(activate), NULL);
 	s = g_application_run(G_APPLICATION(App), argc, argv);
 	g_object_unref(App);
-	
+	g_object_unref(IMCtx);
+
 	//Finalize
 	do_finalize();
 	return s;
@@ -80,6 +87,13 @@ void activate(GtkApplication *app, gpointer data) {
 	gtk_container_add(GTK_CONTAINER(win), ImgW);
 	gtk_widget_add_events(win, GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_SCROLL_MASK | GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK);
 	gtk_widget_show_all(win);
+
+	//Prepare im
+	IMCtx = gtk_im_multicontext_new();
+	//gtk_im_context_set_client_window(IMCtx, gtk_widget_get_window(win) );
+	gtk_im_context_focus_in(IMCtx);
+	gtk_im_context_set_use_preedit(IMCtx, FALSE);
+	g_signal_connect(IMCtx, "commit", G_CALLBACK(im_commit), NULL);
 
 	//Start timer
 	g_timeout_add(10, gametick_wrapper, NULL);
@@ -102,6 +116,10 @@ gboolean gametick_wrapper(gpointer data) {
 		return FALSE;
 	}
 	return TRUE;
+}
+
+void im_commit(GtkIMContext *self, gchar *ctx, gpointer data) {
+	insert_to_cmdbuf(ctx);
 }
 
 //Mouse scroll handler
@@ -130,13 +148,11 @@ gboolean mouse_move(GtkWidget *self, GdkEventMotion *evt, gpointer data) {
 
 //Keyboard release handler
 gboolean key_event(GtkWidget *self, GdkEventKey *event, gpointer data) {
-	/*if(event->type == GDK_KEY_PRESS) {
-		info("press %s\n", event->string);
-	} else if(event->type == GDK_KEY_RELEASE) {
-		info("release %s\n", event->string);
+	//If command mode, pass key event to im
+	if(CommandCursor != -1) {
+		gtk_im_context_filter_keypress(IMCtx, event);
 	}
 	
-	info("key: %02x\n", event->string[0]);	*/
 	char r = (char)event->string[0];
 
 	//translate keyval to original data
@@ -153,6 +169,10 @@ gboolean key_event(GtkWidget *self, GdkEventKey *event, gpointer data) {
 		k = SPK_ESC;
 	} else if(event->keyval == GDK_KEY_F3) {
 		k = SPK_F3;
+	}
+
+	if(CommandCursor != -1 && k == SPK_NONE) {
+		return FALSE; //Accept only for special keys during command mode
 	}
 	if(k == SPK_NONE && !(0x20 <= r && r <= 0x7e) || event->length > 1) {
 		return FALSE; //Do not process except ascii and specified controls
@@ -234,6 +254,15 @@ int32_t compute_passhash(char* uname, char* password, uint8_t *salt, uint8_t *ou
 	return 0;
 }
 
+void insert_to_cmdbuf(gchar* data) {
+	CommandBufferMutex = TRUE;
+	if(utf8_insertstring(CommandBuffer, (char*)data, CommandCursor, sizeof(CommandBuffer) ) == 0) {
+		CommandCursor += (int32_t)g_utf8_strlen(data, 65535);
+	} else {
+		g_print("insert_to_cmdbuf(): insert failed.\n");
+	}
+	CommandBufferMutex = FALSE;
+}
 
 /*
 void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
@@ -252,13 +281,6 @@ void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
 	//Get text and insert into CommandBuffer
 	char *cb = gdk_clipboard_read_text_finish(GClipBoard, res, NULL);
 	//g_print("Clipboard string size: %d\nCommandBuffer length: %d\n", l, (uint32_t)strlen(CommandBuffer));
-	CommandBufferMutex = TRUE;
-	if(utf8_insertstring(CommandBuffer, cb, CommandCursor, sizeof(CommandBuffer) ) == 0) {
-		CommandCursor += (int32_t)g_utf8_strlen(cb, 65535);
-	} else {
-		g_print("main.c: clipboard_read_handler(): insert failed.\n");
-	}
-	CommandBufferMutex = FALSE;
 	free(cb);
 }
 
