@@ -248,6 +248,7 @@ function keyup_cb(evt) {
 			ZundaGame.modifyKeyFlags(4, false);
 		} else if(evt.key == 'h' || evt.key == "H") {
 			Zundagame.modifyKeyFlags(0x100, false);
+		}
 	}
 }
 
