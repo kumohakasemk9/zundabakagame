@@ -225,6 +225,8 @@ function keydown_cb(evt) {
 			ZundaGame.modifyKeyFlags(2, true);
 		} else if(evt.key == "e" || evt.key == "E") {
 			ZundaGame.modifyKeyFlags(4, true);
+		} else if(evt.key == 'h' || evt.key == "H") {
+			Zundagame.modifyKeyFlags(0x100, true);
 		} else if(evt.key == "d" || evt.key == "D") {
 			ZundaGame.use_item();
 		} else if(evt.key == "t" || evt.key == "T") {
@@ -244,7 +246,8 @@ function keyup_cb(evt) {
 			ZundaGame.modifyKeyFlags(2, false);
 		} else if(evt.key == "e" || evt.key == "E") {
 			ZundaGame.modifyKeyFlags(4, false);
-		}
+		} else if(evt.key == 'h' || evt.key == "H") {
+			Zundagame.modifyKeyFlags(0x100, false);
 	}
 }
 
