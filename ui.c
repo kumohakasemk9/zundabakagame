@@ -64,6 +64,7 @@ void draw_map_status();
 void draw_locator();
 void draw_help_win();
 
+extern int32_t ITEMCOOLDOWNS[ITEM_COUNT];
 extern langid_t LangID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game Objects
 extern int32_t CameraX, CameraY; //Camera Position
@@ -243,16 +244,6 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 			if(SMPPlayerInfo[i].cid != -1 && SMPPlayerInfo[i].playable_objid == idx) {
 				drawstring_inwidth(x, y - 50, SMPPlayerInfo[i].usr, (int32_t)w, 1);
 				break;
-			}
-		}
-	}
-	double bary = y + h + 2;
-	if(is_playable_character(Gobjs[idx].tid) ) {
-		//Timer bar for skill
-		for(uint8_t i = 0; i < SKILL_COUNT; i++) {
-			if(Gobjs[idx].timers[i + 1] != 0) {
-				draw_hpbar(x, bary, w, 5, Gobjs[idx].timers[i + 1], get_skillinittimer(Gobjs[idx].tid, i), COLOR_ENEMY, COLOR_TEXTCHAT);
-				bary += 7;
 			}
 		}
 	}
@@ -561,8 +552,9 @@ void draw_hotbar(double offsx, double offsy) {
 	}
 	for(uint8_t i = 0; i < ITEM_COUNT + SKILL_COUNT; i++) {
 		double tx = offsx + (i * 50);
-		int32_t itemlabel = 0;
 		int32_t itemdisabled = 0;
+		int32_t fullpbar;
+		int32_t nowpbar;
 		//Draw item background
 		if(SelectingItemID == i) {
 			//When item is selected, change backcolor and show item description
@@ -575,42 +567,65 @@ void draw_hotbar(double offsx, double offsy) {
 		fillrect(tx, offsy, 48, 48);
 
 		if(i < ITEM_COUNT) {
+			fullpbar = ITEMCOOLDOWNS[i];
+			nowpbar = ItemCooldownTimers[i];
 			//Show Item Image (hotbar)
 			drawimage_scale(tx, offsy, 48, 48, ITEMIMGIDS[i]);
 			//If item is not available, make text red.
 			if(ItemCooldownTimers[i] != 0 || Money < ITEMPRICES[i]) {
 				itemdisabled = 1;
-			}
-			if(ItemCooldownTimers[i] != 0) {
-				itemlabel = ItemCooldownTimers[i];
+				chcolor(COLOR_TEXTERROR, 1);	
 			} else {
-				itemlabel = ITEMPRICES[i];
+				chcolor(COLOR_TEXTCMD, 1);
 			}
+			drawstringf(tx + 2, offsy + 2 + 24, "%d", ITEMPRICES[i]);
 		} else {
 			//Draw Skills Icon
 			int32_t j = i - ITEM_COUNT;
+			fullpbar = plinf.skillcooldowns[j];
+			nowpbar = SkillCooldownTimers[j];
 			drawimage_scale(tx, offsy + 2, 48, 48, plinf.skillimageids[j]);
 			if(SkillCooldownTimers[j] != 0) {
 				itemdisabled = 1;
-				itemlabel = SkillCooldownTimers[j];
+				chcolor(COLOR_TEXTERROR, 1);
 			} else {
-				//Draw QWE Label
-				char* L[] = {"Q", "W", "E"};
 				chcolor(COLOR_TEXTCMD, 1);
-				drawstring(tx + 2, offsy + 2 + 24, L[j]);
+			}
+			//Draw QWE Label
+			char* L[] = {"Q", "W", "E"};
+			drawstring(tx + 2, offsy + 2 + 24, L[j]);
+			//Draw skill timer
+			if(is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
+				int32_t t = Gobjs[PlayingCharacterID].timers[j + 1];
+				if(t != 0) {
+					double v = scale_number( (double)t, (double)plinf.skillinittimers[j], 192);
+					chcolor(COLOR_TEXTCHAT, 1);
+					drawline(tx + 24, offsy + 2, tx + 24 + constrain_number(v, 0, 24), offsy + 2, 2); //upper middle -> upper right
+					if(v >= 24) {
+						drawline(tx + 48, offsy + 2, tx + 48, offsy + 2 + constrain_number(v, 24, 72) - 24, 2); //upper right -> lower right
+					}
+					if(v >= 72) {
+						drawline(tx + 48, offsy + 48 + 2, tx + 48 - (constrain_number(v, 72, 120) - 72 ), offsy + 48 + 2, 2); //lower right -> lower left
+					}
+					if(v >= 120) {
+						drawline(tx, offsy + 48 + 2, tx, offsy + 48 + 2 - (constrain_number(v, 120, 168) - 120), 2); //lower left -> upper left
+					}
+					if(v >= 168) {
+						drawline(tx, offsy + 2, tx + (constrain_number(v, 168, 192) - 168), offsy + 2, 2); //upper left -> upper middle
+					}
+				}
 			}
 		}
-	
+		
+		//if item/skill is in cd, draw indicator
+		if(nowpbar != 0) {
+			chcolor(0xa0ff0000, 1);
+			fillrect(tx, offsy + 2, 48, scale_number(nowpbar, fullpbar, 48) );
+		}
+
 		//draw unusable icon if unavailable
 		if(itemdisabled) {
 			drawimage(tx, offsy, IMG_ITEM_UNUSABLE);
-			chcolor(COLOR_TEXTERROR, 1);
-		} else {
-			chcolor(COLOR_TEXTCMD, 1);
-		}
-		if(!(i >= ITEM_COUNT && !itemdisabled) ) {
-			//already drawn: skill label when skill usable
-			drawstringf(tx + 2, offsy + 2 + 24, "%d", itemlabel);
 		}
 	}
 }

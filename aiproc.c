@@ -509,7 +509,7 @@ void damage_object(int32_t dstid, int32_t srcid) {
 		//Object Dead
 		//g_print("damage_object(): Object %d is dead.\n", i);
 		int32_t killerid = Gobjs[srcid].srcid;
-		if(killerid == PlayingCharacterID && Money < 200) {
+		if(killerid == PlayingCharacterID && Money < 500) {
 			obj_type_t tid = Gobjs[dstid].tid;
 			if(tid == TID_ZUNDAMON1) {
 				Money += 5;
@@ -531,11 +531,16 @@ void damage_object(int32_t dstid, int32_t srcid) {
 			
 			}
 		}
+		
+		//If playable dead, money will be half
+		if(dstid == PlayingCharacterID) {
+			Money = constrain_i32(Money, 0, Money / 2);
+		}
 
 		//Write deathlog if facilities or playable character
 		if(dstinfo.objecttype == UNITTYPE_FACILITY || is_playable_character(Gobjs[dstid].tid) ) {
 			//If enemy unit is killed by player, give money to ally team
-					//printlog("Object %d (srcid=%d) killed %d.\n", srcid, killerid, dstid);
+			//printlog("Object %d (srcid=%d) killed %d.\n", srcid, killerid, dstid);
 			//Minecraft style death log
 			int32_t deathreasonid = 16;
 			obj_type_t tid = Gobjs[srcid].tid;
