@@ -37,8 +37,8 @@ ui.c: gamescreen drawing
 //Coordinates
 #define IHOTBAR_XOFF 5 //Item hotbar X offset
 #define IHOTBAR_YOFF (WINDOW_HEIGHT - 100) //Item hotbar Y offset
-#define STATUS_XOFF (WINDOW_WIDTH / 2)
-#define STATUS_YOFF IHOTBAR_YOFF + 48
+#define STATUS_XOFF 0
+#define STATUS_YOFF 0
 
 #include "inc/zundagame.h"
 
@@ -50,7 +50,6 @@ ui.c: gamescreen drawing
 
 void draw_game_main();
 void draw_cui();
-void draw_info();
 void draw_hotbar(double, double);
 void draw_game_object(int32_t, LookupResult_t, double, double);
 void draw_shapes(int32_t, double, double);
@@ -61,6 +60,9 @@ int32_t drawstring_title(double, char*, int32_t);
 void drawstringf(double, double, const char*, ...);
 int32_t get_substring_width(char*, int32_t, int32_t);
 int32_t shrink_substring(char*, int32_t, int32_t, int32_t, int32_t*);
+void draw_map_status();
+void draw_locator();
+void draw_help_win();
 
 extern langid_t LangID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game Objects
@@ -111,11 +113,13 @@ void game_paint() {
 	clear_screen();
 
 	//Draw game
+	draw_locator(); //draw game background
 	draw_game_main(); //draw characters
-	draw_cui(); //draw minecraft like cui
 	draw_hotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
-	draw_info(); //draw game information
-	
+	draw_map_status(); //draw money, techevel etc
+	draw_cui(); //draw chat and command window, title string, error
+	draw_help_win(); //draw help window
+
 	#ifndef __WASM
 		//Calculate draw time (AVG)
 		static int32_t dtmc = 0;
@@ -133,59 +137,12 @@ void game_paint() {
 
 void draw_game_main() {
 	//draw lol type skill helper
-	if(is_range(SkillKeyState,0, SKILL_COUNT - 1) && is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
-		double x, y;
-		getlocalcoord(PlayingCharacterID, &x, &y);
-		chcolor(0x600000ff, 1);
-		fillcircle(x, y, get_skillrange(Gobjs[PlayingCharacterID].tid, SkillKeyState) );
-	}
-
-	//draw ruler or grid
-	if(LocatorType == 1) {
-		//x-grid (show lines where x is double of 100, do not show first one)
-		chcolor(0x4000ff00, 1);
-		double tx = (floor(CameraX / 100.0) + 1) * 100;
-		int32_t cx = floor(CameraX / 100.0) + 1;
-		while(tx < CameraX + WINDOW_WIDTH) {
-			double lx, tt;
-			map2local(tx, 0, &lx, &tt);
-			drawline(lx, 0, lx, WINDOW_HEIGHT, 1);
-			drawstringf(lx, 0, "%d", cx);
-			tx += 100;
-			cx++;
-		}
-		//y-grid (show lines where y is double of 100, do not show first one)
-		double ty = (floor(CameraX / 100.0) + 1) * 100;
-		int32_t cy = floor(CameraY / 100.0) + 1;
-		while(ty < CameraY + WINDOW_HEIGHT) {
-			double ly, tt;
-			map2local(0, ty, &tt, &ly);
-			drawline(0, ly, WINDOW_WIDTH, ly, 1);
-			drawstringf(0, ly, "%d", cy);
-			ty += 100;
-			cy++;
-		}
-	} else if(LocatorType == 2) {
-		//x-ruler (show lines where x is double of 10, make line longer if it is double of 50)
-		chcolor(0x4000ff00, 1);
-		double tx = floor( (CameraX + (WINDOW_WIDTH * 0.25) ) / 10.0) * 10;
-		while(tx < CameraX + (WINDOW_WIDTH * 0.75) ) {
-			double lx, tt, ll = 5;
-			map2local(tx, 0, &lx, &tt);
-			drawline(lx, 20, lx, ll + 20, 1);
-			tx += 10;
-		}
-		//y-ruler
-		double ty = floor( (CameraY + (WINDOW_HEIGHT * 0.25) ) / 10.0) * 10;
-		while(ty < CameraY + (WINDOW_HEIGHT * 0.75) ) {
-			double ly, tt, ll = 5;
-			map2local(0, ty, &tt, &ly);
-			drawline(20, ly, ll + 20, ly, 1);
-			ty += 10;
-		}
-
-	}
-
+	//if(is_range(SkillKeyState,0, SKILL_COUNT - 1) && is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
+	//	double x, y;
+	//	getlocalcoord(PlayingCharacterID, &x, &y);
+	//	chcolor(0x600000ff, 1);
+	//	fillcircle(x, y, get_skillrange(Gobjs[PlayingCharacterID].tid, SkillKeyState) );
+	//}
 
 	//draw characters
 	for(uint8_t z = 0; z < MAX_ZINDEX; z++) {
@@ -376,29 +333,90 @@ void draw_shapes(int32_t idx, double x, double y) {
 	}
 }
 
+void draw_locator() {
+	//draw ruler or grid
+	chcolor(0x4000ff00, 1);
+	if(LocatorType == 1) {
+		//calculate first line coordinate
+		int32_t cx = (int32_t)floor(CameraX / 100) + 1; 
+		int32_t cy = (int32_t)floor(CameraY / 100) + 1;
+		double tx = cx * 100; //first x coordinate (double of 100) after CameraX
+		double ty = cy * 100; //first y coordinate (double of 100) after CameraY
+		double lx, ly;
+		map2local(tx, ty, &lx, &ly);
+		//xgrid
+		while(lx < WINDOW_WIDTH) {
+			drawline(lx, 0, lx, WINDOW_HEIGHT, 1);
+			drawstringf(lx, 0, "%d", cx);
+			lx += 100;
+			cx++;
+		}
+		//y-grid
+		while(ly > 0) {
+			drawline(0, ly, WINDOW_WIDTH, ly, 1);
+			drawstringf(0, ly, "%d", cy);
+			ly -= 100;
+			cy++;
+		}
+	} else if(LocatorType == 2) {
+		//x-ruler (show lines where x is double of 10, make line longer if it is double of 50)
+		int32_t cx = (int32_t)floor( (CameraX + (WINDOW_WIDTH * 0.25) ) / 25.0);
+		int32_t cy = (int32_t)floor( (CameraY + (WINDOW_HEIGHT * 0.25) ) / 25.0);
+		double tx = cx * 25.0;
+		double ty = cy * 25.0;
+		double lx, ly;
+		map2local(tx, ty, &lx, &ly);
+		//x-ruler
+		while(lx < (WINDOW_WIDTH * 0.75) ) {
+			double ll = 5;
+			if(cx % 4 == 0) {
+				ll = 20;
+				drawstringf(lx, 50, "%d", (cx * 25) / 100);
+			}
+			drawline(lx, 20, lx, ll + 20, 1);
+			lx += 25;
+			cx++;
+		}
+		//y-ruler
+		while(ly > (WINDOW_HEIGHT * 0.25) ) {
+			double ll = 5;
+			if(cy % 4 == 0) {
+				ll = 20;
+				drawstringf(20, ly, "%d", (cy * 25) / 100);
+			}
+			drawline(20, ly, ll + 20, ly, 1);
+			ly -= 25;
+			cy++;
+		}
+	} else if(LocatorType == 3) {
+		//X grid
+		int32_t cx = (int32_t)floor(CameraX / 100.0) + 1;
+		int32_t cy = (int32_t)floor(CameraY / 100.0) + 1;
+		double tx = cx * 100.0;
+		double ty = cy * 100.0;
+		double lx, ly;
+		map2local(tx, ty, &lx, &ly);
+		while(ly > 0) {
+			double llx = lx;
+			int32_t llcx = cx;
+			while(llx < WINDOW_WIDTH) {
+				drawline(llx - 5, ly - 5, llx + 5, ly + 5, 1);
+				drawline(llx - 5, ly + 5, llx + 5, ly - 5, 1);
+				drawstringf(llx, ly + 5, "%02d%02d", llcx, cy);
+				llcx++;
+				llx += 100;
+			}
+			cy++;
+			ly -= 100;
+		}
+	}
+}
+
 void draw_cui() {
 	//draw minecraft like cui
 	int32_t fh = get_font_height();
 	double yoff = IHOTBAR_YOFF - fh - 12; //text area pos
 
-	//Show F3
-	chcolor(COLOR_TEXTCMD, 1);
-	if(DebugStatType == 1) {
-		//Calculate obj count
-		int32_t objc = 0;
-		for(int32_t i = 0; i < MAX_OBJECT_COUNT; i++) {
-			if(Gobjs[i].tid != TID_NULL) {
-				objc++;
-			}
-		}
-		drawstringf(0, 0, "System: %.2f %.2f (%.2f%%) %.2f%%", DrawTime, GameTickTime, GameTickTime / 10.0, (double)objc / (double)MAX_OBJECT_COUNT); //System Statics
-	} else if(DebugStatType == 2) {
-		drawstringf(0, 0, "Input: (%d, %d) (%d, %d) 0x%02x", CameraX, CameraY, CursorX, CursorY, KeyFlags); //Input Statics
-	} else if(DebugStatType == 3) {
-		drawstringf(0, 0, "Network: %d %d", SMPStatus, SelectedSMPProf);
-	}
-
-	
 	//Show command input window if command mode
 	if(CommandCursor != -1) {
 		//Shrink string to fit in screen
@@ -422,7 +440,7 @@ void draw_cui() {
 	//Show message window if there are message
 	if(CommandCursor != -1 || ChatTimeout != 0) {
 		chcolor(COLOR_TEXTCHAT, 1);
-		double ty = (double) fh * 2;
+		double ty = (double) fh;
 		for(uint8_t i = 0; i < MAX_CHAT_COUNT; i++) {
 			if(strlen(ChatMessages[i]) != 0) {
 				//print(m)
@@ -430,9 +448,7 @@ void draw_cui() {
 			}
 		}
 	}
-}
 
-void draw_info() {
 	//Draw Error Message if there are error
 	if(StatusShowTimer != 0) {
 		/*if(!is_range(RecentErrorId, 0, MAX_STRINGS - 1) ) {
@@ -466,51 +482,27 @@ void draw_info() {
 		}
 	}
 
-	//Show game status
-	//Show icons
-	drawimage(STATUS_XOFF, STATUS_YOFF, IMG_STAT_MONEY_ICO); //Money ico
-	drawimage(STATUS_XOFF, STATUS_YOFF + 16, IMG_STAT_TECH_ICO); //Tech icon
-	drawimage(STATUS_XOFF + 80, STATUS_YOFF, IMG_EARTH_ICO); //Earth Icon
-	//Show Money val
+	//Show F3
 	chcolor(COLOR_TEXTCMD, 1);
-	drawstringf(STATUS_XOFF + 16, STATUS_YOFF, "%d", Money);
-	//Show MapTechnologyLevel
-	drawstringf(STATUS_XOFF + 16, STATUS_YOFF + 16, "%d", MapTechnologyLevel);
-	//Show Energy Level
-	//Show Energy Icon
-	uint8_t tiid = IMG_STAT_ENERGY_GOOD; //battery icon index, if energy level is inefficient, change icon
-	uint32_t ttxtclr = COLOR_TEXTCMD;
-	if(MapRequiredEnergyLevel > MapEnergyLevel) {
-		tiid = IMG_STAT_ENERGY_BAD;
-		ttxtclr = COLOR_TEXTERROR;
-	}
-	drawimage(STATUS_XOFF, STATUS_YOFF + 32, tiid);
-	//Show current Energy level
-	chcolor(ttxtclr, 1);
-	drawstringf(STATUS_XOFF + 16, STATUS_YOFF + 32, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
-	//Show Earth HP
-	LookupResult_t t;
-	if(is_range(EarthID, 0, MAX_OBJECT_COUNT - 1) && Gobjs[EarthID].tid == TID_EARTH && lookup(Gobjs[EarthID].tid, &t) != -1) {
-		int32_t earthhp = (int32_t)Gobjs[EarthID].hp;
-		chcolor(COLOR_TEXTCMD, 1);
-		drawstringf(STATUS_XOFF + 96, STATUS_YOFF, "%d/%d", earthhp, t.inithp);
-	}
-
-	//Show status about playable character
-	if(is_range(CurrentPlayableID, 0, MAX_OBJECT_COUNT - 1) && is_playable_character(Gobjs[PlayingCharacterID].tid) && lookup(Gobjs[PlayingCharacterID].tid, &t) != -1) {
-		int32_t myhp = (int32_t)Gobjs[PlayingCharacterID].hp;
-		if(CharacterMove) {
-			drawimage(STATUS_XOFF + 80, STATUS_YOFF + 16, 20); //Show mouse icon
-		} else {
-			drawimage(STATUS_XOFF + 80, STATUS_YOFF + 16, 35); //Show keyboard icon
+	const int32_t DEBUG_XOFF = (WINDOW_WIDTH / 2), DEBUG_YOFF = 0;
+	if(DebugStatType == 1) {
+		//Calculate obj count
+		int32_t objc = 0;
+		for(int32_t i = 0; i < MAX_OBJECT_COUNT; i++) {
+			if(Gobjs[i].tid != TID_NULL) {
+				objc++;
+			}
 		}
-		chcolor(COLOR_TEXTCMD, 1);
-		drawstringf(STATUS_XOFF + 96, STATUS_YOFF + 16, "%d/%d x %d", myhp, t.inithp, SpawnRemain);
-	} else {
-		chcolor(COLOR_TEXTERROR, 1);
-		drawstringf(STATUS_XOFF + 96, STATUS_YOFF + 16, "%d", StateChangeTimer);
+		drawstringf(DEBUG_XOFF, DEBUG_YOFF, "System: %.2f %.2f (%.2f%%) %.2f%%", DrawTime, GameTickTime, GameTickTime / 10.0, (double)objc / (double)MAX_OBJECT_COUNT); //System Statics
+	} else if(DebugStatType == 2) {
+		drawstringf(DEBUG_XOFF, DEBUG_YOFF, "Input: (%d, %d) (%d, %d) 0x%02x", CameraX, CameraY, CursorX, CursorY, KeyFlags); //Input Statics
+	} else if(DebugStatType == 3) {
+		drawstringf(DEBUG_XOFF, DEBUG_YOFF, "Network: %d %d", SMPStatus, SelectedSMPProf);
 	}
 
+}
+
+void draw_help_win() {
 	//Show help during help key pressed
 	if(KeyFlags & KEY_HELP) {
 		//Get image size
@@ -519,6 +511,45 @@ void draw_info() {
 		double iw, ih;
 		get_image_size(himg, &iw, &ih);
 		drawimage( (WINDOW_WIDTH / 2) - (iw / 2), (WINDOW_HEIGHT / 2) - (ih / 2), himg);
+	}
+}
+
+void draw_map_status() {
+	//Show game status
+	//Show icons
+	drawimage(STATUS_XOFF, STATUS_YOFF, IMG_STAT_MONEY_ICO); //Money ico
+	drawimage(STATUS_XOFF + 50, STATUS_YOFF, IMG_STAT_TECH_ICO); //Tech icon
+	drawimage(STATUS_XOFF + 80, STATUS_YOFF, IMG_EARTH_ICO); //Earth Icon
+	//Show Money val
+	chcolor(COLOR_TEXTCMD, 1);
+	drawstringf(STATUS_XOFF + 16, STATUS_YOFF, "%d", Money);
+	//Show MapTechnologyLevel
+	drawstringf(STATUS_XOFF + 66, STATUS_YOFF, "%d", MapTechnologyLevel);
+	//Show Energy Level
+	//Show Energy Icon
+	uint8_t tiid = IMG_STAT_ENERGY_GOOD; //battery icon index, if energy level is inefficient, change icon
+	uint32_t ttxtclr = COLOR_TEXTCMD;
+	if(MapRequiredEnergyLevel > MapEnergyLevel) {
+		tiid = IMG_STAT_ENERGY_BAD;
+		ttxtclr = COLOR_TEXTERROR;
+	}
+	drawimage(STATUS_XOFF + 150, STATUS_YOFF, tiid);
+	//text
+	chcolor(ttxtclr, 1);
+	drawstringf(STATUS_XOFF + 166, STATUS_YOFF, "%d/%d", MapRequiredEnergyLevel, MapEnergyLevel);
+
+	//Show Earth HP
+	LookupResult_t t;
+	if(is_range(EarthID, 0, MAX_OBJECT_COUNT - 1) && Gobjs[EarthID].tid == TID_EARTH && lookup(Gobjs[EarthID].tid, &t) != -1) {
+		chcolor(COLOR_TEXTCMD, 1);
+		drawstringf(STATUS_XOFF + 96, STATUS_YOFF, "%.1lf%%", (Gobjs[EarthID].hp / t.inithp) * 100);
+	}
+
+	//Show timer if player dead
+	if(GameState == GAMESTATE_DEAD) {
+		drawimage(STATUS_XOFF + 250, STATUS_YOFF, 19);
+		chcolor(COLOR_TEXTERROR, 1);
+		drawstringf(STATUS_XOFF + 266, STATUS_YOFF, "%d", StateChangeTimer);
 	}
 }
 

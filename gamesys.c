@@ -1172,7 +1172,7 @@ void cmd_putch(char c) {
 
 void switch_locator() {
 	LocatorType++;
-	if(LocatorType > 2) { LocatorType = 0; }
+	if(LocatorType > 3) { LocatorType = 0; }
 }
 
 //Set or reset bit of KeyFlags, s 1: set, 0: reset; f: bitmask
@@ -1272,6 +1272,7 @@ void keypress_handler(char kc, specialkey_t ks) {
 		case 'H':
 			//H
 			if( (KeyFlags & KEY_HELP) == 0 ) { KeyFlags += KEY_HELP; }
+			break;
 		case 'u':
 		case 'U':
 			switch_locator();

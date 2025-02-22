@@ -508,36 +508,37 @@ void damage_object(int32_t dstid, int32_t srcid) {
 	if(Gobjs[dstid].hp == 0) {
 		//Object Dead
 		//g_print("damage_object(): Object %d is dead.\n", i);
+		int32_t killerid = Gobjs[srcid].srcid;
+		if(killerid == PlayingCharacterID && Money < 200) {
+			obj_type_t tid = Gobjs[dstid].tid;
+			if(tid == TID_ZUNDAMON1) {
+				Money += 5;
+			
+			} else if(tid == TID_ZUNDAMON2) {
+				Money += 10;
+			
+			} else if(tid == TID_ZUNDAMON3) {
+				Money += 20;
+			
+			} else if(tid == TID_ENEMYBASE) {
+				Money += 100;
+			
+			} else if(tid == TID_ZUNDAMON_KAMIKAZE) {
+				Money += 4;
 
-		//If enemy unit is dead, give money to ally team
-		obj_type_t tid = Gobjs[dstid].tid;
-		if(tid == TID_ZUNDAMON1) {
-			Money += 5;
+			} else if(tid == TID_ZUNDAMONMINE) {
+				Money += 1;
 			
-		} else if(tid == TID_ZUNDAMON2) {
-			Money += 10;
-			
-		} else if(tid == TID_ZUNDAMON3) {
-			Money += 20;
-			
-		} else if(tid == TID_ENEMYBASE) {
-			Money += 100;
-			
-		} else if(tid == TID_ZUNDAMON_KAMIKAZE) {
-			Money += 4;
-
-		} else if(tid == TID_ZUNDAMONMINE) {
-			Money += 1;
-			
+			}
 		}
 
 		//Write deathlog if facilities or playable character
 		if(dstinfo.objecttype == UNITTYPE_FACILITY || is_playable_character(Gobjs[dstid].tid) ) {
-			int32_t killerid = Gobjs[srcid].srcid;
-			//printlog("Object %d (srcid=%d) killed %d.\n", srcid, killerid, dstid);
+			//If enemy unit is killed by player, give money to ally team
+					//printlog("Object %d (srcid=%d) killed %d.\n", srcid, killerid, dstid);
 			//Minecraft style death log
 			int32_t deathreasonid = 16;
-			tid = Gobjs[srcid].tid;
+			obj_type_t tid = Gobjs[srcid].tid;
 			if(tid == TID_EXPLOSION || tid == TID_ALLYEXPLOSION || tid == TID_ENEMYEXPLOSION) {
 				//blown up
 				deathreasonid = 11;

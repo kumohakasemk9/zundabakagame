@@ -213,7 +213,7 @@ int32_t SKILLICONIDS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
 
 //Playable character information (tid, portraitimgid, dead portrait)
 const int32_t PLAYABLE_INFORMATION[PLAYABLE_CHARACTERS_COUNT][3] = {
-	{15, 19, 19} //kumo9-x24 (kumohakasemk9)
+	{15, 22, 22} //kumo9-x24 (kumohakasemk9)
 };
 
 //Image assets
@@ -237,7 +237,7 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"adwaitalegacy/preferences-other.png", //16 upgrade hotbar icon
 	"adwaitalegacy/applications-internet.png", //17 earth icon (status bar)
 	"adwaitalegacy/applications-system.png", //18 Money icon (status bar)
-	"img/kumo9-x24/portrait.png", //19 kumo9-x24 portrait (hotbar)
+	"adwaitalegacy/emblem-urgent.png", //19 dead playable respawn timer icon (status)
 	"adwaitalegacy/input-mouse.png", //20 Mouse icon (status bar)
 	"adwaitalegacy/preferences-system-16.png", //21 map mark: pit
 	"adwaitalegacy/image-missing.png", //22 image-missing
