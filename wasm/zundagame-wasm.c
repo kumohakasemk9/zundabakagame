@@ -29,6 +29,24 @@ extern langid_t LangID;
 extern SMPProfile_t *SMPProfs;
 extern int32_t SMPProfCount;
 uint8_t WASMRXBuffer[NET_BUFFER_SIZE]; //WASM can not reference Javascript Memory, need to pass data to WASM allocated memory
+extern int32_t WebsockMode;
+extern smpstatus_t SMPStatus;
+
+int32_t get_netbuf_size() {
+	return NET_BUFFER_SIZE;
+}
+
+int32_t is_websock_mode() {
+	return WebsockMode;
+}
+
+void set_websock_mode(int32_t v) {
+	if(SMPStatus == NETWORK_DISCONNECTED) {
+		WebsockMode = v;
+	} else {
+		warn("set_websock_mode(): Do not call while connecting\n");
+	}
+}
 
 uint8_t *getPtr_RXBuffer() {
 	return WASMRXBuffer;
@@ -84,11 +102,6 @@ uint32_t host2network_fconv_32(int32_t d) {
 	return htonl( (uint32_t)d);
 }
 
-ssize_t recv_tcp_socket(void* b, size_t a) {
-	warn("This function should be never called\n");
-	return 0;
-}
-
 int32_t isconnected_tcp_socket() {
 	warn("This function should be never called\n");
 	return 0;
@@ -99,34 +112,10 @@ int32_t compute_passhash(char* username, char* password, uint8_t* salt, uint8_t*
 	return -1;
 }
 
-/*
-void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
-	//Data type check
-	const GdkContentFormats* f = gdk_clipboard_get_formats(GClipBoard);
-	gsize i;
-	const GType* t = gdk_content_formats_get_gtypes(f, &i);
-	if(t == NULL) {
-		g_print("main.c: clipboard_read_handler(): gdk_content_formats_get_gtypes() failed.\n");
-		return;
-	}
-	if(i != 1 || t[0] != G_TYPE_STRING) {
-		g_print("main.c: clipboard_read_handler(): Data type missmatch.\n");
-		return;
-	}
-	//Get text and insert into CommandBuffer
-	char *cb = gdk_clipboard_read_text_finish(GClipBoard, res, NULL);
-	//g_print("Clipboard string size: %d\nCommandBuffer length: %d\n", l, (uint32_t)strlen(CommandBuffer));
-	CommandBufferMutex = TRUE;
-	if(utf8_insertstring(CommandBuffer, cb, CommandCursor, sizeof(CommandBuffer) ) == 0) {
-		CommandCursor += (int32_t)g_utf8_strlen(cb, 65535);
-	} else {
-		g_print("main.c: clipboard_read_handler(): insert failed.\n");
-	}
-	CommandBufferMutex = FALSE;
-	free(cb);
+ssize_t recv_tcp_socket(void* b, size_t l) {
+	warn("This function should never be called\n");
+	return -1;
 }
-
-*/
 
 void detect_syslang() {
 	//This won't be executed in WASM ver.

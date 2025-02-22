@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
 	char *passwdfile = "server_passwd";
 	//Process parameters
 	for(int i = 1; i < argc; i++) {
-		if(strcmp(argv[i], "--port") == 0) {
+		if(strcmp(argv[i], "-p") == 0) {
 			if(i + 1 < argc) {
 				int t = atoi(argv[i + 1]);
 				if(1 <= t && t <= 65535) {
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
 				printf("You need to specify port number!!\n");
 				return 1;
 			}
-		} else if(strcmp(argv[i], "--passfile") == 0) {
+		} else if(strcmp(argv[i], "-f") == 0) {
 			if(i + 1 < argc) {
 				passwdfile = argv[i + 1];
 			} else {

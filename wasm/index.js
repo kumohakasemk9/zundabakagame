@@ -38,6 +38,7 @@ var SavedColor;
 var GTTime = 0, GTTimeCnt = 0, GTTimeAvg = 0;
 var DTime = 0, DTimeCnt = 0, DTimeAvg = 0;
 var WS = null;
+var WSmode;
 
 addEventListener("load", function() {
 	//Check window size
@@ -75,6 +76,7 @@ async function wasm_load_cb(ev) {
 		ZundaGame.set_language(1);
 	}
 	ZundaGame.gameinit();
+	ZundaGame.set_websock_mode(1);
 	
 	//Load images
 	updateStatus("Loading images...");
@@ -111,6 +113,8 @@ function img_load_cb(evt) {
 		CV.addEventListener("wheel", mousewheel_cb);
 		document.addEventListener("keydown", keydown_cb);
 		document.addEventListener("keyup", keyup_cb);
+		WSmode = document.getElementById("websockmode");
+		WSmode.addEventListener("change", wsmode_change);
 	}
 }
 
@@ -148,6 +152,15 @@ function drawgame() {
 	} else {
 		updateStatus("Error");
 		p.innerText = "error";
+	}
+}
+
+function wsmode_change(evt) {
+	if(WSmode.checked) {
+		ZundaGame.set_websock_mode(0);
+		console.log("Turned raw websock mode on");
+	} else {
+		ZundaGame.set_websock_mode(1);
 	}
 }
 
@@ -255,15 +268,24 @@ function keyup_cb(evt) {
 }
 
 function ws_msg_cb(evt) {
-	//let binstr = "";
+	//Implement timeout!
 	const data = new DataView(evt.data);
 	let len = data.byteLength;
+	//let binstr = "";
+	if(len > ZundaGame.get_netbuf_size() ) {
+		console.warn("recv buffer overflow.");
+		return true;
+	}
 	for(let i = 0; i < len; i++) {
 		//binstr += ("00" + data.getUint8(i).toString(16) ).slice(-2) + " ";
 		MemView.setUint8(PRXBuffer + i, data.getUint8(i) );
 	}
 	//console.log(`WS recv (${len}): ${binstr}`);
-	ZundaGame.pkt_recv_handler(PRXBuffer, len);
+	if(ZundaGame.is_websock_mode() ) {
+		ZundaGame.net_message_handler(PRXBuffer, len);
+	} else {
+		ZundaGame.process_tcp_packet(PRXBuffer, len);
+	}
 	return false;
 }
 
@@ -278,7 +300,7 @@ function ws_close_cb(evt) {
 } 
 
 function ws_error_cb(evt) {
-	console.warn("Websocket error: " + evt);
+	console.warn("Websocket error: " + evt.toString() );
 }
 
 function sha512_cb(digest) {
@@ -288,7 +310,11 @@ function sha512_cb(digest) {
 		return;
 	}
 	let v = new DataView(digest);
-	let senddata = [1];
+	let senddata = [];
+	if(ZundaGame.is_websock_mode() == 0) {
+		senddata.push(65);
+	}
+	senddata.push(1);
 	for(let i = 0; i < v.byteLength; i++) {
 		senddata.push(v.getUint8(i) );
 	}
@@ -430,6 +456,7 @@ function make_tcp_socket(peeraddr, port) {
 	const s_port = pointer_to_str(port);
 	const wsaddr = `ws://${s_addr}:${s_port}/`
 	console.log(`Connecting to ${wsaddr}`);
+	WSpendinglen = 0;
 	WS = new WebSocket(wsaddr);
 	WS.binaryType = "arraybuffer";
 	WS.addEventListener("open", ws_open_cb);
@@ -443,6 +470,7 @@ function make_tcp_socket(peeraddr, port) {
 function send_tcp_socket(data, len) {
 	if(WS == null) {
 		console.warn("send_tcp_socket(): Websocket is not connected.");
+		return -1;
 	} else {
 		//let binstr = "";
 		let rdata = new Array();

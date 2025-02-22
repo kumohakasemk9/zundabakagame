@@ -37,7 +37,7 @@ ifeq ($(TARGET),WASM)
 	CC=emcc
 	OBJS=wasm/zundagame-wasm.o $(COMOBJS)
 	CFLAGS=$(COMCFLAGS) -D__WASM
-	LDFLAGS=--no-entry -s "EXPORTED_FUNCTIONS=['_gameinit', '_gametick', '_select_next_item', '_select_prev_item', '_use_item', '_switch_character_move', '_game_paint', '_isProgramExiting', '_is_cmd_mode', '_getIMGPATHES', '_getImageCount', '_modifyKeyFlags', '_cmd_putch', '_cmd_enter', '_cmd_cancel', '_cmd_cursor_back', '_cmd_cursor_forward', '_cmd_backspace', '_start_command_mode', '_mousemotion_handler', '_set_language', '_pkt_recv_handler', '_connection_establish_handler', '_connection_close_handler', '_getPtr_RXBuffer', '_switch_locator']" -s ERROR_ON_UNDEFINED_SYMBOLS=0
+	LDFLAGS=--no-entry -s "EXPORTED_FUNCTIONS=['_gameinit', '_gametick', '_select_next_item', '_select_prev_item', '_use_item', '_switch_character_move', '_game_paint', '_isProgramExiting', '_is_cmd_mode', '_getIMGPATHES', '_getImageCount', '_modifyKeyFlags', '_cmd_putch', '_cmd_enter', '_cmd_cancel', '_cmd_cursor_back', '_cmd_cursor_forward', '_cmd_backspace', '_start_command_mode', '_mousemotion_handler', '_set_language', '_net_message_handler', '_process_tcp_packet', '_connection_establish_handler', '_connection_close_handler', '_getPtr_RXBuffer', '_switch_locator', '_is_websock_mode', '_get_netbuf_size', '_set_websock_mode']" -s ERROR_ON_UNDEFINED_SYMBOLS=0
 	OUTNAME=wasm/zundagame.wasm
 endif
 

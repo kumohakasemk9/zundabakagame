@@ -55,13 +55,14 @@ int32_t DisconnectWhenBadPacket = 1; //Need to be modified by gdb
 char **BlockedUsers = NULL; //blocked username ptr array (dynamic alloc)
 int32_t BlockedUsersCount = 0; //Elements of Blocked Users
 int32_t IsChatEnable = 1; //0 to supress chat
+int32_t WebsockMode; //If 1, client should not add length header in sending messages, always 0 in non WASM builds
 
 #ifdef __WASM
 	extern void wasm_login_to_smp(char*, char*, uint8_t*);
 #endif
 int32_t process_smp_events(uint8_t*, size_t, int32_t);
 void net_server_send_cmd(server_command_t);
-void pkt_recv_handler(uint8_t*, size_t);
+void net_message_handler(uint8_t*, size_t);
 void connection_establish_handler();
 void connection_close_handler();
 int32_t evh_playable_location(uint8_t*, size_t, int32_t);
@@ -74,6 +75,7 @@ ssize_t evh_hello(uint8_t*, size_t, int32_t);
 int32_t evh_bye(int32_t);
 int32_t evh_change_playable_id(uint8_t*, size_t, int32_t);
 int32_t findblockeduser(char*);
+void process_tcp_packet(uint8_t*, size_t);
 
 void close_connection_cmd() {
 	info("Disconnect requested from user.\n");
@@ -128,15 +130,18 @@ void network_recv_task() {
 		return;
 	}
 	TimeoutTimer = 0;
+	process_tcp_packet(b, (size_t)r);
+}
 
+void process_tcp_packet(uint8_t *b, size_t l) {
 	//Process data
 	//Length 0-FD    XX
 	//Length FE-FFFF FE XX XX
 	//concat TempRXBuffer and b into tmpbuf
 	uint8_t tmpbuf[NET_BUFFER_SIZE * 2];
 	memcpy(tmpbuf, TempRXBuffer, TRXBLength);
-	memcpy(&tmpbuf[TRXBLength], b, (size_t)r);
-	size_t totallen = TRXBLength + (size_t)r;
+	memcpy(&tmpbuf[TRXBLength], b, (size_t)l);
+	size_t totallen = TRXBLength + (size_t)l;
 	//Process for each packet
 	size_t p = 0;
 	while(p < totallen) {
@@ -166,7 +171,7 @@ void network_recv_task() {
 		if(remain < reqsize) {
 			break; //Not enough packet received
 		} else {
-			pkt_recv_handler(&tmpbuf[p + lenhdrsize], reqsize - lenhdrsize);
+			net_message_handler(&tmpbuf[p + lenhdrsize], reqsize - lenhdrsize);
 		}
 		p += reqsize;
 	}
@@ -188,13 +193,14 @@ void connection_establish_handler() {
 	showstatus( (char*)getlocalizedstring(20) ); //connected
 	info("Connected to remote SMP server.\n");
 	SMPStatus = NETWORK_CONNECTED;
-	#ifndef __WASM
-	send_tcp_socket("\n", 1);
-	#endif
+	if(WebsockMode == 0) {
+		send_tcp_socket("\n", 1);
+		info("RAW mode: sending raw protocol request.\n");
+	}
 }
 
-//Packet receiver handler
-void pkt_recv_handler(uint8_t *pkt, size_t plen) {
+//Network message receiver handler
+void net_message_handler(uint8_t *pkt, size_t plen) {
 	//Handle packet
 	if(pkt[0] == NP_RESP_DISCONNECT) {
 		//Disconnect packet
@@ -303,6 +309,9 @@ void connect_server_cmd(char* cmdparam) {
 	ConnectionTimeoutTimer = 0;
 	DisconnectReasonProvided = 0;
 	IsChatEnable = 1;
+	#ifndef __WASM
+	WebsockMode = 0;
+	#endif
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		SMPPlayerInfo[i].cid = -1;
 		SMPPlayerInfo[i].playable_objid = -1;
@@ -375,11 +384,14 @@ void net_server_send_cmd(server_command_t cmd) {
 		warn("net_server_send_command(): Bad command.\n");
 		return;
 	}
-	#ifdef __WASM
-		//WASM version should send message without size header, websocket will care for it
+
+	//Send it
+	if(WebsockMode == 1) {
+		//If websocket will ensure message length, send message without size header
 		send_tcp_socket(cmdbuf, ctxlen);
-	#else
-		//Check for size and make size header, assemble packet.
+		//info("websock mode: omitting sizehdr");
+	} else {
+		//Check for size and make size header, assemble message.
 		size_t hdrlen;
 		uint8_t buf[NET_BUFFER_SIZE];
 		if(is_range( (int32_t)ctxlen, 0, 0xfd) ) {
@@ -400,12 +412,10 @@ void net_server_send_cmd(server_command_t cmd) {
 			return;
 		}
 		memcpy(&buf[hdrlen], cmdbuf, ctxlen);
-
-		//Send
 		if(send_tcp_socket(buf, totallen) != totallen) {
 			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 		}
-	#endif
+	}
 }
 
 //Process SMP packet

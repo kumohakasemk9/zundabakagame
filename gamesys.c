@@ -828,7 +828,7 @@ void execcmd() {
 	} else if(strcmp(CommandBuffer, "/togglechat") == 0) {
 		//Togglechat cmd
 		togglechat_cmd();
-
+	
 	} else {
 		if(CommandBuffer[0] == '/') {
 			chatf( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) );

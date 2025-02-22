@@ -113,7 +113,7 @@ void listusermute_cmd();
 void togglechat_cmd();
 void addusermute_cmd(char*);
 void delusermute_cmd(char*);
-
+void switch_websock_mode_cmd();
 
 //aiproc.c
 void procai();
