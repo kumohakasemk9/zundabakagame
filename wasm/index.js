@@ -233,6 +233,7 @@ function keydown_cb(evt) {
 		if(evt.key == "Enter") {
 			send_cmd_to_game(CmdInput.value);
 			CmdInput.value = "";
+			CmdInput.unfocus();
 			focus_game();
 		}
 	}
