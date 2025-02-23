@@ -21,6 +21,7 @@ main-emscripten.c: wasm functions
 
 extern void console_put(char*, int); //imported function, print str on console (0: info, 1: warn, 2: err)
 
+extern char CommandBuffer[BUFFER_SIZE];
 extern int32_t ProgramExiting;
 extern const char* IMGPATHES[IMAGE_COUNT];
 extern int32_t CommandCursor;
@@ -31,6 +32,14 @@ extern int32_t SMPProfCount;
 uint8_t WASMRXBuffer[NET_BUFFER_SIZE]; //WASM can not reference Javascript Memory, need to pass data to WASM allocated memory
 extern int32_t WebsockMode;
 extern smpstatus_t SMPStatus;
+
+char* getPtr_CommandBuffer() {
+	return CommandBuffer;
+}
+
+int32_t getLimit_CommandBuffer() {
+	return BUFFER_SIZE;
+}
 
 int32_t get_netbuf_size() {
 	return NET_BUFFER_SIZE;

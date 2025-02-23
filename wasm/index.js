@@ -39,20 +39,22 @@ var GTTime = 0, GTTimeCnt = 0, GTTimeAvg = 0;
 var DTime = 0, DTimeCnt = 0, DTimeAvg = 0;
 var WS = null;
 var WSmode;
+var CmdInput;
+var IsGameFocused;
 
 addEventListener("load", function() {
-	//Check window size
-	if(window.clientWidth < 850 || window.clientHeight < 650) {
-		alert("You need at least 850x 650 window space");
-		return;
-	}
-	
 	//Obtain graphics context, init
 	CV = document.getElementById("cv");
 	G = CV.getContext("2d");
 	G.font = "14pt monospace";
 	G.textBaseline = "top";
-	
+	//Init other elems
+	CmdInput = document.getElementById("cmdinput");
+	IsGameFocused = 0;
+	CV.addEventListener("mouseleave", cv_mouseleave_cb);
+	CV.addEventListener("mouseenter", cv_mouseenter_cb);	
+
+	//Load WASM
 	updateStatus("Loading WASM...", 0, 0);
 	const XHR = new XMLHttpRequest();
 	XHR.open("GET", "zundagame.wasm");
@@ -71,6 +73,7 @@ async function wasm_load_cb(ev) {
 	MemView = new DataView(ZundaGame.memory.buffer);
 	PRXBuffer = ZundaGame.getPtr_RXBuffer();
 
+	//Auto set language, init game
 	let la = navigator.language;
 	if(la.includes("ja") ) {
 		ZundaGame.set_language(1);
@@ -111,8 +114,8 @@ function img_load_cb(evt) {
 		CV.addEventListener("mousemove", mousemove_cb);
 		CV.addEventListener("mousedown", mousedown_cb);
 		CV.addEventListener("wheel", mousewheel_cb);
-		document.addEventListener("keydown", keydown_cb);
-		document.addEventListener("keyup", keyup_cb);
+		addEventListener("keydown", keydown_cb);
+		addEventListener("keyup", keyup_cb);
 		WSmode = document.getElementById("websockmode");
 		WSmode.addEventListener("change", wsmode_change);
 	}
@@ -153,6 +156,14 @@ function drawgame() {
 		updateStatus("Error");
 		p.innerText = "error";
 	}
+}
+
+function cv_mouseleave_cb() {
+	unfocus_game();
+}
+
+function cv_mouseenter_cb() {
+	focus_game();
 }
 
 function wsmode_change(evt) {
@@ -201,69 +212,102 @@ function mousemove_cb(evt) {
 }
 
 function mousedown_cb(evt) {
+	if(IsGameFocused == 0) { return; }
 	if(evt.buttons == 1) {
 		ZundaGame.switch_character_move();
 	}
 }
 
 function mousewheel_cb(evt) {
+	if(IsGameFocused == 0) { return; }
 	if(evt.deltaY > 0) {
 		ZundaGame.select_next_item();
 	} else {
 		ZundaGame.select_prev_item();
 	}
+	evt.preventDefault();
 }
 
 function keydown_cb(evt) {
-	const c = evt.key.codePointAt(0);
-	if(ZundaGame.is_cmd_mode() ) {
+	if(document.activeElement == CmdInput) {
 		if(evt.key == "Enter") {
-			ZundaGame.cmd_enter();
-		} else if(evt.key == "Escape") {
-			ZundaGame.cmd_cancel();
-		} else if(evt.key == "Backspace") {
-			ZundaGame.cmd_backspace();
-		} else if(evt.key == "ArrowLeft") {
-			ZundaGame.cmd_cursor_back();
-		} else if(evt.key == "ArrowRight") {
-			ZundaGame.cmd_cursor_forward();
-		} else if(evt.key.length == 1 && 0x20 <= c && c <= 0x7e) {
-			ZundaGame.cmd_putch(c);
-			evt.preventDefault();
+			send_cmd_to_game(CmdInput.value);
+			CmdInput.value = "";
+			focus_game();
 		}
-	} else {
-		if(evt.key == "q" || evt.key == "Q") {
-			ZundaGame.modifyKeyFlags(1, true);
-		} else if(evt.key == "w" || evt.key == "W") {
-			ZundaGame.modifyKeyFlags(2, true);
-		} else if(evt.key == "e" || evt.key == "E") {
-			ZundaGame.modifyKeyFlags(4, true);
-		} else if(evt.key == 'h' || evt.key == "H") {
-			ZundaGame.modifyKeyFlags(0x100, true);
-		} else if(evt.key == "d" || evt.key == "D") {
-			ZundaGame.use_item();
-		} else if(evt.key == "u" || evt.key == "U") {
-			ZundaGame.switch_locator();
-		} else if(evt.key == "t" || evt.key == "T") {
-			ZundaGame.start_command_mode(0);
-		} else if(evt.key == "/") {
-			ZundaGame.start_command_mode(1);
-			evt.preventDefault();
-		}
+	}
+	if(IsGameFocused == 0) { return; }
+	if(evt.key == "q" || evt.key == "Q") {
+		ZundaGame.modifyKeyFlags(1, true);
+	} else if(evt.key == "w" || evt.key == "W") {
+		ZundaGame.modifyKeyFlags(2, true);
+	} else if(evt.key == "e" || evt.key == "E") {
+		ZundaGame.modifyKeyFlags(4, true);
+	} else if(evt.key == 'h' || evt.key == "H") {
+		ZundaGame.modifyKeyFlags(0x100, true);
+	} else if(evt.key == "a" || evt.key == "A") {
+		ZundaGame.select_prev_item();
+	} else if(evt.key == "s" || evt.key == "S") {
+		ZundaGame.select_next_item();
+	} else if(evt.key == "d" || evt.key == "D") {
+		ZundaGame.use_item();
+	} else if(evt.key == "u" || evt.key == "U") {
+		ZundaGame.switch_locator();
+	} else if(evt.key == "t" || evt.key == "T") {
+		start_command_mode(0);
+		evt.preventDefault();
+	} else if(evt.key == "/") {
+		start_command_mode(1);
+		evt.preventDefault();
 	}
 }
 
+function start_command_mode(m) {
+	if(m == 1) {
+		CmdInput.value = "/";
+	}
+	CmdInput.focus();
+	unfocus_game();
+}
+
+function send_cmd_to_game(c) {
+	//inject command string to the game
+	//Get encoded str
+	p = ZundaGame.getPtr_CommandBuffer();
+	ui8a = new TextEncoder().encode(c);
+	l = ui8a.byteLength;
+	if(l >= ZundaGame.getLimit_CommandBuffer() ) {
+		console.warn("Too long command.");
+		return;
+	}
+	//Inject to CommandBuffer
+	for(let i = 0; i < l; i++) {
+		MemView.setUint8(p + i, ui8a[i] );
+	}
+	MemView.setUint8(p + l, 0);
+	ZundaGame.execcmd();
+}
+
+function unfocus_game() {
+	CV.style.border = "dashed red 1px";
+	IsGameFocused = 0;
+}
+
+function focus_game() {
+	CV.style.border = "solid white 2px";
+	IsGameFocused = 1;
+}
+
 function keyup_cb(evt) {
-	if(!ZundaGame.is_cmd_mode() ) {
-		if(evt.key == "q" || evt.key == "Q") {
-			ZundaGame.modifyKeyFlags(1, false);
-		} else if(evt.key == "w" || evt.key == "W") {
-			ZundaGame.modifyKeyFlags(2, false);
-		} else if(evt.key == "e" || evt.key == "E") {
-			ZundaGame.modifyKeyFlags(4, false);
-		} else if(evt.key == 'h' || evt.key == "H") {
-			ZundaGame.modifyKeyFlags(0x100, false);
-		}
+	if(IsGameFocused == 0) { return; }
+	if(evt.key == "q" || evt.key == "Q") {
+		ZundaGame.modifyKeyFlags(1, false);
+	} else if(evt.key == "w" || evt.key == "W") {
+		ZundaGame.modifyKeyFlags(2, false);
+	} else if(evt.key == "e" || evt.key == "E") {
+		ZundaGame.modifyKeyFlags(4, false);
+	} else if(evt.key == 'h' || evt.key == "H") {
+		ZundaGame.modifyKeyFlags(0x100, false);
 	}
 }
 
