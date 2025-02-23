@@ -14,6 +14,7 @@ main-emscripten.c: wasm functions
 
 */
 #include "../inc/zundagame.h"
+#include "sha512/sha512.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,8 +114,19 @@ int32_t isconnected_tcp_socket() {
 }
 
 int32_t compute_passhash(char* username, char* password, uint8_t* salt, uint8_t* output) {
-	warn("compute_passhash(): Not supported in wasm. We have no openssl, and JavaScript crypto module is not friendly for wasm import. :(\n");
-	return -1;
+	char in[UNAME_SIZE + PASSWD_SIZE + SALT_LENGTH];
+	size_t ul = strlen(username);
+	size_t pl = strlen(password);
+	size_t l = ul + pl + SALT_LENGTH;
+	if(l > sizeof(in) ) {
+		warn("compute_passhash(): too long input.\n");
+		return -1;
+	}
+	memcpy(in, username, ul);
+	memcpy(&in[ul], password, pl);
+	memcpy(&in[ul + pl], salt, SALT_LENGTH);
+	crypto_hash_sha512(output, in, l);
+	return 0;
 }
 
 ssize_t recv_tcp_socket(void* b, size_t l) {

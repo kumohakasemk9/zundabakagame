@@ -1,6 +1,5 @@
 const importobj = {
 	env : {
-		wasm_login_to_smp : wasm_login_to_smp,
 		make_tcp_socket : make_tcp_socket,
 		close_tcp_socket : close_tcp_socket,
 		send_tcp_socket : send_tcp_socket,
@@ -545,19 +544,4 @@ function close_tcp_socket() {
 		return 0;
 	}
 	return -1;
-}
-
-//char*, char* uint8_t*
-function wasm_login_to_smp(usr, pwd, salt) {
-	const ptrs = [usr, pwd, salt];
-	const maxlens = [20, 16, 16];
-	let rkba = new Array();
-	for(let i = 0; i < 3; i++) {
-		for(let j = 0; j < maxlens[i]; j++) {
-			e = MemView.getUint8(ptrs[i] + j);
-			if(e == 0 && i != 2) {break;}
-			rkba.push(e);
-		}
-	}
-	crypto.subtle.digest("SHA-512", new Uint8Array(rkba) ).then(sha512_cb);
 }

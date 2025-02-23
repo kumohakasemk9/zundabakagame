@@ -57,9 +57,6 @@ int32_t BlockedUsersCount = 0; //Elements of Blocked Users
 int32_t IsChatEnable = 1; //0 to supress chat
 int32_t WebsockMode; //If 1, client should not add length header in sending messages, always 0 in non WASM builds
 
-#ifdef __WASM
-	extern void wasm_login_to_smp(char*, char*, uint8_t*);
-#endif
 int32_t process_smp_events(uint8_t*, size_t, int32_t);
 void net_server_send_cmd(server_command_t);
 void net_message_handler(uint8_t*, size_t);
@@ -75,6 +72,7 @@ ssize_t evh_hello(uint8_t*, size_t, int32_t);
 int32_t evh_bye(int32_t);
 int32_t evh_change_playable_id(uint8_t*, size_t, int32_t);
 int32_t findblockeduser(char*);
+int32_t addusermute(char*);
 void process_tcp_packet(uint8_t*, size_t);
 
 void close_connection_cmd() {
@@ -379,14 +377,9 @@ void net_server_send_cmd(server_command_t cmd) {
 		info("net_server_send_cmd(): NP_LOGIN_WITH_HASH: Attempeting to login to SMP server as %s\n", usr);
 		char *pwd = SMPProfs[SelectedSMPProf].pwd;
 		//Make login key (SHA512 of username+password+salt)
-		#ifdef __WASM
-			//In WASM version, browser will make login key and send it
-			wasm_login_to_smp(usr, pwd, SMPsalt);
-			return;
-		#endif
 		uint8_t ph[SHA512_LENGTH];
 		if(compute_passhash(usr, pwd, SMPsalt, ph) != 0)  {
-			warn("np_server_send_cmd(): NP_LOGIN_WITH_HASH: calculating hash failed.\n");
+			warn("net_server_send_cmd(): NP_LOGIN_WITH_HASH: calculating hash failed.\n");
 			return;
 		}
 		memcpy(&cmdbuf[1], ph, SHA512_LENGTH); //combine command and hash
@@ -1188,11 +1181,21 @@ void addusermute_cmd(char *p) {
 		warn("addusermute_cmd(): too long username.\n");
 		return;
 	}
+	addusermute(p);
+}
+
+int32_t addusermute(char *p) {
+	size_t l = strnlen(p, UNAME_SIZE);
+
+	if(l >= UNAME_SIZE) {
+		warn("addusermute(): too long username\n");
+		return -1;
+	}
 
 	//Check for dup
 	if(findblockeduser(p) != -1) {
-		warn("addusermute_cmd(): You already have that.\n");
-		return;
+		warn("addusermute(): You already have that.\n");
+		return -1;
 	}
 	
 	//If it is first time to add, malloc. if there's NULL in array, overwrite it. if no space, grow the array.
@@ -1200,8 +1203,8 @@ void addusermute_cmd(char *p) {
 	if(BlockedUsers == NULL) {
 		BlockedUsers = malloc( sizeof(char*) );
 		if(BlockedUsers == NULL) {
-			warn("addusermute_cmd(): malloc() failed.\n");
-			return;
+			warn("addusermute(): malloc() failed.\n");
+			return -1;
 		}
 		BlockedUsersCount++;
 		i = 0;
@@ -1217,8 +1220,8 @@ void addusermute_cmd(char *p) {
 		if(i == -1) {
 			char **t = realloc(BlockedUsers, sizeof(char*) * (BlockedUsersCount + 1) );
 			if(t == NULL) {
-				warn("addusermute_cmd(): malloc() failed.\n");
-				return;
+				warn("addusermute(): malloc() failed.\n");
+				return -1;
 			}
 			BlockedUsers = t;
 			i = BlockedUsersCount;
@@ -1230,12 +1233,15 @@ void addusermute_cmd(char *p) {
 	if(is_range(i, 0, BlockedUsersCount - 1) ) {
 		BlockedUsers[i] = malloc(l + 1);
 		if(BlockedUsers[i] == NULL) {
-			warn("addusermute_cmd(): malloc() failed.\n");
-			return;
+			warn("addusermute(): malloc() failed.\n");
+			return -1;
 		}
 		strcpy(BlockedUsers[i], p);
+		info("addusermute(): muted user added: %s\n", p);
+		return 0;
 	} else {
-		warn("addusermute_cmd(): You made buggy code!!\n");
+		warn("addusermute(): You made buggy code!!\n");
+		return -1;
 	}
 }
 
@@ -1254,6 +1260,7 @@ void delusermute_cmd(char *p) {
 	int32_t i = findblockeduser(p);
 	if(is_range(i, 0, BlockedUsersCount - 1) ) {
 		//If find, free it and make it NULL
+		info("delusermute_cmd(): muted user removed: %s\n", BlockedUsers[i]);
 		free(BlockedUsers[i]);
 		BlockedUsers[i] = NULL;
 	} else {

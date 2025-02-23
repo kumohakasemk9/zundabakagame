@@ -64,6 +64,7 @@ void cmd_putch(char);
 void modifyKeyFlags(keyflags_t, int32_t);
 void switch_debug_info();
 void changeplayable_cmd(char*);
+void read_blocked_users();
 
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
 int32_t ChatTimeout = 0; //Douncounting timer, chat will shown it this is not 0
@@ -1045,6 +1046,7 @@ int32_t gameinit(char* fn) {
 	
 	#ifndef __WASM
 		read_creds(fn); //read smp profiles
+		read_blocked_users(); //read smp blocked users
 		if(init_graphics() == -1) { //Graphics init
 			fail("init_graphics() failed.\n");
 			return -1;
@@ -1070,23 +1072,40 @@ void do_finalize() {
 	//Finalize
 	ProgramExiting = 1; //Notify that program is exiting
 	
-	#ifndef __WASM
-		//Clean SMP profiles
-		if(SMPProfs != NULL) {
-			free(SMPProfs);
-		}
+	//Clean SMP profiles
+	if(SMPProfs != NULL) {
+		free(SMPProfs);
+	}
 
-		//Clean blocked user list
-		if(BlockedUsers != NULL) {
-			for(int32_t i = 0; i < BlockedUsersCount; i++) {
-				char *e = BlockedUsers[i];
-				if(e != NULL) {
-					free(e);
-				}
+	//Clean blocked user list
+	if(BlockedUsers != NULL) {
+		#ifndef __WASM
+			//save blocked user list in nonwasm edition
+			FILE *fwbl = fopen("blocked_users", "w");
+			if(fwbl == NULL) {
+				warn("Saving block user list failed: %s\n", strerror(errno) );
 			}
-			free(BlockedUsers);
+		#endif
+
+		for(int32_t i = 0; i < BlockedUsersCount; i++) {
+			char *e = BlockedUsers[i];
+			if(e != NULL) {
+				#ifndef __WASM
+					if(fwbl != NULL) {
+						fprintf(fwbl, "%s\n", e);
+					}
+				#endif
+				free(e);
+			}
 		}
-		
+		free(BlockedUsers);
+		#ifndef __WASM
+			if(fwbl != NULL) {
+				fclose(fwbl);
+			}
+		#endif
+	}
+	#ifndef __WASM
 		//Close Network Connection
 		if(SMPStatus != NETWORK_DISCONNECTED) {
 			close_tcp_socket();
@@ -1111,6 +1130,29 @@ void read_creds(char *fn) {
 		if(add_smp_profile(buf, '\t') == -1) {
 			warn("at %s line %d\n", fn, lineno);
 		}
+	}
+	fclose(f);
+}
+
+//Read blocked user list from file
+void read_blocked_users() {
+	FILE *f = fopen("blocked_users", "r");
+	char buf[BUFFER_SIZE];
+	if(f == NULL) {
+		warn("Can not open blocked_users: %s\n", strerror(errno) );
+		return;
+	}
+	while(fgets(buf, BUFFER_SIZE, f) != NULL) {
+		buf[BUFFER_SIZE - 1] = 0; //For Additional security
+		for(int32_t i = 0; i < strlen(buf); i++) {
+			if(buf[i] == '\r' || buf[i] == '\n') {
+				buf[i] = 0;
+			}
+		}
+		if(strlen(buf) == 0) {
+			continue;
+		}
+		addusermute(buf);
 	}
 	fclose(f);
 }
