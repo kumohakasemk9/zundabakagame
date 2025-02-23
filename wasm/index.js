@@ -40,6 +40,8 @@ var DTime = 0, DTimeCnt = 0, DTimeAvg = 0;
 var WS = null;
 var CmdInput;
 var IsGameFocused;
+var NetworkTimeout;
+var NetworkTimeoutInit;
 
 addEventListener("load", function() {
 	//Obtain graphics context, init
@@ -130,6 +132,14 @@ function gametick() {
 			GTTime = 0;
 			GTimeAvg = 0;
 		}
+		if(WS != null && NetworkTimeoutInit != -1) {
+			if(NetworkTimeout == 0) {
+				console.warn("Websocket timeout");
+				WS.close();
+			} else {
+				NetworkTimeout --;
+			}
+		}
 	}
 }
 
@@ -161,6 +171,11 @@ function cv_mouseleave_cb() {
 
 function cv_mouseenter_cb() {
 	focus_game();
+}
+
+function change_timeout_cb() {
+	let i = document.getElementById("wstimeout").value;
+	NetworkTimeoutInit = parseInt(i);
 }
 
 function smpadd_cb() {
@@ -310,7 +325,7 @@ function keyup_cb(evt) {
 }
 
 function ws_msg_cb(evt) {
-	//Implement timeout!
+	NetworkTimeout = NetworkTimeoutInit;
 	const data = new DataView(evt.data);
 	let len = data.byteLength;
 	//let binstr = "";
@@ -333,6 +348,7 @@ function ws_msg_cb(evt) {
 
 function ws_open_cb(evt) {
 	console.log("Websocket connected.");
+	NetworkTimeout = NetworkTimeoutInit;
 	ZundaGame.connection_establish_handler();
 }
 
@@ -340,6 +356,7 @@ function ws_close_cb(evt) {
 	console.log("Websocket closed.");
 	document.getElementById("connectoption").style.visibility = "";
 	ZundaGame.connection_close_handler();
+	WS = null;
 } 
 
 function ws_error_cb(evt) {
@@ -506,6 +523,8 @@ function make_tcp_socket(peeraddr, port) {
 	} else {
 		ZundaGame.set_websock_mode(1);
 	}
+	let t = parseInt(document.getElementById("wstimeout").value);
+	NetworkTimeoutInit = t;
 	const wsaddr = `${proto}://${s_addr}:${s_port}/`
 	console.log(`Connecting to ${wsaddr}`);
 	document.getElementById("connectoption").style.visibility = "hidden";
@@ -515,6 +534,7 @@ function make_tcp_socket(peeraddr, port) {
 	WS.addEventListener("message", ws_msg_cb);
 	WS.addEventListener("close", ws_close_cb);
 	WS.addEventListener("error", ws_error_cb);
+	NetworkTimeout = 500;
 	return 0;
 }
 
