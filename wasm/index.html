@@ -10,7 +10,7 @@
     <a href="https://github.com/kumohakasemk9">(C) 2024 Kumohakase</a>, <a href="https://zunko.jp/">(C) 2024 ＳＳＳ合同会社</a>, <a href="https://twitter    .com/sakamoto_ahr">(C) 2024 坂本アヒル</a> <a href="https://github.com/kumohakasemk9/zundabakagame">src</a> Please consider supporting me through <a href="https://ko-fi.com/kumohakase">ko-fi</a> or <a href="https://www.patreon.com/kumohakasemk8">pateron</a> Powered by <a href="https://emscripten.org">emspricten</a><br>
 	 <canvas width="800" height="600" id="cv" style="border: dashed red 1px;"></canvas><br>
     <input size="120" id="cmdinput"><br>
-    <span id="profiler"></span><br>
-    <input type="checkbox" id="websockmode">Raw messages on web socket<br>
+    SMP Address: <input id="smpaddr"> Port: <input id="smpport" size=5>  User: <input id="smpusername"> Pass: <input id="smppassword" type="password"> <input type="button" value="append" id="smpadd"><br>
+<span id="connectoption"><label><input id="smpwss" type="checkbox">Use TLS Websocket</label> <label><input id="smprawmode" type="checkbox">Enforce full packet</label></span> <span id="profiler"></span><br>
  </body>
 </html>

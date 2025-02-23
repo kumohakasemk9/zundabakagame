@@ -50,11 +50,7 @@ int32_t is_websock_mode() {
 }
 
 void set_websock_mode(int32_t v) {
-	if(SMPStatus == NETWORK_DISCONNECTED) {
-		WebsockMode = v;
-	} else {
-		warn("set_websock_mode(): Do not call while connecting\n");
-	}
+	WebsockMode = v;
 }
 
 uint8_t *getPtr_RXBuffer() {

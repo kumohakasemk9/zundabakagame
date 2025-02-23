@@ -38,7 +38,6 @@ var SavedColor;
 var GTTime = 0, GTTimeCnt = 0, GTTimeAvg = 0;
 var DTime = 0, DTimeCnt = 0, DTimeAvg = 0;
 var WS = null;
-var WSmode;
 var CmdInput;
 var IsGameFocused;
 
@@ -79,7 +78,6 @@ async function wasm_load_cb(ev) {
 		ZundaGame.set_language(1);
 	}
 	ZundaGame.gameinit();
-	ZundaGame.set_websock_mode(1);
 	
 	//Load images
 	updateStatus("Loading images...");
@@ -116,8 +114,7 @@ function img_load_cb(evt) {
 		CV.addEventListener("wheel", mousewheel_cb);
 		addEventListener("keydown", keydown_cb);
 		addEventListener("keyup", keyup_cb);
-		WSmode = document.getElementById("websockmode");
-		WSmode.addEventListener("change", wsmode_change);
+		document.getElementById("smpadd").addEventListener("click", smpadd_cb);
 	}
 }
 
@@ -166,13 +163,14 @@ function cv_mouseenter_cb() {
 	focus_game();
 }
 
-function wsmode_change(evt) {
-	if(WSmode.checked) {
-		ZundaGame.set_websock_mode(0);
-		console.log("Turned raw websock mode on");
-	} else {
-		ZundaGame.set_websock_mode(1);
-	}
+function smpadd_cb() {
+	let serv = document.getElementById("smpaddr");
+	let port = document.getElementById("smpport");
+	let usr = document.getElementById("smpusername");
+	let pwd = document.getElementById("smppassword");
+	send_cmd_to_game(`/addsmp ${serv.value} ${port.value} ${usr.value} ${pwd.value}`);
+	usr.value = "";
+	pwd.value = "";
 }
 
 function updateStatus(s) {
@@ -233,7 +231,6 @@ function keydown_cb(evt) {
 		if(evt.key == "Enter") {
 			send_cmd_to_game(CmdInput.value);
 			CmdInput.value = "";
-			CmdInput.unfocus();
 			focus_game();
 		}
 	}
@@ -341,11 +338,12 @@ function ws_open_cb(evt) {
 
 function ws_close_cb(evt) {
 	console.log("Websocket closed.");
+	document.getElementById("connectoption").style.visibility = "";
 	ZundaGame.connection_close_handler();
 } 
 
 function ws_error_cb(evt) {
-	console.warn("Websocket error: " + evt.toString() );
+	console.warn("Websocket error: " + evt );
 }
 
 function sha512_cb(digest) {
@@ -499,9 +497,18 @@ function console_put(a, l) {
 function make_tcp_socket(peeraddr, port) {
 	const s_addr = pointer_to_str(peeraddr);
 	const s_port = pointer_to_str(port);
-	const wsaddr = `ws://${s_addr}:${s_port}/`
+	let proto = "ws"
+	if(document.getElementById("smpwss").checked) {
+		proto = "wss"
+	}
+	if(document.getElementById("smprawmode").checked) {
+		ZundaGame.set_websock_mode(0);
+	} else {
+		ZundaGame.set_websock_mode(1);
+	}
+	const wsaddr = `${proto}://${s_addr}:${s_port}/`
 	console.log(`Connecting to ${wsaddr}`);
-	WSpendinglen = 0;
+	document.getElementById("connectoption").style.visibility = "hidden";
 	WS = new WebSocket(wsaddr);
 	WS.binaryType = "arraybuffer";
 	WS.addEventListener("open", ws_open_cb);
