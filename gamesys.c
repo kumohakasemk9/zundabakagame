@@ -427,9 +427,7 @@ void gametick() {
 	if(StatusShowTimer != 0) { StatusShowTimer--; }
 
 	//SMP Processing
-	#ifndef __WASM
-		network_recv_task();
-	#endif
+	network_recv_task();
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		process_smp();
 	}

@@ -82,16 +82,26 @@ void close_connection_cmd() {
 	close_connection(NULL);
 }
 
-//Called every 10 ms, do network task. not called in wasm ver.
+//Called every 10 ms, do network task.
 void network_recv_task() {
 	//If not connected, return
 	if(SMPStatus == NETWORK_DISCONNECTED) {
 		return;
 	}
 
-	//If connect() is in progress
-		if(SMPStatus == NETWORK_CONNECTING) {
+	if(SMPStatus != NETWORK_CONNECTING && NetworkTimeout != 0) {
+		//Process in-connection timeout
+		TimeoutTimer--;
+		if(TimeoutTimer < 0) {
+			warn("network_recv_task(): Timeout\n");
+			close_connection((char*)getlocalizedstring(TEXT_SMP_TIMEOUT) );
+			return;
+		}
+	}
 
+	#ifndef __WASM //in WASM version, they will process recv and connection timeout
+	//If connect() is in progress
+	if(SMPStatus == NETWORK_CONNECTING) {
 		//Process connection timeout (5Sec)
 		if(ConnectionTimeoutTimer > 500) {
 			warn("network_recv_task(): Connection timed out.\n");
@@ -117,23 +127,20 @@ void network_recv_task() {
 		return;
 	} else if(r == -1) { //no data
 		//EWOULDBLOCK or EAGAIN ... no data
-		//Check for timeout
-		TimeoutTimer++;
-		if(NetworkTimeout != 0 && TimeoutTimer >= NetworkTimeout) {
-			warn("network_recv_task(): Timed out, no packet longer than timeout.\n");
-			close_connection((char*)getlocalizedstring(TEXT_SMP_TIMEOUT) );
-		}
 		return;
 	} else if(r == -2) { //recv error
 		warn("network_recv_task(): recv failed\n");
 		close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR) );
 		return;
 	}
-	TimeoutTimer = 0;
 	process_tcp_packet(b, (size_t)r);
+	#endif
 }
 
 void process_tcp_packet(uint8_t *b, size_t l) {
+	if(WebsockMode == 0) {
+		TimeoutTimer = NetworkTimeout;
+	}
 	//Process data
 	//Length 0-FD    XX
 	//Length FE-FFFF FE XX XX
@@ -197,10 +204,14 @@ void connection_establish_handler() {
 		send_tcp_socket("\n", 1);
 		info("RAW mode: sending raw protocol request.\n");
 	}
+	TimeoutTimer = NetworkTimeout;
 }
 
 //Network message receiver handler
 void net_message_handler(uint8_t *pkt, size_t plen) {
+	if(WebsockMode == 1) {
+		TimeoutTimer = NetworkTimeout;
+	}
 	//Handle packet
 	if(pkt[0] == NP_RESP_DISCONNECT) {
 		//Disconnect packet
