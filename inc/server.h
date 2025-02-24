@@ -28,7 +28,7 @@ typedef struct {
 	char usr[UNAME_SIZE];
 	char pwd[PASSWD_SIZE];
 	int op;
-	int ban;
+	int64_t ban;
 	char banreason[BAN_REASON_SIZE];
 } userinfo_t;
 
@@ -42,7 +42,7 @@ typedef struct  {
 	int bufcur; //current event buffer cursor
 	int uid; //logged in user id, -1 if not logged in
 	int rdlength;
-	int timeouttimer;
+	int64_t timeouttimer;
 	uint8_t rdbuf[SIZE_NET_BUFFER];
 	int protocolid;
 	char httpupgrade[HTTP_LINE_LIMIT];
@@ -62,6 +62,7 @@ ssize_t send_packet(void*, size_t, int);
 int AddUser(char*);
 int GetUserOpLevel(int);
 int GetUIDByName(char*);
+void CopyAsString(char*, char*, size_t);
 
 //events.c
 void EventBufferGC();

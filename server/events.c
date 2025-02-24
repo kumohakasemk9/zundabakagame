@@ -49,8 +49,7 @@ void SendPrivateChat(int cid, int destcid, char* chat) {
 		return;
 	}
 	memcpy(t, &hdr, sizeof(hdr) );
-	memcpy(&t[sizeof(hdr)], chat, cl);
-	t[sizeof(hdr) + cl] = 0;
+	CopyAsString(&t[sizeof(hdr)], chat, cl);
 	AddEvent(t, evsiz, cid);
 }
 
@@ -67,8 +66,7 @@ void SendJoinPacket(int cid) {
 	}
 	int uname_len = strlen(UserInformations[uid].usr);
 	t[0] = EV_HELLO;
-	memcpy(&t[1], UserInformations[uid].usr, uname_len);
-	t[uname_len + 2] = 0;
+	CopyAsString(&t[1], UserInformations[uid].usr, uname_len);
 	AddEvent(t, uname_len + 2, cid);
 }
 
@@ -138,18 +136,18 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 				DisconnectWithReason(cid, "Bad packet.");
 				return;
 			}
-			memcpy(chatbuf, chathead, chatlen);
-			chatbuf[chatlen] = 0;
+			CopyAsString(chatbuf, chathead, chatlen);
 			//is private msg?
-			if(whispercid != -1) {
-				Log(cid, "Whisper to cid %d\n", whispercid);
+			char tb[NET_CHAT_LIMIT] = "";
+			if(0 <= whispercid && whispercid <= MAX_CLIENTS) {
+				snprintf(tb, NET_CHAT_LIMIT - 1, "[To cid %d]", whispercid);
 			}
 			if(chatbuf[0] == '?') {
 				Log(cid, "servercommand: %s\n", chatbuf);
 				ExecServerCommand(chatbuf, cid);
 				copyev = 0; //Do not copy server command chat
 			} else {
-				Log(cid, "chat: %s\n", chatbuf);
+				Log(cid, "chat%s: %s\n", tb, chatbuf);
 			}
 		} else if(evhead[0] == EV_RESET) {
 			Log(cid, "AddEvent(): round reset request\n");

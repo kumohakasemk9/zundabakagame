@@ -46,7 +46,7 @@ userinfo_t *UserInformations = NULL;
 int UserCount = 0;
 uint8_t ServerSalt[SALT_LENGTH];
 FILE *LogFile;
-int Timeout = 5000; //0 to disable timeout
+int Timeout = 100; //0 to disable timeout
 
 void INTHwnd(int);
 void AcceptNewClient();
@@ -58,6 +58,8 @@ void recv_packet_handler(uint8_t*, size_t, int);
 void recv_http_handler(char*, int);
 void recv_websock_handler(uint8_t*, size_t, uint8_t, int, uint8_t*, int);
 ssize_t send_websocket_packet(void*, size_t, uint8_t, int);
+void AcceptUserLogin(int, int);
+int64_t get_time_ms();
 
 int main(int argc, char *argv[]) {
 	int portnum = 25566;
@@ -83,6 +85,19 @@ int main(int argc, char *argv[]) {
 				printf("You need to specify password file!!\n");
 				return 1;
 			}
+		} else if(strcmp(argv[i], "-t") == 0) {
+			if(i + 1 < argc) {
+				int t = atoi(argv[i + 1]);
+				if(0 <= t) {
+					Timeout = t;
+				} else {
+					printf("Bad timeout.\n");
+				}
+			} else {
+				printf("You need to specify timeout.\n");
+				return 1;
+			}
+
 		}
 	}
 
@@ -191,11 +206,9 @@ int main(int argc, char *argv[]) {
 				}
 				//Process timeout
 				if(Timeout != 0 && C[i].fd != -1) {
-					if(C[i].timeouttimer > Timeout) {
+					if(C[i].timeouttimer < get_time_ms() ) {
 						Log(i, "Timed out.\n");
 						DisconnectWithReason(i, "Server timeout.");
-					} else {
-						C[i].timeouttimer++;
 					}
 				}
 			}
@@ -210,8 +223,11 @@ int main(int argc, char *argv[]) {
 	if(f_pwdfile == NULL) {
 		printf("Can not write to %s: %s\n", passwdfile, strerror(errno) );
 	} else {
-		for(int i = 0; i < UserInformations; i++) {
-			
+		for(int i = 0; i < UserCount; i++) {
+			if(UserInformations[i].usr[0] == 0) {
+				continue;
+			}
+			fprintf(f_pwdfile, "%s:%s:%s:%ld:%d:\n", UserInformations[i].usr, UserInformations[i].pwd, UserInformations[i].banreason, UserInformations[i].ban, UserInformations[i].op);
 		}
 	}
 	
@@ -227,10 +243,16 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
+int64_t get_time_ms() {
+	struct timespec t;
+	clock_gettime(CLOCK_REALTIME, &t);
+	return (t.tv_sec * 1000) + (t.tv_nsec / 1000000);
+}
+
 int AddUser(char* line) {
 	char *offs[5];
 	size_t lens[5];
-	const size_t SIZELIMS[] = {UNAME_SIZE, PASSWD_SIZE, BAN_REASON_SIZE, 32, 1};
+	const size_t SIZELIMS[] = {UNAME_SIZE, PASSWD_SIZE, BAN_REASON_SIZE, 32, 2};
 	size_t o = 0;
 	for(int i = 0; i < 5; i++) {
 		char *t = strchr(&line[o], ':');
@@ -290,18 +312,19 @@ int AddUser(char* line) {
 	//Store username, password, banreason
 	char *outs[] = {UserInformations[aid].usr, UserInformations[aid].pwd, UserInformations[aid].banreason};
 	for(int i = 0; i < 3; i++) {
-		memcpy(outs[i], offs[i], lens[i]);
-		outs[i][lens[i] ] = 0;
+		CopyAsString(outs[i], offs[i], lens[i]);
 	}
 	//Store op, ban
 	UserInformations[aid].op = 0;
 	UserInformations[aid].ban = 0;
-	int *outs2[] = {(int*)&UserInformations[aid].ban, &UserInformations[aid].op};
 	for(int i = 0; i < 2; i++) {
 		char t[32];
-		memcpy(t, offs[i + 3], lens[i + 3]);
-		t[lens[i + 3] ] = 0;
-		*outs2[i] = atoi(t);
+		CopyAsString(t, offs[i + 3], lens[i + 3]);
+		if(i == 0) {
+			UserInformations[aid].ban = atol(t);
+		} else {
+			UserInformations[aid].op = atoi(t);
+		}
 	}
 	printf("User add: %s, op=%d, banexpire=%d\n", UserInformations[aid].usr, UserInformations[aid].op, UserInformations[aid].ban);
 	return 0;
@@ -327,6 +350,10 @@ void Log(int cid, const char* ptn, ...) {
 		}
 		printf(">");
 		fprintf(LogFile, ">");
+	}
+	if(cid == -1) {
+		printf("[server]");
+		fprintf(LogFile, "[server]");
 	}
 	va_list varg;
 	va_start(varg, ptn);
@@ -361,6 +388,7 @@ void AcceptNewClient() {
 			C[i].ip = ip;
 			C[i].port = prt;
 			C[i].fd = client;
+			C[i].timeouttimer = get_time_ms() + Timeout;
 			Log(i, "New connection.\n");
 			//LogInFile(i, "New connection from %s:%d.\n", inet_ntoa(ip), prt);
 			if(fcntl(C[i].fd, F_SETFL, O_NONBLOCK) == -1) {
@@ -397,7 +425,7 @@ void ClientReceive(int cid) {
 		SendLeavePacket(cid);
 		return;
 	}
-	C[cid].timeouttimer = 0;
+	C[cid].timeouttimer = get_time_ms() + Timeout;
 
 	//Grantee packet size
 	uint8_t tmpbuf[SIZE_NET_BUFFER * 2];
@@ -815,24 +843,44 @@ void LoginWithHash(uint8_t* dat, int dlen, int cid) {
 		}
 		EVP_MD_CTX_free(evp);
 		if(memcmp(loginkey, dat, SHA512_LENGTH ) == 0) {
-			//Duplicate login check, BUG: can't re login as same user
-			for(int j = 0; j < MAX_CLIENTS; j++) {
-				if(C[j].fd != -1 && C[j].uid == i) {
-					Log(cid, "User already logged in.\n");
-					DisconnectWithReason(cid, "Duplicate login.");
-					return;
-				}
-			}
-			Log(cid, "Logged in as user %s(ID=%d)\n", UserInformations[i].usr, i);
-			C[cid].uid = i;
-			SendUserLists(cid);
-			SendJoinPacket(cid);
+			AcceptUserLogin(cid, i);
 			return;
 		}
 	}
 	//Close connection if login failed
 	Log(cid, "LoginWithPassword: No matching credential.\n");
 	DisconnectWithReason(cid, "Login failure.");
+}
+
+void AcceptUserLogin(int cid, int uid) {
+	userinfo_t t = UserInformations[uid];
+	//Duplicate login check
+	for(int i = 0; i < MAX_CLIENTS; i++) {
+		if(C[i].fd != -1 && C[i].uid == uid) {
+			Log(cid, "User already logged in.\n");
+			DisconnectWithReason(cid, "Duplicate login.");
+			return;
+		}
+	}
+	//Ban check
+	if(t.banreason[0] != 0 && (t.ban > time(NULL) || t.ban == 0) ) {
+		time_t rem = t.ban - time(NULL);
+		char st[SIZE_NET_BUFFER - 1];
+		if(t.ban == 0) {
+			Log(cid, "User %s(%d) is banned for %s.\n", t.usr, uid, t.banreason);
+			snprintf(st, SIZE_NET_BUFFER - 2, "BANNED: %s", t.banreason);
+		} else {
+			Log(cid, "User %s(%d) is banned for %s (expeires in %d sec).\n", t.usr, uid, t.banreason, rem);
+			snprintf(st, SIZE_NET_BUFFER - 2, "SUSPENDED: %s (%d)", t.banreason, rem);
+		}
+		st[SIZE_NET_BUFFER - 2] = 0;
+		DisconnectWithReason(cid, st);
+		return;
+	}
+	Log(cid, "Logged in as user %s(%d)\n", t.usr, uid);
+	C[cid].uid = uid;
+	SendUserLists(cid);
+	SendJoinPacket(cid);
 }
 
 void SendUserLists(int cid) {
@@ -850,8 +898,7 @@ void SendUserLists(int cid) {
 			return;
 		}
 		sendbuf[w_ptr] = i;
-		memcpy(&sendbuf[w_ptr + 1], un, uname_len);
-		sendbuf[w_ptr + 1 + uname_len] = 0;
+		CopyAsString(&sendbuf[w_ptr + 1], un, uname_len);
 		w_ptr += psize;
 	}
 	send_packet(sendbuf, w_ptr, cid);
@@ -879,7 +926,8 @@ void DisconnectWithReason(int cid, char* reason) {
 
 int GetUIDByName(char* n) {
 	for(int i = 0; i < UserCount; i++) {
-		if(memcmp(UserInformations[i].usr, n, strlen(n) ) == 0) {
+		char *t = UserInformations[i].usr;
+		if(memcmp(t, n, strlen(t) ) == 0) {
 			return i;
 		}
 	}
@@ -893,3 +941,9 @@ int GetUserOpLevel(int cid) {
 	}
 	return 0;
 }
+
+void CopyAsString(char* dst, char *src, size_t l) {
+	memcpy(dst, src, l);
+	dst[l] = 0;
+}
+
