@@ -203,8 +203,19 @@ int main(int argc, char *argv[]) {
 		EventBufferGC();
 		usleep(1);
 	}
-	//Finish
 	printf("Closing server.\n");
+	
+	//Write user informations back
+	f_pwdfile = fopen(passwdfile, "w");
+	if(f_pwdfile == NULL) {
+		printf("Can not write to %s: %s\n", passwdfile, strerror(errno) );
+	} else {
+		for(int i = 0; i < UserInformations; i++) {
+			
+		}
+	}
+	
+	//Finish
 	fclose(LogFile);
 	close(ServerSocket);
 	free(UserInformations);
@@ -219,7 +230,7 @@ int main(int argc, char *argv[]) {
 int AddUser(char* line) {
 	char *offs[5];
 	size_t lens[5];
-	const size_t SIZELIMS[] = {UNAME_SIZE, PASSWD_SIZE, BAN_REASON_SIZE, 32, 16};
+	const size_t SIZELIMS[] = {UNAME_SIZE, PASSWD_SIZE, BAN_REASON_SIZE, 32, 1};
 	size_t o = 0;
 	for(int i = 0; i < 5; i++) {
 		char *t = strchr(&line[o], ':');

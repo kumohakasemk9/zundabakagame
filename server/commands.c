@@ -27,7 +27,7 @@ extern userinfo_t *UserInformations;
 extern cliinfo_t C[MAX_CLIENTS];
 
 void ExecServerCommand(char* cmd, int cid) {
-	//Op level 1: reset, 2: ban welcome, 3: adduser deluser 4: stop
+	//Op level 1: reset, 2: ban welcome, 3: adduser deluser op 4: stop
 	if(strcmp("?stop", cmd) == 0) {
 		stop_command(cid);
 
@@ -88,6 +88,7 @@ void ban_command(char *p, int cid) {
 			for(int i = 0; i < MAX_CLIENTS; i++) {
 				if(C[i].uid == uid && C[i].fd != -1) {
 					C[i].closereq = 1;
+					break;
 				}
 			}
 		} else {

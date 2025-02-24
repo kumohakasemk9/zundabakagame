@@ -467,7 +467,8 @@ function get_string_width(pc) {
 //() => int32_t
 function get_font_height() {
 	const t = G.measureText(pointer_to_str("A") );
-	return t.emHeightAscent + t.emHeightDescent;
+	//return t.emHeightAscent + t.emHeightDescent;
+	return t.fontBoundingBoxAscent + t.fontBoundingBoxDescent;
 }
 
 //int32_t, double*, double*
