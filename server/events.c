@@ -263,7 +263,7 @@ void GetEvent(int cid) {
 	C[cid].bufcur += elen;
 	//Send out data
 	send_packet(tb, w_ptr, cid);
-	EventBufferGC();
+	//EventBufferGC();
 	//Log(cid, "GetEvent()\n");
 }
 
