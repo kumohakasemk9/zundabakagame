@@ -161,38 +161,56 @@ void AddEvent(uint8_t* d, int dlen, int cid) {
 				copyev = 0;
 				Log(cid, "AddEvent(): Request denied, bad op level.\n");
 			}
-		}/* else if(evhead[0] == EV_PLAYABLE_LOCATION) {
+		} else if(evhead[0] == EV_PLAYABLE_LOCATION) {
 			//Update current client's coordinate information, do not stack the packet.
 			ev_playablelocation_t *ev = (ev_playablelocation_t*)evhead;
 			C[cid].playable_x = ev->x;
 			C[cid].playable_y = ev->y;
 			copyev = 0;
-		}*/
+		}
 		if(copyev == 1) {
 			memcpy(&EventBuffer[EBptr + sizeof(event_hdr_t) + pdlen], evhead, evlen);
 			pdlen += evlen;
 		}
 		evcp += evlen;
 	}
-
-	//Append Event header
-	event_hdr_t hdr = {
-		.cid = (int8_t)cid,
-		.evlen = pdlen
-	};
-	memcpy(&EventBuffer[EBptr], &hdr, sizeof(hdr) );
-	EBptr += sizeof(hdr) + pdlen;
+	if(pdlen != 0) {
+		//Append Event header
+		event_hdr_t hdr = {
+			.cid = (int8_t)cid,
+			.evlen = pdlen
+		};
+		memcpy(&EventBuffer[EBptr], &hdr, sizeof(hdr) );
+		EBptr += sizeof(hdr) + pdlen;
+	}
 }
 
 void GetEvent(int cid) {
-	char tb[SIZE_EVENT_BUFFER];
+	char tb[SIZE_EVENT_BUFFER + (sizeof(player_locations_table_t) * MAX_CLIENTS) + 2];
 	tb[0] = NP_EXCHANGE_EVENTS;
-	int elen = EBptr - C[cid].bufcur;
+	int ltcnt = 0;
+	int w_ptr = 2; //send buffer write ptr
+	//Copy playable location table before event chunks
+	for(int i = 0; i < MAX_CLIENTS; i++) {
+		if(C[i].fd == -1 || C[i].uid == -1) {
+			continue;
+		}
+		player_locations_table_t table = {
+			.cid = i,
+			.px = C[i].playable_x,
+			.py = C[i].playable_y
+		};
+		memcpy(&tb[w_ptr], &table, sizeof(player_locations_table_t) );
+		ltcnt++;
+		w_ptr += sizeof(player_locations_table_t);
+	}
+	tb[1] = (uint8_t)ltcnt;
 	//Copy events to sending buffer, but get rid of the events that has same owner to sender (except chat)
+	int elen = EBptr - C[cid].bufcur;
 	uint8_t *head = &EventBuffer[C[cid].bufcur];
 	int p = 0; //Pointer of event chunk array
-	int w_ptr = 1; //Copied Event chunk ptr
 	while(p < elen) {
+		//Process one event chunk
 		event_hdr_t *evchdr = (event_hdr_t*)&head[p];
 		int ecid = evchdr->cid; //Event chunk owner
 		int eclen = evchdr->evlen; //Event chunk len
@@ -225,7 +243,7 @@ void GetEvent(int cid) {
 				copyevent = 0;
 			}
 			if(copyevent) {
-				//Append event chunk header
+				//Append event
 				memcpy(&tb[w_ptr + sizeof(event_hdr_t) + w_evclen], evhead, evlen);
 				w_evclen += evlen;
 			}
@@ -308,6 +326,10 @@ void EventBufferGC() {
 			mincur = C[i].bufcur;
 		}
 	}
+	//if(mincur < 0) {
+	//	printf("Invalid state: mincur is %d\n", mincur);
+	//	return;
+	//}
 	//Shift actual data
 	int slen = EBptr - mincur;
 	for(int i = 0; i < slen; i++) {

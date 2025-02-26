@@ -50,6 +50,13 @@ typedef struct {
 	uint16_t evlen;
 } PACKED event_hdr_t;
 
+//Player location structure (sent before event chunks)
+typedef struct {
+	uint8_t cid;
+	uint16_t px;
+	uint16_t py;
+} PACKED player_locations_table_t;
+
 //Greeter packet
 typedef struct {
 	uint8_t pkttype; //NP_GREETINGS

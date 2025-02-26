@@ -13,6 +13,9 @@ Zundamon is from https://zunko.jp/
 server.c: SMP server main code
 */
 
+//fix bug: segfault in EventBufferGC() when connecting with chrome ws
+//fix bug: event buffer overflow (make multiple EV_PLAYER_LOCATION event to one)
+
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -101,11 +104,13 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	//Generate salt for user credential cipher
+	//Init variables
 	for(int i = 0; i < SALT_LENGTH; i++) {
 		ServerSalt[i] = random() % 0x100;
 	}
-	for(int i = 0; i < MAX_CLIENTS; i++) { C[i].fd = -1; }
+	for(int i = 0; i < MAX_CLIENTS; i++) {
+		C[i].fd = -1;
+	}
 
 	//Install signal
 	struct sigaction sa;

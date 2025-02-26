@@ -531,7 +531,7 @@ void proc_playable_op() {
 	}
 	Gobjs[PlayingCharacterID].sx = tx;
 	Gobjs[PlayingCharacterID].sy = ty;
-	if(SMPStatus == NETWORK_LOGGEDIN && (tx != 0 || ty != 0) ) {
+	if(SMPStatus == NETWORK_LOGGEDIN ) {
 		stack_packet(EV_PLAYABLE_LOCATION, Gobjs[PlayingCharacterID].x, Gobjs[PlayingCharacterID].y);
 	}
 
