@@ -211,16 +211,16 @@ function mousemove_cb(evt) {
 function mousedown_cb(evt) {
 	if(IsGameFocused == 0) { return; }
 	if(evt.buttons == 1) {
-		ZundaGame.switch_character_move();
+		ZundaGame.keypress_handler(0x20, 0); //Space key
 	}
 }
 
 function mousewheel_cb(evt) {
 	if(IsGameFocused == 0) { return; }
 	if(evt.deltaY > 0) {
-		ZundaGame.select_next_item();
+		ZundaGame.keypress_handler(0x41, 0); //A
 	} else {
-		ZundaGame.select_prev_item();
+		ZundaGame.keypress_handler(0x53, 0); //S
 	}
 	evt.preventDefault();
 }
@@ -234,29 +234,18 @@ function keydown_cb(evt) {
 		}
 	}
 	if(IsGameFocused == 0) { return; }
-	if(evt.key == "q" || evt.key == "Q") {
-		ZundaGame.modifyKeyFlags(1, true);
-	} else if(evt.key == "w" || evt.key == "W") {
-		ZundaGame.modifyKeyFlags(2, true);
-	} else if(evt.key == "e" || evt.key == "E") {
-		ZundaGame.modifyKeyFlags(4, true);
-	} else if(evt.key == 'h' || evt.key == "H") {
-		ZundaGame.modifyKeyFlags(0x100, true);
-	} else if(evt.key == "a" || evt.key == "A") {
-		ZundaGame.select_prev_item();
-	} else if(evt.key == "s" || evt.key == "S") {
-		ZundaGame.select_next_item();
-	} else if(evt.key == "d" || evt.key == "D") {
-		ZundaGame.use_item();
-	} else if(evt.key == "u" || evt.key == "U") {
-		ZundaGame.switch_locator();
-	} else if(evt.key == "t" || evt.key == "T") {
+	if(evt.key == "t" || evt.key == "T") {
 		start_command_mode(0);
-		evt.preventDefault();
 	} else if(evt.key == "/") {
 		start_command_mode(1);
-		evt.preventDefault();
+	} else if(evt.key == "ArrowUp") {
+		ZundaGame.keypress_handler(0, 4);
+	} else if(evt.key == "ArrowDown") {
+		ZundaGame.keypress_handler(0, 5);
+	} else {
+		ZundaGame.keypress_handler(evt.key.charCodeAt(0), 0);
 	}
+	evt.preventDefault();
 }
 
 function start_command_mode(m) {
@@ -297,15 +286,7 @@ function focus_game() {
 
 function keyup_cb(evt) {
 	if(IsGameFocused == 0) { return; }
-	if(evt.key == "q" || evt.key == "Q") {
-		ZundaGame.modifyKeyFlags(1, false);
-	} else if(evt.key == "w" || evt.key == "W") {
-		ZundaGame.modifyKeyFlags(2, false);
-	} else if(evt.key == "e" || evt.key == "E") {
-		ZundaGame.modifyKeyFlags(4, false);
-	} else if(evt.key == 'h' || evt.key == "H") {
-		ZundaGame.modifyKeyFlags(0x100, false);
-	}
+	ZundaGame.keyrelease_handler(evt.key.charCodeAt(0) );
 }
 
 function ws_msg_cb(evt) {
