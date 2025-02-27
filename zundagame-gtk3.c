@@ -176,16 +176,14 @@ gboolean key_event(GtkWidget *self, GdkEventKey *event, gpointer data) {
 
 	//translate keyval to original data
 	specialkey_t k = SPK_NONE;
-	if(r == '\r') {
-		k = SPK_ENTER;
-	} else if(r == '\b') {
-		k = SPK_BS;
-	} else if(event->keyval == GDK_KEY_Left) {
+	if(event->keyval == GDK_KEY_Left) {
 		k = SPK_LEFT;
 	} else if(event->keyval == GDK_KEY_Right) {
 		k = SPK_RIGHT;
-	} else if(r == 0x1b) {
-		k = SPK_ESC;
+	} else if(event->keyval == GDK_KEY_Up) {
+		k = SPK_UP;
+	} else if(event->keyval == GDK_KEY_Down) {
+		k = SPK_DOWN;
 	} else if(r == 0x16) {
 		//Paste (Ctrl+V)
 		if(event->type == GDK_KEY_PRESS) {
@@ -197,15 +195,11 @@ gboolean key_event(GtkWidget *self, GdkEventKey *event, gpointer data) {
 
 	if(CommandCursor != -1) {
 		gtk_im_context_filter_keypress(IMCtx, event);
-		if(k == SPK_NONE) {
-			return FALSE; //Accept only for special keys during command mode
+		if(k != SPK_LEFT && k != SPK_RIGHT && r != '\r' && r != '\b' && r != 0x1b) {
+			return FALSE; //Accept only AllowLeft, Right, Enter, Esc, BS during command mode
 		}
 	}
-
-	if( (k == SPK_NONE && !(0x20 <= r && r <= 0x7e) ) || event->length > 1) {
-		return FALSE; //Do not process except ascii and specified controls
-	}
-		
+	
 	//Pass it to wrapper
 	if(event->type == GDK_KEY_PRESS) {
 		keypress_handler(r, k);

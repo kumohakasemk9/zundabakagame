@@ -111,12 +111,11 @@ typedef enum {
 //enum for passing special key pressed event
 typedef enum {
 	SPK_NONE = 0,
-	SPK_ENTER = 1,
-	SPK_ESC = 2,
-	SPK_BS = 3,
-	SPK_LEFT = 4,
-	SPK_RIGHT = 5,
-	SPK_F3 = 6
+	SPK_LEFT = 1,
+	SPK_RIGHT = 2,
+	SPK_F3 = 3,
+	SPK_UP = 4,
+	SPK_DOWN = 5
 } specialkey_t;
 
 //enum for passing mouse event

@@ -65,7 +65,12 @@ void modifyKeyFlags(keyflags_t, int32_t);
 void switch_debug_info();
 void changeplayable_cmd(char*);
 void read_blocked_users();
+void commit_menu();
+void title_cmd();
+void select_next_menuitem();
+void select_prev_menuitem();
 
+int32_t SelectingMenuItem = 0;
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
 int32_t ChatTimeout = 0; //Douncounting timer, chat will shown it this is not 0
 GameObjs_t Gobjs[MAX_OBJECT_COUNT]; //Game object memory
@@ -668,6 +673,31 @@ void select_prev_item() {
 	}
 }
 
+//Select prev menuitem
+void select_prev_menuitem() {
+	if(GameState != GAMESTATE_TITLE) {
+		return;
+	}
+	if(SelectingMenuItem < MAX_MENU_STRINGS - 1) {
+		SelectingMenuItem++;
+	} else {
+		SelectingMenuItem = 0;
+	}
+}
+
+//Select_next menuitem
+void select_next_menuitem() {
+	if(GameState != GAMESTATE_TITLE) {
+		return;
+	}
+	if(SelectingMenuItem > 0) {
+		SelectingMenuItem--;
+	} else {
+		SelectingMenuItem = MAX_MENU_STRINGS - 1;
+	}
+}
+
+
 void debug_add_character() {
 	if(DebugMode) {
 		double mx, my;
@@ -828,7 +858,10 @@ void execcmd() {
 	} else if(strcmp(CommandBuffer, "/togglechat") == 0) {
 		//Togglechat cmd
 		togglechat_cmd();
-	
+	} else if(strcmp(CommandBuffer, "/title") == 0) {
+		//returntotitle command
+		title_cmd();
+
 	} else {
 		if(CommandBuffer[0] == '/') {
 			showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) );
@@ -840,6 +873,11 @@ void execcmd() {
 			}
 		}
 	}
+}
+
+void title_cmd() {
+	GameState = GAMESTATE_TITLE;
+	reset_game();
 }
 
 void changeplayable_cmd(char *param) {
@@ -930,11 +968,6 @@ void reset_game_cmd() {
 	}
 }
 
-//clear entire game objects
-void clear_gameobj() {
-
-}
-
 //Restarts game
 void reset_game() {
 	//Initialize game related variables
@@ -946,6 +979,8 @@ void reset_game() {
 	CameraY = 0;
 	SkillKeyState = -1;
 	SpawnRemain = InitSpawnRemain;
+	EarthID = -1;
+	PlayingCharacterID = -1;
 	CurrentPlayableID = PlayableID;
 	//Init Skill state and timer
 	for(uint8_t i = 0; i < SKILL_COUNT; i++) {
@@ -1267,7 +1302,11 @@ void keypress_handler(char kc, specialkey_t ks) {
 			break;
 		case ' ':
 			//space
-			switch_character_move();
+			if(GameState != GAMESTATE_TITLE) {
+				switch_character_move();
+			} else {
+				commit_menu();
+			}
 			break;
 		case 'a':
 		case 'A':
@@ -1337,15 +1376,21 @@ void keypress_handler(char kc, specialkey_t ks) {
 			if(ks == SPK_F3) {
 				//F3 Key
 				switch_debug_info();
+			} else if(ks == SPK_UP) {
+				//Up key
+				select_next_menuitem();
+			} else if(ks == SPK_DOWN) {
+				//DownKey
+				select_prev_menuitem();
 			}
 		}
 	} else {
 		//command mode
 		//printf("%02d\n", kc);
-		if(ks == SPK_ENTER) {
+		if(kc == '\r') {
 			//Enter
 			cmd_enter();
-		} else if(ks == SPK_BS) {
+		} else if(kc == '\b') {
 			//BackSpace
 			cmd_backspace();
 		} else if(ks == SPK_LEFT) {
@@ -1354,13 +1399,10 @@ void keypress_handler(char kc, specialkey_t ks) {
 		} else if(ks == SPK_RIGHT) {
 			//RightArrow
 			cmd_cursor_forward();
-		} else if(kc == 0x16) {
-			//CtrlV
-			//gdk_clipboard_read_text_async(GClipBoard, NULL, clipboard_read_handler, NULL);
-		} else if(ks == SPK_ESC) {
+		} else if(kc == 0x1b) {
 			//Escape
 			cmd_cancel();
-		} else {
+		} else if(0x20 <= kc && kc <= 0x7e) {
 			//Others
 			//printf("%d\n", keycode);
 			cmd_putch(kc);
@@ -1425,5 +1467,17 @@ void mousepressed_handler(mousebutton_t keynum) {
 		select_next_item();
 	} else if(keynum == MB_DOWN) { //WheelDn
 		select_prev_item();
+	}
+}
+
+//space key handler when game is in TITLE state
+void commit_menu() {
+	if(GameState != GAMESTATE_TITLE) {
+		return;
+	}
+	if(SelectingMenuItem == 0) {
+		//Go to game
+		GameState = GAMESTATE_INITROUND;
+		reset_game();
 	}
 }

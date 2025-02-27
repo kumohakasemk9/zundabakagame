@@ -83,6 +83,7 @@ extern int32_t CurrentPlayableID; //Current Playable Character type ID
 extern int32_t Money; //Current map money amount
 extern int32_t CharacterMove; //Character Moving on/off
 extern int32_t SelectingItemID;
+extern int32_t SelectedMenuItem;
 extern const int32_t ITEMPRICES[ITEM_COUNT];
 extern const int32_t ITEMIMGIDS[ITEM_COUNT];
 extern char StatusTextBuffer[BUFFER_SIZE];
@@ -105,6 +106,7 @@ extern SMPProfile_t SMPProfs[];
 extern int32_t SelectedSMPProf;
 extern int32_t SpawnRemain;
 extern int32_t LocatorType; //Ruler type id
+extern int32_t SelectingMenuItem;
 
 //Paint event of window client, called for every 30mS
 void game_paint() {
@@ -343,12 +345,16 @@ void draw_title_screen() {
 	y += (h / 2.0) + 100;
 	
 	//Draw menu
-	chcolor(COLOR_TEXTCMD, 1);
 	for(int i = 0; i < MAX_MENU_STRINGS; i++) {
 		const char *t = getlocalizedmenustring(i);
-		double w = get_string_width(t);
+		double fh = get_font_height();
+		if(SelectingMenuItem == i) {
+			chcolor(0xa0ff00ff, 1);
+			fillrect(x, y, w, fh);
+		}
+		chcolor(COLOR_TEXTCMD, 1);
 		drawstring(x, y, t);
-		y += get_font_height();
+		y += fh;
 	}
 }
 
