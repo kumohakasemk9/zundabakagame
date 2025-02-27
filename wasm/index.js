@@ -231,6 +231,7 @@ function keydown_cb(evt) {
 			send_cmd_to_game(CmdInput.value);
 			CmdInput.value = "";
 			focus_game();
+			return;
 		}
 	}
 	if(IsGameFocused == 0) { return; }
