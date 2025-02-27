@@ -517,7 +517,7 @@ void proc_playable_op() {
 	//Move Playable character
 	double tx = 0, ty = 0;
 	if(CharacterMove && GameState == GAMESTATE_PLAYING) {
-		//If CharacterMove == 1, and PALYING state, playable character will follow mouse
+		//If CharacterMove == 1, and PLAYING state, playable character will follow mouse
 		//Set player move speed
 		double cx, cy;
 		double playerspd = 1.0 + (MapTechnologyLevel * 0.5);
@@ -641,10 +641,11 @@ int32_t buy_facility(int32_t fid) {
 			}
 		}
 	}
-	add_character(tid, mx, my, OBJID_INVALID);
 	//If connected to remote server, notify item place.
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		stack_packet(EV_PLACE_ITEM, tid, mx, my);
+	} else {
+		add_character(tid, mx, my, PlayingCharacterID);
 	}
 	return 0;
 }
@@ -830,7 +831,7 @@ void execcmd() {
 	
 	} else {
 		if(CommandBuffer[0] == '/') {
-			chatf( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) );
+			showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) );
 		} else {
 			if(SMPStatus == NETWORK_LOGGEDIN) {
 				stack_packet(EV_CHAT, CommandBuffer);
@@ -844,10 +845,15 @@ void execcmd() {
 void changeplayable_cmd(char *param) {
 	//Change playable character for next round
 	int32_t i = atoi(param);
-	if(is_range(i, 0, PLAYABLE_CHARACTERS_COUNT - 1) ) {
-		PlayableID = i;
+	if(!is_range(i, 0, PLAYABLE_CHARACTERS_COUNT - 1) ) {
+		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		return;
+	}
+	if(SMPStatus == NETWORK_LOGGEDIN) {
+		stack_packet(EV_CHANGE_PLAYABLE_ID);
 	} else {
-		warn( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		info("Change Playableid to %d\n", PlayableID);
+		PlayableID = i;
 	}
 }
 
@@ -857,7 +863,7 @@ void chspawn_cmd(char* param) {
 	if(is_range(i, -1, MAX_SPAWN_COUNT) ) {
 		InitSpawnRemain = i;
 	} else {
-		warn( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 	}
 }
 
@@ -874,7 +880,7 @@ void ebcount_cmd() {
 			minim = 1;
 		}
 		if(!is_range(t[i], minim, 4) ) {
-			warn( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+			showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 			return;
 		}
 
@@ -894,7 +900,7 @@ void ebdist_cmd() {
 	//DifEnemyBaseDist set command (distance)
 	int32_t i = (int32_t)strtol(&CommandBuffer[8], NULL, 10);
 	if(!is_range(i, MIN_EBDIST, MAX_EBDIST) ) {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		return;
 	}
 	DifEnemyBaseDist = i;
@@ -904,7 +910,7 @@ void atkgain_cmd() {
 	//DifATKGain set command (atkgain)
 	double i = (double)atof(&CommandBuffer[9]);
 	if(!is_range_number(i, MIN_ATKGAIN, MAX_ATKGAIN) ) {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		return;
 	}
 	if(SMPStatus == NETWORK_LOGGEDIN) {
@@ -924,10 +930,14 @@ void reset_game_cmd() {
 	}
 }
 
+//clear entire game objects
+void clear_gameobj() {
+
+}
+
 //Restarts game
 void reset_game() {
 	//Initialize game related variables
-	GameState = GAMESTATE_INITROUND;
 	MapTechnologyLevel = 0;
 	MapEnergyLevel = 0;
 	Money = 0;
@@ -945,10 +955,15 @@ void reset_game() {
 	for(uint8_t i = 0; i < ITEM_COUNT; i++) {
 		ItemCooldownTimers[i] = 0;
 	}
-	//Initialize GameObj Slots (Clears map)
+	//Init Gameobjs
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		Gobjs[i].tid = TID_NULL;
 	}
+	//In TITLE state, skip state changing and adding character
+	if(GameState == GAMESTATE_TITLE) {
+		return;
+	}
+	GameState = GAMESTATE_INITROUND;
 
 	//Add Earth (Ally base, if you lose it game is over.)
 	const double START_POS = 200;
@@ -1062,8 +1077,9 @@ int32_t gameinit(char* fn) {
 	}
 	
 	check_data(); //Data Check
-	
-	reset_game(); //reset game round
+	GameState = GAMESTATE_TITLE;
+	reset_game();	
+
 	return 0;
 }
 

@@ -11,6 +11,13 @@ Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
 
 zundagame-gtk3.c: gtk3 entry point, funcs.
+
+ToDo
+integrate with liballeg
+add sound
+add title and background
+improve help screen
+make vim styled cui
 */
 
 #include "inc/zundagame.h"

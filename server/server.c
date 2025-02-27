@@ -49,7 +49,7 @@ userinfo_t *UserInformations = NULL;
 int UserCount = 0;
 uint8_t ServerSalt[SALT_LENGTH];
 FILE *LogFile;
-int Timeout = 100; //0 to disable timeout
+int Timeout = 1000; //0 to disable timeout
 
 void INTHwnd(int);
 void AcceptNewClient();

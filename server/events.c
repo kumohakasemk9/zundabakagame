@@ -205,7 +205,7 @@ void GetEvent(int cid) {
 		w_ptr += sizeof(player_locations_table_t);
 	}
 	tb[1] = (uint8_t)ltcnt;
-	//Copy events to sending buffer, but get rid of the events that has same owner to sender (except chat)
+	//Process events and copy
 	int elen = EBptr - C[cid].bufcur;
 	uint8_t *head = &EventBuffer[C[cid].bufcur];
 	int p = 0; //Pointer of event chunk array
@@ -224,19 +224,16 @@ void GetEvent(int cid) {
 			int tl = GetEventPacketSize(evhead, evlen);
 			if(tl != -1) {
 				evlen = tl;
-				//Don't loopback except EV_CHAT and EV_RESET
-				 if(evhead[0] != EV_CHAT && evhead[0] != EV_RESET) {
-					if(ecid == cid) {
+				//EV_USE_SKILL won't loopback
+				 if(evhead[0] == EV_USE_SKILL && ecid == cid) {
+					copyevent = 0;
+				 }
+				//Process secret chat (char 0 = destination cid, char1 = 0)
+				if(evhead[0] == EV_CHAT) {
+					ev_chat_t *hdr = (ev_chat_t*)evhead;
+					int dcid = hdr->dstcid;
+					if(0 <= dcid && dcid <= MAX_CLIENTS && (cid != dcid && cid != ecid) ) {
 						copyevent = 0;
-					}
-				
-					//Process secret chat (char 0 = destination cid, char1 = 0)
-					if(evhead[0] == EV_CHAT) {
-						ev_chat_t *hdr = (ev_chat_t*)evhead;
-						int dcid = hdr->dstcid;
-						if(0 <= dcid && dcid <= MAX_CLIENTS && (cid != dcid && cid != ecid) ) {
-							copyevent = 0;
-						}
 					}
 				}
 			} else {

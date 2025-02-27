@@ -43,7 +43,7 @@ int32_t SelectedSMPProf; //Current SMP profile ID
 SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //Client information (Modified by server)
 uint8_t TempRXBuffer[NET_BUFFER_SIZE]; //For packet size grantee
 size_t TRXBLength; //For packet size grantee
-int32_t NetworkTimeout = 50; //If there's still no packet after this period, client will auto disconnect.
+int32_t NetworkTimeout = 100; //If there's still no packet after this period, client will auto disconnect.
 int32_t TimeoutTimer;
 int32_t ConnectionTimeoutTimer;
 extern int32_t DifEnemyBaseCount[4];
@@ -1073,7 +1073,7 @@ void changetimeout_cmd(char *param) {
 	//change network timeout
 	int32_t i = (int32_t)strtol(param, NULL, 10);
 	if(!is_range(i, 0, 1000) ) {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		warn("changetimeout_cmd(): paraneter must be 0 to 1000.\n");
 		return;
 	}
@@ -1083,7 +1083,7 @@ void changetimeout_cmd(char *param) {
 void getcurrentsmp_cmd() {
 	//Command to get connection state
 	if(SMPStatus == NETWORK_DISCONNECTED) {
-		chat( (char*)getlocalizedstring(TEXT_OFFLINE) );
+		showstatus( (char*)getlocalizedstring(TEXT_OFFLINE) );
 	} else {
 		chatf("getcurrentsmp: %d (%s@%s:%s)", SelectedSMPProf, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
 	}
@@ -1092,7 +1092,7 @@ void getcurrentsmp_cmd() {
 void add_smp_cmd(char* p) {
 	//Add SMP profile
 	if(add_smp_profile(p, ' ') != 0) {
-			chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+			showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 	}
 }
 
@@ -1103,7 +1103,7 @@ void get_smp_cmd(char *param) {
 		chatf("getsmp: %d (%s@%s:%s)", i, SMPProfs[i].usr, SMPProfs[i].host, SMPProfs[i].port);
 	} else {
 		warn("get_smp_cmd(): bad SMP id.\n");
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 	}
 }
 
@@ -1192,7 +1192,7 @@ void getclients_cmd() {
 		chatf("getclients: %s", clientlist);
 	} else {
 		warn("getclients_cmd(): disconnected.\n");
-		chat( (char*)getlocalizedstring(TEXT_OFFLINE) ); //Offline
+		showstatus( (char*)getlocalizedstring(TEXT_OFFLINE) ); //Offline
 	}
 }
 
@@ -1215,7 +1215,7 @@ void addusermute_cmd(char *p) {
 	size_t l = strnlen(p, UNAME_SIZE);
 	//Check param
 	if(l >= UNAME_SIZE) {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		warn("addusermute_cmd(): too long username.\n");
 		return;
 	}
@@ -1289,7 +1289,7 @@ void delusermute_cmd(char *p) {
 
 	//Check param
 	if(l >= UNAME_SIZE) {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		warn("addusermute_cmd(): too long username.\n");
 		return;
 	}
@@ -1302,7 +1302,7 @@ void delusermute_cmd(char *p) {
 		free(BlockedUsers[i]);
 		BlockedUsers[i] = NULL;
 	} else {
-		chat( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		warn("addusermute_cmd(): not found on list!\n");
 	}
 }

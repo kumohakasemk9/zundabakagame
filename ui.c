@@ -23,6 +23,7 @@ ui.c: gamescreen drawing
 #define IMG_STAT_TECH_ICO 23 //Technology level icon
 #define IMG_STAT_ENERGY_GOOD 31 //Energy icon (good)
 #define IMG_STAT_ENERGY_BAD 32 //Energy icon (insufficient energy)
+#define IMG_TITLE 35 //Title image id
 
 //Colors
 #define COLOR_TEXTBG 0x60000000 //Text background color (30% opaque black)
@@ -63,6 +64,7 @@ int32_t shrink_substring(char*, int32_t, int32_t, int32_t, int32_t*);
 void draw_map_status();
 void draw_locator();
 void draw_help_win();
+void draw_title_screen();
 
 extern int32_t ITEMCOOLDOWNS[ITEM_COUNT];
 extern langid_t LangID;
@@ -114,10 +116,16 @@ void game_paint() {
 	clear_screen();
 
 	//Draw game
-	draw_locator(); //draw game background
+	if(GameState != GAMESTATE_TITLE) {
+		draw_locator(); //draw game background
+	}
 	draw_game_main(); //draw characters
-	draw_hotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
-	draw_map_status(); //draw money, techevel etc
+	if(GameState != GAMESTATE_TITLE) {
+		draw_hotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
+		draw_map_status(); //draw money, techevel etc
+	} else {
+		draw_title_screen();
+	}
 	draw_cui(); //draw chat and command window, title string, error
 	draw_help_win(); //draw help window
 
@@ -321,6 +329,26 @@ void draw_shapes(int32_t idx, double x, double y) {
 		} else {
 			//printf("main.c: draw_game_main(): WARNING: ID%d is laser but it has bad target id!\n", idx);
 		}
+	}
+}
+
+//draw title screen
+void draw_title_screen() {
+	//Draw title image
+	double w, h, y, x;
+	y = 100;
+	get_image_size(IMG_TITLE, &w, &h);
+	x = (WINDOW_WIDTH / 2.0) - (w / 2.0);
+	drawimage(x, y - (h / 2.0), IMG_TITLE);
+	y += (h / 2.0) + 100;
+	
+	//Draw menu
+	chcolor(COLOR_TEXTCMD, 1);
+	for(int i = 0; i < MAX_MENU_STRINGS; i++) {
+		const char *t = getlocalizedmenustring(i);
+		double w = get_string_width(t);
+		drawstring(x, y, t);
+		y += get_font_height();
 	}
 }
 
@@ -655,7 +683,7 @@ void drawstringf(double x, double y, const char *p, ...) {
 	va_end(v);
 	//Safety check
 	if(r >= sizeof(b) || r == -1) {
-		die("gutil.c: drawstringf() failed: formatted string not null terminated, input format string too long?\n");
+		die("ui.c: drawstringf() failed: formatted string not null terminated, input format string too long?\n");
 		return;
 	}
 	//Print

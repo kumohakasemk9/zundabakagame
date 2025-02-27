@@ -82,6 +82,46 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"Disabled chat"
 };
 
+//Menu strings
+const char *EN_MENU_STRINGS[MAX_MENU_STRINGS] = {
+	"Start operation",
+	"View manual",
+	"Attack gain: ",
+	"Enemy bases distance: ",
+	"Enemy base count topright: ",
+	"Enemy base count bottomright: ",
+	"Enemy base count topleft: "
+};
+
+const char *JP_MENU_STRINGS[MAX_MENU_STRINGS] = {
+	"作戦開始",
+	"操作説明",
+	"攻撃力倍率: ",
+	"敵星間距離: ",
+	"敵星数 右上: ",
+	"敵星数 右下: ",
+	"敵星数 左上: "
+};
+
+//Death reasons
+const char *EN_DEATH_STRINGS[MAX_DEATH_STRINGS] = {
+	"blown up",
+	"turned into a bee hive",
+	"took too much Edamames",
+	"burnt into crisp",
+	"annihilated",
+	"got killed by uncomprehensible reason"
+};
+
+const char *JP_DEATH_STRINGS[MAX_DEATH_STRINGS] = {
+	"爆発に巻き込まれた",
+	"蜂の巣にされた",
+	"大量の枝豆を浴びた",
+	"カリカリに焼けた",
+	"消滅した",
+	"わけの分からない理由で死んだ"
+};
+
 //TID names LUT
 const char *JP_TID_NAMES[MAX_TID] = {
 	"地球",
@@ -253,7 +293,7 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"adwaitalegacy/battery-caution.png", //32 Insufficient energy level icon
 	"img/kumo9-x24/kumolaser.png", //33 Kumo x24 laser icon (hotbar)
 	"img/kumo9-x24/positron.png", //34 Kumo x24 positron icon (hotbar)
-	"adwaitalegacy/input-keyboard.png", //35 keyboard input icon (status bar)
+	"img/title.png", //35 title image
 	"img/help-en.png", //36 English instruction manual image
 	"img/help-jp.png", //37 Japanese instruction manual image
 };
@@ -331,6 +371,31 @@ const char* getlocalizedstring(int32_t stringid) {
 		return JP_STRINGS[stringid];
 	} else {
 		return EN_STRINGS[stringid];
+	}
+}
+
+const char* getlocalizeddeathreason(int32_t stringid) {
+	if(!is_range(stringid, 0, MAX_DEATH_STRINGS - 1) ) {
+		warn("getlocalizeddeathreason(): bad stringid passed.\n");
+		return NULL;
+	}
+	if(LangID == LANGID_JP) {
+		return JP_DEATH_STRINGS[stringid];
+	} else {
+		return EN_DEATH_STRINGS[stringid];
+	}
+
+}
+
+const char* getlocalizedmenustring(int32_t stringid) {
+	if(!is_range(stringid, 0, MAX_MENU_STRINGS - 1) ) {
+		warn("getlocalizedstring(): bad stringid passed.\n");
+		return NULL;
+	}
+	if(LangID == LANGID_JP) {
+		return JP_MENU_STRINGS[stringid];
+	} else {
+		return EN_MENU_STRINGS[stringid];
 	}
 }
 

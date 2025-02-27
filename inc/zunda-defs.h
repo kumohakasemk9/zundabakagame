@@ -18,6 +18,8 @@ zunda-defs.h: definitions
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define BUFFER_SIZE 1024 //Command, message buffer size
 #define MAX_STRINGS 28 // Max string count
+#define MAX_MENU_STRINGS 7 //Main menu string count
+#define MAX_DEATH_STRINGS 6 //Death reason strings count
 #define CHARACTER_TIMER_COUNT 4
 #define MAX_TID 24 //max type id
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
@@ -147,7 +149,8 @@ typedef enum {
 	GAMESTATE_PLAYING = 1,
 	GAMESTATE_DEAD = 2,
 	GAMESTATE_GAMEOVER = 3,
-	GAMESTATE_GAMECLEAR = 4
+	GAMESTATE_GAMECLEAR = 4,
+	GAMESTATE_TITLE = 5
 } gamestate_t;
 
 //KeyFlags
