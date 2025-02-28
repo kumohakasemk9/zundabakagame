@@ -69,6 +69,7 @@ void commit_menu();
 void title_cmd();
 void select_next_menuitem();
 void select_prev_menuitem();
+void title_item_change(int32_t);
 
 int32_t SelectingMenuItem = 0;
 char ChatMessages[MAX_CHAT_COUNT][BUFFER_SIZE]; //Chatmessage storage
@@ -859,7 +860,7 @@ void execcmd() {
 		//Togglechat cmd
 		togglechat_cmd();
 	} else if(strcmp(CommandBuffer, "/title") == 0) {
-		//returntotitle command
+		//title command
 		title_cmd();
 
 	} else {
@@ -876,6 +877,7 @@ void execcmd() {
 }
 
 void title_cmd() {
+	close_connection_cmd();
 	GameState = GAMESTATE_TITLE;
 	reset_game();
 }
@@ -917,7 +919,7 @@ void ebcount_cmd() {
 		if(i == 0) {
 			minim = 1;
 		}
-		if(!is_range(t[i], minim, 4) ) {
+		if(!is_range(t[i], minim, MAX_EBCOUNT) ) {
 			showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 			return;
 		}
@@ -1376,12 +1378,21 @@ void keypress_handler(char kc, specialkey_t ks) {
 			if(ks == SPK_F3) {
 				//F3 Key
 				switch_debug_info();
-			} else if(ks == SPK_UP) {
-				//Up key
-				select_next_menuitem();
-			} else if(ks == SPK_DOWN) {
-				//DownKey
-				select_prev_menuitem();
+			}
+			if(GameState == GAMESTATE_TITLE) {
+				if(ks == SPK_UP) {
+					//Up key
+					select_next_menuitem();
+				} else if(ks == SPK_DOWN) {
+					//DownKey
+					select_prev_menuitem();
+				} else if(ks == SPK_LEFT) {
+					//Left key
+					title_item_change(-1);
+				} else if(ks == SPK_RIGHT) {
+					//right key
+					title_item_change(1);
+				}
 			}
 		}
 	} else {
@@ -1464,9 +1475,17 @@ void mousepressed_handler(mousebutton_t keynum) {
 	} else if(keynum == MB_RIGHT) { //Right
 		use_item();
 	} else if(keynum == MB_UP) { //WheelUp
-		select_next_item();
+		if(GameState == GAMESTATE_TITLE) {
+			title_item_change(1);
+		} else {
+			select_next_item();
+		}
 	} else if(keynum == MB_DOWN) { //WheelDn
-		select_prev_item();
+		if(GameState == GAMESTATE_TITLE) {
+			title_item_change(-1);
+		} else {
+			select_prev_item();
+		}
 	}
 }
 
@@ -1479,5 +1498,42 @@ void commit_menu() {
 		//Go to game
 		GameState = GAMESTATE_INITROUND;
 		reset_game();
+	}
+}
+
+void title_item_change(int amount) {
+	if(SelectingMenuItem == 2) {
+		//Atkgain
+		double t = DifATKGain;
+		if(amount > 0) {
+			t += 0.1;
+		} else {
+			t -= 0.1;
+		}
+		DifATKGain = constrain_number(t, MIN_ATKGAIN, MAX_ATKGAIN);
+	} else if(SelectingMenuItem == 3) {
+		//EnemyBasesDistance
+		int32_t t = DifEnemyBaseDist;
+		if(amount > 0) {
+			t += 50;
+		} else {
+			t -= 50;
+		}
+		DifEnemyBaseDist = constrain_i32(t, MIN_EBDIST, MAX_EBDIST);
+	} else if(4 <= SelectingMenuItem && SelectingMenuItem <= 6) {
+		//EnemyBaseCount 0 - 3
+		int32_t t = DifEnemyBaseCount[SelectingMenuItem - 4] + amount;
+		int32_t m = 0;
+		if(SelectingMenuItem == 4) {
+			m = 1;
+		}
+		DifEnemyBaseCount[SelectingMenuItem - 4] = constrain_i32(t, m, MAX_EBCOUNT);
+	} else if(SelectingMenuItem == 7) {
+		//Spawn limit
+		int32_t t = InitSpawnRemain + amount;
+		InitSpawnRemain = constrain_i32(t, -1, MAX_SPAWN_COUNT);
+	} else if(SelectingMenuItem == 8) {
+		int32_t t = PlayableID + amount;
+		PlayableID = constrain_i32(t, 0, PLAYABLE_CHARACTERS_COUNT - 1);
 	}
 }

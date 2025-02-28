@@ -87,7 +87,7 @@ int32_t lookup(obj_type_t, LookupResult_t*);
 int32_t lookup_playable(int32_t, PlayableInfo_t*);
 int32_t is_playable_character(obj_type_t);
 const char *getlocalizedstring(int32_t);
-const char *gelocalizeddeathreason(int32_t);
+const char *getlocalizeddeathreason(int32_t);
 const char *getlocalizedmenustring(int32_t);
 void check_data();
 const char *getlocalizedcharactername(int32_t);

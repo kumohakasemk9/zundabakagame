@@ -243,6 +243,11 @@ function keydown_cb(evt) {
 		ZundaGame.keypress_handler(0, 4);
 	} else if(evt.key == "ArrowDown") {
 		ZundaGame.keypress_handler(0, 5);
+	} else if(evt.key == "ArrowLeft") {
+		ZundaGame.keypress_handler(0, 1);
+	} else if(evt.key == "ArrowRight") {
+		ZundaGame.keypress_handler(0, 2);
+	
 	} else {
 		ZundaGame.keypress_handler(evt.key.charCodeAt(0), 0);
 	}

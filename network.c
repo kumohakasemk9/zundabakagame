@@ -57,6 +57,7 @@ char **BlockedUsers = NULL; //blocked username ptr array (dynamic alloc)
 int32_t BlockedUsersCount = 0; //Elements of Blocked Users
 int32_t IsChatEnable = 1; //0 to supress chat
 int32_t WebsockMode; //If 1, client should not add length header in sending messages, always 0 in non WASM builds
+extern int32_t GameState;
 
 int32_t process_smp_events(uint8_t*, size_t, int32_t);
 void net_server_send_cmd(server_command_t);
@@ -308,6 +309,10 @@ void net_message_handler(uint8_t *pkt, size_t plen) {
 
 //Connect to specified address
 void connect_server_cmd(char* cmdparam) {
+	if(GameState == GAMESTATE_TITLE) {
+		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable in title screen
+	}
+
 	//Convert parameter to int
 	int sp = atoi(cmdparam);
 

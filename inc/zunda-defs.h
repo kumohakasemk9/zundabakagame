@@ -18,7 +18,7 @@ zunda-defs.h: definitions
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define BUFFER_SIZE 1024 //Command, message buffer size
 #define MAX_STRINGS 28 // Max string count
-#define MAX_MENU_STRINGS 7 //Main menu string count
+#define MAX_MENU_STRINGS 9 //Main menu string count
 #define MAX_DEATH_STRINGS 6 //Death reason strings count
 #define CHARACTER_TIMER_COUNT 4
 #define MAX_TID 24 //max type id
@@ -31,8 +31,9 @@ zunda-defs.h: definitions
 #define MAX_ATKGAIN 8.0 //Maxmium AtkGain
 #define MIN_ATKGAIN 0.1 //Minimum AtkGain
 #define MIN_EBDIST 100 //Minimum ebdist
-#define MAX_EBDIST 500 //Maximum ebdist
-#define MAX_SPAWN_COUNT 10 //Maximum revival count
+#define MAX_EBDIST 600 //Maximum ebdist
+#define MAX_EBCOUNT 4 //Maxmium ebcount
+#define MAX_SPAWN_COUNT 20 //Maximum revival count
 #define MAX_ZINDEX 3 //Max z-index
 
 //Sizes

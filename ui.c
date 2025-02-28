@@ -107,6 +107,11 @@ extern int32_t SelectedSMPProf;
 extern int32_t SpawnRemain;
 extern int32_t LocatorType; //Ruler type id
 extern int32_t SelectingMenuItem;
+extern int32_t DifEnemyBaseDist;
+extern int32_t DifEnemyBaseCount[4];
+extern int32_t InitSpawnRemain;
+extern double DifATKGain;
+extern int32_t PlayableID;
 
 //Paint event of window client, called for every 30mS
 void game_paint() {
@@ -346,6 +351,7 @@ void draw_title_screen() {
 	
 	//Draw menu
 	for(int i = 0; i < MAX_MENU_STRINGS; i++) {
+		//Draw menu item
 		const char *t = getlocalizedmenustring(i);
 		double fh = get_font_height();
 		if(SelectingMenuItem == i) {
@@ -354,6 +360,33 @@ void draw_title_screen() {
 		}
 		chcolor(COLOR_TEXTCMD, 1);
 		drawstring(x, y, t);
+
+		//Draw settings for setting item
+		char st[BUFFER_SIZE] = "";
+		if(i == 2) {
+			snprintf(st, BUFFER_SIZE - 1, "%.3lf", DifATKGain);
+		} else if(i == 3) {
+			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseDist);
+		} else if(i == 4) {
+			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[0]);
+		} else if(i == 5) {
+			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[1]);
+		} else if(i == 6) {
+			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[2]);
+		} else if(i == 7) {
+			if(InitSpawnRemain == -1) {
+				strcpy(st, getlocalizedstring(11) );
+			} else {
+				snprintf(st, BUFFER_SIZE - 1, "%d", InitSpawnRemain);
+			}
+		} else if(i == 8) {
+			snprintf(st, BUFFER_SIZE - 1, "%d", PlayableID);
+		}
+		st[BUFFER_SIZE - 1] = 0;
+		if(strlen(st) != 0) {
+			double tw = get_string_width(st);
+			drawstring(x + w - tw, y, st);
+		}
 		y += fh;
 	}
 }

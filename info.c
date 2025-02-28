@@ -32,7 +32,7 @@ const char* JP_STRINGS[MAX_STRINGS] = {
 	"地球は守られた!",
 	"プレイありがとうございます。おめでとう!",
 	"現在使用出来ません",
-	"爆発に巻き込まれた",
+	"無限",
 	"蜂の巣にされた",
 	"大量の枝豆を浴びた",
 	"カリカリに焼けた",
@@ -63,7 +63,7 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"Earth is safe now!",
 	"Thanks for playing, Congratulations!",
 	"Unavailable",
-	"blown up",
+	"infinite",
 	"turned into a bee hive",
 	"took too much Edamames",
 	"burnt into crisp",
@@ -90,7 +90,9 @@ const char *EN_MENU_STRINGS[MAX_MENU_STRINGS] = {
 	"Enemy bases distance: ",
 	"Enemy base count topright: ",
 	"Enemy base count bottomright: ",
-	"Enemy base count topleft: "
+	"Enemy base count topleft: ",
+	"Spawn limit: ",
+	"Battleship: "
 };
 
 const char *JP_MENU_STRINGS[MAX_MENU_STRINGS] = {
@@ -100,7 +102,9 @@ const char *JP_MENU_STRINGS[MAX_MENU_STRINGS] = {
 	"敵星間距離: ",
 	"敵星数 右上: ",
 	"敵星数 右下: ",
-	"敵星数 左上: "
+	"敵星数 左上: ",
+	"リスポーン上限: ",
+	"戦闘艦: "
 };
 
 //Death reasons

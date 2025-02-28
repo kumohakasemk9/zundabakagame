@@ -542,24 +542,28 @@ void damage_object(int32_t dstid, int32_t srcid) {
 			//If enemy unit is killed by player, give money to ally team
 			//printlog("Object %d (srcid=%d) killed %d.\n", srcid, killerid, dstid);
 			//Minecraft style death log
-			int32_t deathreasonid = 16;
+			int32_t deathreasonid = 5;
 			obj_type_t tid = Gobjs[srcid].tid;
 			if(tid == TID_EXPLOSION || tid == TID_ALLYEXPLOSION || tid == TID_ENEMYEXPLOSION) {
 				//blown up
-				deathreasonid = 11;
+				deathreasonid = 0;
 					
 			} else if(tid == TID_ENEMYBULLET) {
-					//Zundad
-					deathreasonid = 13;
+				//Zundad
+				deathreasonid = 2;
 					
 			} else if(tid == TID_ENEMYZUNDALASER || tid == TID_KUMO9_X24_LASER || tid == TID_KUMO9_X24_MISSILE_RESIDUE) {
-					//Burnt into crisp
-					deathreasonid = 14;
+				//Burnt into crisp
+				deathreasonid = 3;
 					
 			} else if(tid == TID_KUMO9_X24_PCANNON) {
-					//Annihilated
-					deathreasonid = 15;
+				//Annihilated
+				deathreasonid = 4;
 					
+			} else if(tid == TID_ALLYBULLET) {
+				//Bee hive
+				deathreasonid = 1;
+				
 			}
 			char smpkiller[UNAME_SIZE + 2] = "", smpvictim[UNAME_SIZE + 2] = "";
 			//If SMP, show smp username (if object is playable)
@@ -582,16 +586,16 @@ void damage_object(int32_t dstid, int32_t srcid) {
 			if(is_range(killerid, 0, MAX_OBJECT_COUNT - 1) && is_range(Gobjs[killerid].tid, 0, MAX_TID - 1) ){
 				int32_t killertid = Gobjs[killerid].tid;
 				if(LangID == LANGID_JP) {
-					chatf("%s%sは%s%sによって%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedcharactername(killertid), smpkiller, getlocalizedstring(deathreasonid));
+					chatf("%s%sは%s%sによって%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedcharactername(killertid), smpkiller, getlocalizeddeathreason(deathreasonid));
 				} else {
-					chatf("%s%s is %s by %s%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedstring(deathreasonid), getlocalizedcharactername(killertid), smpkiller);
+					chatf("%s%s is %s by %s%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizeddeathreason(deathreasonid), getlocalizedcharactername(killertid), smpkiller);
 				}
 				//printlog("Object %d is %s\n", killerid, EN_TID_NAMES[killertid]);
 			} else {
 				if(LangID == LANGID_JP) {
-					chatf("%s%sは%s%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedstring(deathreasonid) );
+					chatf("%s%sは%s%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizeddeathreason(deathreasonid) );
 				} else {
-					chatf("%s%s %s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedstring(deathreasonid) );
+					chatf("%s%s %s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizeddeathreason(deathreasonid) );
 				}
 			}
 		}
