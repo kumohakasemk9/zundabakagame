@@ -191,7 +191,7 @@ void procai() {
 				}
 				int32_t newgid = add_character(newetid, Gobjs[i].x, Gobjs[i].y, i);
 				if(GameState == GAMESTATE_TITLE) {
-					Gobjs[newgid].timeout = 6000;
+					Gobjs[newgid].timeout = 3000;
 				}
 				//There is 20% chance of kamikaze zundamon swawn
 				if(randint(0, 100) < 20) {
