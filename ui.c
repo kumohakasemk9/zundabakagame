@@ -130,11 +130,11 @@ void game_paint() {
 	if(GameState != GAMESTATE_TITLE) {
 		draw_hotbar(IHOTBAR_XOFF, IHOTBAR_YOFF); //draw mc like hot bar
 		draw_map_status(); //draw money, techevel etc
-	} else {
-		draw_title_screen();
 	}
 	draw_cui(); //draw chat and command window, title string, error
-	draw_help_win(); //draw help window
+	if(GameState == GAMESTATE_TITLE) {
+		draw_title_screen();
+	}
 
 	#ifndef __WASM
 		//Calculate draw time (AVG)

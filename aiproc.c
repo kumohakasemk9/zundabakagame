@@ -51,20 +51,15 @@ void procai() {
 		TitleSkillTimer++;
 		if(TitleSkillTimer > 500) {
 			TitleSkillTimer = 0;
-			//Get playable character ids
-			int32_t playablegids[MAX_OBJECT_COUNT];
-			int32_t c = 0;
+			//Get playable character id
 			for(int32_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 				if(is_playable_character(Gobjs[i].tid) ) {
-					playablegids[c] = i;
-					c++;
+					int32_t skillid = randint(0, SKILL_COUNT - 1);
+					if(Gobjs[i].timers[1] == 0 && Gobjs[i].timers[2] == 0 && Gobjs[i].timers[3] == 0) {
+						Gobjs[i].timers[1 + skillid] = get_skillinittimer(Gobjs[i].tid, skillid);
+					}
+					break;
 				}
-			}
-			if(c != 0) {
-				int32_t selectedgid = playablegids[randint(0, c - 1)];
-				int32_t skillid = randint(0, SKILL_COUNT - 1);
-				int32_t initskillt = get_skillinittimer(Gobjs[selectedgid].tid, skillid);
-				Gobjs[selectedgid].timers[1 + skillid] = constrain_i32(initskillt, 0, 500);
 			}
 		}
 	}
@@ -164,14 +159,14 @@ void procai() {
 			earthcount++;
 			//Apply recovery according to MapTechnologyLevel
 			Gobjs[i].hp = constrain_number(Gobjs[i].hp + MapTechnologyLevel, 0, srcinfo.inithp);
-			//If in title, spawn ally every 10 sec
+			//If there was no ally and in title, generate new allies
 			if(GameState == GAMESTATE_TITLE && Gobjs[i].timers[1] == 0) {
 				Gobjs[i].timers[1] = 1000;
 				int32_t newallycid = randint(0, PLAYABLE_CHARACTERS_COUNT - 1);
 				PlayableInfo_t newally;
 				lookup_playable(newallycid, &newally);
 				int32_t naobjid = add_character(newally.associatedtid, Gobjs[i].x, Gobjs[i].y, i);
-				Gobjs[naobjid].timeout = 6000;
+				Gobjs[naobjid].timeout = 3000;
 			}
 
 		} else if(tid == TID_ENEMYBASE) {
@@ -306,7 +301,12 @@ void procai() {
 			}
 			// Positron canon
 			if(Gobjs[i].timers[3] != 0) {
-				add_character(TID_KUMO9_X24_PCANNON, Gobjs[i].x, Gobjs[i].y, i);
+				int32_t rid = add_character(TID_KUMO9_X24_PCANNON, Gobjs[i].x, Gobjs[i].y, i);
+				if(is_range(Gobjs[rid].aiming_target,0, MAX_OBJECT_COUNT - 1) ) {
+					int32_t rrid = add_character(TID_ALLYEXPLOSION, Gobjs[Gobjs[rid].aiming_target].x, Gobjs[Gobjs[rid].aiming_target].y, rid);
+					Gobjs[rrid].hitdiameter = 500;
+					Gobjs[rrid].damage = 5;
+				}
 				Gobjs[i].timers[3] = 0;
 			}
 			
@@ -330,12 +330,6 @@ void procai() {
 				Gobjs[i].y = Gobjs[Gobjs[i].parentid].y;
 				if(is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) && Gobjs[Gobjs[i].aiming_target].tid != TID_NULL) {
 					//If target object is not dead
-					if(Gobjs[i].timeout == 1) {
-						//Make explosion (diam 600) on target before pcannon disappears
-						int32_t r = add_character(TID_ALLYEXPLOSION, Gobjs[Gobjs[i].aiming_target].x, Gobjs[Gobjs[i].aiming_target].y, i);
-						Gobjs[r].hitdiameter = 800;
-						Gobjs[r].damage = 5;
-					}
 					damage_object(Gobjs[i].aiming_target, i);
 				}
 			} else {
@@ -647,9 +641,6 @@ void damage_object(int32_t dstid, int32_t srcid) {
 				}
 			}
 
-			if(GameState == GAMESTATE_TITLE) { 
-				return; //No deathlog in title
-			}
 			//show death log
 			if(is_range(killerid, 0, MAX_OBJECT_COUNT - 1) && is_range(Gobjs[killerid].tid, 0, MAX_TID - 1) ){
 				int32_t killertid = Gobjs[killerid].tid;
@@ -761,7 +752,6 @@ int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
 		} else {
 			Gobjs[newid].aiming_target = find_nearest_unit(newid, KUMO9_X24_PCANNON_RANGE, UNITTYPE_FACILITY | UNITTYPE_UNIT);
 		}
-
 	}
 	return newid;
 }

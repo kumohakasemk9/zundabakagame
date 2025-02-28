@@ -754,8 +754,8 @@ void reset_game() {
 	if(GameState == GAMESTATE_TITLE) {
 		//Place demo facilities instead
 		EarthID = add_character(TID_EARTH, 100, 100, OBJID_INVALID);
-		for(int32_t i = 0; i < 4; i++) {
-			add_character(TID_ENEMYBASE, WINDOW_WIDTH + (300 * (i + 1) ), WINDOW_HEIGHT + 300, OBJID_INVALID);
+		for(int32_t i = 0; i < 8; i++) {
+			add_character(TID_ENEMYBASE, WINDOW_WIDTH + (300 * ( (i % 4) + 1) ), WINDOW_HEIGHT + (300 * floor(i / 4) + 1), OBJID_INVALID);
 		}
 		add_character(TID_FORT, WINDOW_WIDTH * 0.7, 100, OBJID_INVALID);
 		return;

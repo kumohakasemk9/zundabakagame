@@ -310,8 +310,8 @@ const int32_t NUMINFO[MAX_TID][9] = {
 	{ 3,   300, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //3 Spicy Zundamon
 	{ 4,   500, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //4 Mad Zundamon
 	{ 5,    70, TEAMID_ENEMY, 2,    0, UNITTYPE_BULLET_INTERCEPTABLE,  50,  300,  0}, //5 Zundamon space mine
-	{ 6,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 200,    0,  2}, //6 Pit
-	{ 7, 15000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 200,    0, 10}, //7 Fort
+	{ 6,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 100,    0,  2}, //6 Pit
+	{ 7, 15000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 100,    0, 10}, //7 Fort
 	{ 8,    20,  TEAMID_ALLY, 2,    0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  300,  0}, //8 Missile
 	{-1,     0,  TEAMID_ALLY, 2,    1,               UNITTYPE_BULLET, 100,    0,  0}, //9 AllyExplosion
 	{-1,     0, TEAMID_ENEMY, 2,    1,               UNITTYPE_BULLET, 100,    0,  0}, //10 EnemyExplosion
@@ -323,9 +323,9 @@ const int32_t NUMINFO[MAX_TID][9] = {
 	{12,   500, TEAMID_ENEMY, 1,    0,                 UNITTYPE_UNIT, 100,    0,  0}, //16 Kamikaze zundamon
 	{24,    70,  TEAMID_ALLY, 2,    0, UNITTYPE_BULLET_INTERCEPTABLE,  10,  700,  0}, //17 Kumo9 x24 missile
 	{25,     0,  TEAMID_ALLY, 0,    5,               UNITTYPE_BULLET, 100,  100,  0}, //18 kumo9 x24 missile residue
-	{26,  3000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0, 15}, //19 Money generater facility
-	{27,  3000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  4}, //20 researchment facility
-	{29,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 210,    0,  0}, //21 power plant
+	{26,  3000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 110,    0, 15}, //19 Money generater facility
+	{27,  3000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 110,    0,  4}, //20 researchment facility
+	{29,  5000,  TEAMID_ALLY, 0,    0,             UNITTYPE_FACILITY, 110,    0,  0}, //21 power plant
 	{-1,     0,  TEAMID_ALLY, 2,    5,               UNITTYPE_BULLET, 600,  500,  0}, //22 Kumo9-x24-robot-laser
 	{-1,     0,  TEAMID_ALLY, 2,   50,               UNITTYPE_BULLET,   0,   20,  0}  //23 Kumo9-x24-robot-pcanon
 };
