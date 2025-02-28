@@ -14,7 +14,7 @@ zunda-defs.h: definitions
 */
 
 //Data storage sizes
-#define IMAGE_COUNT 38 //Preload image count
+#define IMAGE_COUNT 44 //Preload image count
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define BUFFER_SIZE 1024 //Command, message buffer size
 #define MAX_STRINGS 28 // Max string count
@@ -26,6 +26,7 @@ zunda-defs.h: definitions
 #define HOSTNAME_SIZE 64 //SMPServerInfo_t host record max len
 #define PORTNAME_SIZE 6 //SMPServerInfo_t port record max len
 #define NET_BUFFER_SIZE 8192 //Network buffer size for receiving
+#define HELP_PAGE_MAX 4
 
 //Parameter limits
 #define MAX_ATKGAIN 8.0 //Maxmium AtkGain

@@ -63,7 +63,7 @@ int32_t get_substring_width(char*, int32_t, int32_t);
 int32_t shrink_substring(char*, int32_t, int32_t, int32_t, int32_t*);
 void draw_map_status();
 void draw_locator();
-void draw_help_win();
+void draw_image_center(int32_t);
 void draw_title_screen();
 
 extern int32_t ITEMCOOLDOWNS[ITEM_COUNT];
@@ -112,6 +112,7 @@ extern int32_t DifEnemyBaseCount[4];
 extern int32_t InitSpawnRemain;
 extern double DifATKGain;
 extern int32_t PlayableID;
+extern int32_t SelectingHelpPage;
 
 //Paint event of window client, called for every 30mS
 void game_paint() {
@@ -133,7 +134,17 @@ void game_paint() {
 	}
 	draw_cui(); //draw chat and command window, title string, error
 	if(GameState == GAMESTATE_TITLE) {
-		draw_title_screen();
+		if(SelectingHelpPage == -1) {
+			draw_title_screen();
+		} else {
+			if(is_range(SelectingHelpPage, 0, HELP_PAGE_MAX - 1) ) {
+				draw_image_center(getlocalizedhelpimgid(SelectingHelpPage) );
+			}
+		}
+	}
+
+	if(GameState != GAMESTATE_TITLE && (KeyFlags & KEY_HELP) ) {
+		draw_image_center(getlocalizedhelpimgid(3) );
 	}
 
 	#ifndef __WASM
@@ -347,15 +358,17 @@ void draw_title_screen() {
 	get_image_size(IMG_TITLE, &w, &h);
 	x = (WINDOW_WIDTH / 2.0) - (w / 2.0);
 	drawimage(x, y - (h / 2.0), IMG_TITLE);
-	y += (h / 2.0) + 100;
-	
+	y += (h / 2.0) + 50;
+	drawstring_title(y, getlocalizedstring(12), FONT_DEFAULT_SIZE);
+	y += 50;
+
 	//Draw menu
 	for(int i = 0; i < MAX_MENU_STRINGS; i++) {
 		//Draw menu item
 		const char *t = getlocalizedmenustring(i);
 		double fh = get_font_height();
 		if(SelectingMenuItem == i) {
-			chcolor(0xa0ff00ff, 1);
+			chcolor(0x60ffffff, 1);
 			fillrect(x, y, w, fh);
 		}
 		chcolor(COLOR_TEXTCMD, 1);
@@ -388,6 +401,11 @@ void draw_title_screen() {
 			drawstring(x + w - tw, y, st);
 		}
 		y += fh;
+	}
+	if(is_range(PlayableID, 0, PLAYABLE_CHARACTERS_COUNT - 1) ) {
+		PlayableInfo_t plinf;
+		lookup_playable(PlayableID, &plinf);
+		drawimage(x, y, plinf.portraitimgid);
 	}
 }
 
@@ -560,16 +578,11 @@ void draw_cui() {
 
 }
 
-void draw_help_win() {
-	//Show help during help key pressed
-	if(KeyFlags & KEY_HELP) {
-		//Get image size
-		int32_t himg = getlocalizedhelpimgid();
-		//Calculate img offset to show
-		double iw, ih;
-		get_image_size(himg, &iw, &ih);
-		drawimage( (WINDOW_WIDTH / 2) - (iw / 2), (WINDOW_HEIGHT / 2) - (ih / 2), himg);
-	}
+void draw_image_center(int32_t imgid) {
+	//Calculate img offset to show
+	double iw, ih;
+	get_image_size(imgid, &iw, &ih);
+	drawimage( (WINDOW_WIDTH / 2) - (iw / 2), (WINDOW_HEIGHT / 2) - (ih / 2), imgid);
 }
 
 void draw_map_status() {

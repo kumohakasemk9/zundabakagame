@@ -33,7 +33,7 @@ const char* JP_STRINGS[MAX_STRINGS] = {
 	"プレイありがとうございます。おめでとう!",
 	"現在使用出来ません",
 	"無限",
-	"蜂の巣にされた",
+	"上下矢印キーで選択、左右矢印キーで項目変更、スペースで決定",
 	"大量の枝豆を浴びた",
 	"カリカリに焼けた",
 	"消滅した",
@@ -64,7 +64,7 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"Thanks for playing, Congratulations!",
 	"Unavailable",
 	"infinite",
-	"turned into a bee hive",
+	"Up Down Arrow Key to select, Left Right Arrow key to modify item, space to enter.",
 	"took too much Edamames",
 	"burnt into crisp",
 	"annihilated",
@@ -257,7 +257,7 @@ int32_t SKILLICONIDS[PLAYABLE_CHARACTERS_COUNT][SKILL_COUNT] = {
 
 //Playable character information (tid, portraitimgid, dead portrait)
 const int32_t PLAYABLE_INFORMATION[PLAYABLE_CHARACTERS_COUNT][3] = {
-	{15, 22, 22} //kumo9-x24 (kumohakasemk9)
+	{15, 20, 22} //kumo9-x24 (kumohakasemk9)
 };
 
 //Image assets
@@ -282,7 +282,7 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"adwaitalegacy/applications-internet.png", //17 earth icon (status bar)
 	"adwaitalegacy/applications-system.png", //18 Money icon (status bar)
 	"adwaitalegacy/emblem-urgent.png", //19 dead playable respawn timer icon (status)
-	"adwaitalegacy/input-mouse.png", //20 Mouse icon (status bar)
+	"img/kumo9-x24/portrait.png", //20 kumo9-x24 portrait
 	"adwaitalegacy/preferences-system-16.png", //21 map mark: pit
 	"adwaitalegacy/image-missing.png", //22 image-missing
 	"adwaitalegacy/preferences-other-16.png", //23 technology star (status)
@@ -300,6 +300,12 @@ const char *IMGPATHES[IMAGE_COUNT] = {
 	"img/title.png", //35 title image
 	"img/help-en.png", //36 English instruction manual image
 	"img/help-jp.png", //37 Japanese instruction manual image
+	"img/manual-en1.png", //38 English manual 1
+	"img/manual-en2.png", //39 English manual 2
+	"img/manual-en3.png", //40 English manual 3
+	"img/manual-jp1.png", //41 Japanese manual 1
+	"img/manual-jp2.png", //42 Japanese manual 2
+	"img/manual-jp3.png", //43 Japanese manual 3
 };
 
 //InitialIMGID, InitialHP, Team, ZIndex, damage, unit_type, inithitdiameter, timeout, requirepowerlevel
@@ -358,11 +364,18 @@ const double DBLINFO[MAX_TID] = {
 	0    //23
 };
 
-int32_t getlocalizedhelpimgid() {
+const int32_t HELPIMG_EN_LUT[HELP_PAGE_MAX] = {38, 39, 40, 36}; //English help manual image id LUT
+const int32_t HELPIMG_JP_LUT[HELP_PAGE_MAX] = {41, 42, 43, 37}; //Japanese help manual image LUT
+
+int32_t getlocalizedhelpimgid(int32_t imgid) {
+	if(!is_range(imgid, 0, HELP_PAGE_MAX - 1) ) {
+		warn("getlocalizedhelpimgid(): bad imgid passed.\n");
+		return 0;
+	}
 	if(LangID == LANGID_JP) {
-		return 37;
+		return HELPIMG_JP_LUT[imgid];
 	} else {
-		return 36;
+		return HELPIMG_EN_LUT[imgid];
 	}
 }
 
@@ -422,7 +435,7 @@ int32_t lookup(obj_type_t i, LookupResult_t* r) {
 }
 
 void check_data() {
-//Check data
+	//Check data
 	for(uint8_t i = 0; i < MAX_TID; i++) {
 		if(!is_range(NUMINFO[i][0], -1, IMAGE_COUNT - 1)) {
 			die("info.c: check_data(): bad initimgid value on tid %d\n", i);

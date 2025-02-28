@@ -558,8 +558,10 @@ void damage_object(int32_t dstid, int32_t srcid) {
 	//Decrease target HP
 	double m = 1.00;
 	//Apply DifATKGain if attacker is playable character
-	if(is_playable_character(Gobjs[srcid].tid) ) {
-		m = DifATKGain;
+	if(is_range(Gobjs[srcid].srcid, 0, MAX_OBJECT_COUNT - 1) ) {
+		if(is_playable_character(Gobjs[Gobjs[srcid].srcid].tid) ) {
+			m = DifATKGain;
+		}
 	}
 	Gobjs[dstid].hp = constrain_number(Gobjs[dstid].hp - (Gobjs[srcid].damage * m) , 0, dstinfo.inithp);
 	
@@ -623,6 +625,7 @@ void damage_object(int32_t dstid, int32_t srcid) {
 				deathreasonid = 1;
 				
 			}
+			
 			char smpkiller[UNAME_SIZE + 2] = "", smpvictim[UNAME_SIZE + 2] = "";
 			//If SMP, show smp username (if object is playable)
 			if(SMPStatus == NETWORK_LOGGEDIN) {

@@ -119,6 +119,7 @@ extern int32_t BlockedUsersCount;
 extern char** BlockedUsers;
 int32_t LocatorType = 0; //Game background type
 extern int32_t TitleSkillTimer;
+int32_t SelectingHelpPage;
 
 //Translate window coordinate into map coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -631,6 +632,8 @@ void go_title() {
 		close_connection_cmd();
 	}
 	TitleSkillTimer = 0;
+	SelectingMenuItem = 0;
+	SelectingHelpPage = -1;
 	GameState = GAMESTATE_TITLE;
 	reset_game();
 }
@@ -1232,10 +1235,21 @@ void commit_menu() {
 	if(GameState != GAMESTATE_TITLE) {
 		return;
 	}
+	if(SelectingHelpPage != -1) {
+		SelectingHelpPage++;
+		if(SelectingHelpPage > HELP_PAGE_MAX - 2) {
+			SelectingHelpPage = -1;
+			return;
+		}
+		return;
+	} 
 	if(SelectingMenuItem == 0) {
 		//Go to game
 		GameState = GAMESTATE_INITROUND;
 		reset_game();
+	} else if(SelectingMenuItem == 1) {
+		//Instruction Manual
+		SelectingHelpPage = 0;
 	}
 }
 
