@@ -15,8 +15,6 @@ zundagame-gtk3.c: gtk3 entry point, funcs.
 ToDo
 integrate with liballeg
 add sound
-add title and background
-improve help screen
 make vim styled cui
 */
 

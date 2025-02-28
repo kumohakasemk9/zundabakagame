@@ -163,14 +163,6 @@ void game_paint() {
 }
 
 void draw_game_main() {
-	//draw lol type skill helper
-	//if(is_range(SkillKeyState,0, SKILL_COUNT - 1) && is_range(PlayingCharacterID, 0, MAX_OBJECT_COUNT - 1) ) {
-	//	double x, y;
-	//	getlocalcoord(PlayingCharacterID, &x, &y);
-	//	chcolor(0x600000ff, 1);
-	//	fillcircle(x, y, get_skillrange(Gobjs[PlayingCharacterID].tid, SkillKeyState) );
-	//}
-
 	//draw characters
 	for(uint8_t z = 0; z < MAX_ZINDEX; z++) {
 		for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
@@ -237,18 +229,17 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 		die("draw_game_object(): bad Gobjs[idx].imgid, how can you do that!?\n");
 		return;
 	}
-	double w;
-	double h;
+	double w, h, tx, ty;
 	get_image_size(Gobjs[idx].imgid, &w, &h);
-	x = x - (w / 2.0);
-	y = y - (h / 2.0);
-	drawimage(x, y, Gobjs[idx].imgid);
+	tx = x - (w / 2.0);
+	ty = y - (h / 2.0);
+	drawimage(tx, ty, Gobjs[idx].imgid);
 	if(DebugMode) {
 		chcolor(0xffffffff, 1);
-		hollowrect(x, y, w, h);
-		drawstringf(x, y, "ID=%d", idx);
+		hollowrect(tx, ty, w, h);
+		drawstringf(tx, ty, "ID=%d", idx);
 		chcolor(0x30ffffff, 1);
-		fillcircle(x + (w / 2.0), y + (h / 2.0), Gobjs[idx].hitdiameter);
+		fillcircle(x, y, Gobjs[idx].hitdiameter);
 	}
 	//Draw HP bar if their initial HP is not 0
 	if(t.inithp != 0) {
@@ -257,18 +248,18 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 		if(t.teamid == TEAMID_ALLY) {
 			cc = COLOR_ALLY;
 		}
-		double hpy = y - 7;
+		double hpy = ty - 7;
 		//facility hpbar can be bottom of the object if they will be out of frame
 		if(t.objecttype == UNITTYPE_FACILITY && hpy < 0) {
-			hpy = y + h + 2;
+			hpy = ty + h + 2;
 		}
-		draw_hpbar(x, hpy, w, 5, Gobjs[idx].hp, t.inithp, COLOR_TEXTCHAT, cc);
+		draw_hpbar(tx, hpy, w, 5, Gobjs[idx].hp, t.inithp, COLOR_TEXTCHAT, cc);
 	}
 	//In SMP: If the object is playable and from foreign client (SMP), draw name tag
 	if(SMPStatus == NETWORK_LOGGEDIN && is_playable_character(Gobjs[idx].tid) ) {
 		for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 			if(SMPPlayerInfo[i].cid != -1 && SMPPlayerInfo[i].playable_objid == idx) {
-				drawstring_inwidth(x, y - 50, SMPPlayerInfo[i].usr, (int32_t)w, 1);
+				drawstring_inwidth(tx, ty - 50, SMPPlayerInfo[i].usr, (int32_t)w, 1);
 				break;
 			}
 		}

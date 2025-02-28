@@ -54,11 +54,10 @@ void procai() {
 			//Get playable character id
 			for(int32_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 				if(is_playable_character(Gobjs[i].tid) ) {
-					int32_t skillid = randint(0, SKILL_COUNT - 1);
-					if(Gobjs[i].timers[1] == 0 && Gobjs[i].timers[2] == 0 && Gobjs[i].timers[3] == 0) {
+					int32_t skillid = randint(0, 5);
+					if(skillid < SKILL_COUNT && Gobjs[i].timers[1] == 0 && Gobjs[i].timers[2] == 0 && Gobjs[i].timers[3] == 0) {
 						Gobjs[i].timers[1 + skillid] = get_skillinittimer(Gobjs[i].tid, skillid);
 					}
-					break;
 				}
 			}
 		}
@@ -159,19 +158,19 @@ void procai() {
 			earthcount++;
 			//Apply recovery according to MapTechnologyLevel
 			Gobjs[i].hp = constrain_number(Gobjs[i].hp + MapTechnologyLevel, 0, srcinfo.inithp);
-			//If there was no ally and in title, generate new allies
+			//generate new allies every 10s if title
 			if(GameState == GAMESTATE_TITLE && Gobjs[i].timers[1] == 0) {
 				Gobjs[i].timers[1] = 1000;
 				int32_t newallycid = randint(0, PLAYABLE_CHARACTERS_COUNT - 1);
 				PlayableInfo_t newally;
 				lookup_playable(newallycid, &newally);
 				int32_t naobjid = add_character(newally.associatedtid, Gobjs[i].x, Gobjs[i].y, i);
-				Gobjs[naobjid].timeout = 3000;
+				Gobjs[naobjid].timeout = 2000;
 			}
 
 		} else if(tid == TID_ENEMYBASE) {
 			enemybasecount++;
-			//Generate random zundamon every 20 sec, but every 10 sec if in title
+			//Generate random zundamon every 20 sec
 			if(Gobjs[i].timers[0] == 0) {
 				obj_type_t newetid;
 				if(GameState != GAMESTATE_TITLE) {
@@ -185,13 +184,13 @@ void procai() {
 					}
 				} else {
 					//Spawn random unit when title
-					Gobjs[i].timers[0] = 1000;
+					Gobjs[i].timers[0] = 500;
 					obj_type_t ETIDS[] = {TID_ZUNDAMON1, TID_ZUNDAMON2, TID_ZUNDAMON3};
 					newetid = ETIDS[randint(0, 2)];
 				}
 				int32_t newgid = add_character(newetid, Gobjs[i].x, Gobjs[i].y, i);
 				if(GameState == GAMESTATE_TITLE) {
-					Gobjs[newgid].timeout = 3000;
+					Gobjs[newgid].timeout = 2000;
 				}
 				//There is 20% chance of kamikaze zundamon swawn
 				if(randint(0, 100) < 20) {
@@ -472,7 +471,6 @@ void procai() {
 					}
 				}
 			}
-			
 		}
 	}
 	//Determine map technology level
@@ -492,6 +490,7 @@ void procai() {
 			CharacterMove = 0;
 		}
 	}
+
 }
 
 //Called when Gobjs[dst] object is close (within Gobjs[dst].hitdiameter) to Gobjs[src] object
@@ -550,11 +549,11 @@ void damage_object(int32_t dstid, int32_t srcid) {
 	if(lookup(Gobjs[srcid].tid, &srcinfo) == -1 || lookup(Gobjs[dstid].tid, &dstinfo) == -1) {
 		return;
 	}
-
+	
 	if(dstinfo.objecttype == UNITTYPE_FACILITY && GameState == GAMESTATE_TITLE) {
-		return; //All facilities can not be damaged in title mode
+		return; //If in title mode, facilities can not be danaged.
 	}
-
+	
 	//Decrease target HP
 	double m = 1.00;
 	//Apply DifATKGain if attacker is playable character
@@ -643,7 +642,10 @@ void damage_object(int32_t dstid, int32_t srcid) {
 					}
 				}
 			}
-
+			//Skip deathlog if title mode
+			if(GameState == GAMESTATE_TITLE) {
+				return;
+			}
 			//show death log
 			if(is_range(killerid, 0, MAX_OBJECT_COUNT - 1) && is_range(Gobjs[killerid].tid, 0, MAX_TID - 1) ){
 				int32_t killertid = Gobjs[killerid].tid;

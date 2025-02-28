@@ -755,20 +755,20 @@ void reset_game() {
 
 	//In TITLE state, skip state changing and preparing enemy, playable
 	if(GameState == GAMESTATE_TITLE) {
-		//Place demo facilities instead
-		EarthID = add_character(TID_EARTH, 100, 100, OBJID_INVALID);
-		for(int32_t i = 0; i < 8; i++) {
-			add_character(TID_ENEMYBASE, WINDOW_WIDTH + (300 * ( (i % 4) + 1) ), WINDOW_HEIGHT + (300 * floor(i / 4) + 1), OBJID_INVALID);
+		//Add demo character instead
+		for(int32_t i = 0; i < 3; i++) {
+			add_character(TID_ENEMYBASE, WINDOW_WIDTH + ( (i + 1) * 100), WINDOW_HEIGHT, OBJID_INVALID);
 		}
-		add_character(TID_FORT, WINDOW_WIDTH * 0.7, 100, OBJID_INVALID);
+		add_character(TID_EARTH, 150, 150, OBJID_INVALID);
+		add_character(TID_FORT, 500, 150, OBJID_INVALID);
 		return;
 	}
 	GameState = GAMESTATE_INITROUND;
-
+	
 	//Add Earth (Ally base, if you lose it game is over.)
 	const double START_POS = 200;
 	EarthID = add_character(TID_EARTH, START_POS, START_POS, OBJID_INVALID);
-		
+
 	//Place enemy zundamon base according to DifEnemyBaseCount (defines how many enemybase spawns by each edges) and DifEnemyBaseDist(defines how far between enemy bases)
 	//Top right, bottom right, top left, bottomleft
 	const double BASEPOS_X[] = {MAP_WIDTH - START_POS, MAP_WIDTH - START_POS, START_POS, START_POS}; //Exact spawn coordinate for each enemy spawn points
