@@ -53,12 +53,7 @@ void keypress_handler(char, specialkey_t);
 void mousemotion_handler(int, int);
 void keyrelease_handler(char);
 void mousepressed_handler(mousebutton_t);
-int32_t add_character(obj_type_t, double, double, int32_t);
-double get_distance(int32_t, int32_t);
-void set_speed_for_following(int32_t);
-int32_t find_nearest_unit(int32_t, int32_t, facility_type_t);
 void chatf(const char*, ...);
-int32_t find_random_unit(int32_t, int32_t, facility_type_t);
 void chat(char*);
 void showstatus(const char*, ...);
 int32_t spawn_playable(int32_t);
@@ -119,6 +114,8 @@ int32_t addusermute(char*);
 
 //aiproc.c
 void procai();
+int32_t add_character(obj_type_t, double, double, int32_t);
+double get_distance_raw(double, double, double, double);
 
 //ui.c
 void game_paint();

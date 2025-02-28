@@ -38,7 +38,6 @@ gamesys.c: game process and related functions
 //gamesys.c
 void read_creds();
 void local2map(double, double, double*, double*);
-void set_speed_for_going_location(int32_t, double, double, double);
 void start_command_mode(int32_t);
 void switch_character_move();
 void execcmd();
@@ -46,8 +45,6 @@ void use_item();
 void proc_playable_op();
 int32_t buy_facility(int32_t fid);
 void debug_add_character();
-void aim_earth(int32_t);
-double get_distance_raw(double, double, double, double);
 void select_next_item();
 void select_prev_item();
 void spawn_playable_me();
@@ -61,12 +58,11 @@ void cmd_cancel();
 void cmd_cursor_back();
 void cmd_cursor_forward();
 void cmd_putch(char);
-void modifyKeyFlags(keyflags_t, int32_t);
 void switch_debug_info();
 void changeplayable_cmd(char*);
 void read_blocked_users();
 void commit_menu();
-void title_cmd();
+void go_title();
 void select_next_menuitem();
 void select_prev_menuitem();
 void title_item_change(int32_t);
@@ -122,6 +118,7 @@ int32_t InitSpawnRemain = -1; //how many times can playable character respawn?
 extern int32_t BlockedUsersCount;
 extern char** BlockedUsers;
 int32_t LocatorType = 0; //Game background type
+extern int32_t TitleSkillTimer;
 
 //Translate window coordinate into map coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -143,94 +140,6 @@ void getlocalcoord(int32_t i, double *x, double *y) {
 	}
 	*x = Gobjs[i].x - CameraX;
 	*y = WINDOW_HEIGHT - (Gobjs[i].y - CameraY);
-}
-
-//Add character into game object buffer, returns -1 if fail.
-//tid (character id), x, y(initial pos), parid (parent object id)
-int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
-	int32_t newid = -1;
-	//Get empty slot id
-	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
-		if(Gobjs[i].tid != TID_NULL) { continue; } //Skip occupied slot
-		newid = i;
-		break;
-	}
-	if(newid == -1) {
-		die("gamesys.c: add_character(): Gameobj is full!\n");
-		return 0;
-	}
-	//Add new character
-	LookupResult_t t;
-	if(lookup(tid, &t) == -1) {
-		return 0;
-	}
-	Gobjs[newid].imgid = t.initimgid;
-	Gobjs[newid].tid = tid;
-	Gobjs[newid].x = x;
-	Gobjs[newid].y = y;
-	Gobjs[newid].hp = (double)t.inithp;
-	Gobjs[newid].sx = 0;
-	Gobjs[newid].sy = 0;
-	Gobjs[newid].aiming_target = OBJID_INVALID;
-	for(uint8_t i = 0; i < CHARACTER_TIMER_COUNT; i++) {
-		Gobjs[newid].timers[i] = 0;
-	}
-	Gobjs[newid].hitdiameter = t.inithitdiameter;
-	Gobjs[newid].timeout = t.timeout;
-	Gobjs[newid].damage = t.damage;
-	//set srcid
-	if(is_range(parid, 0, MAX_OBJECT_COUNT - 1) ) {
-		//Set src id to parid if Gobjs[parid] is UNITTYPE_UNIT or UNITTYPE_FACILITY
-		//Otherwise inherit from parent.
-		if(is_range(Gobjs[parid].tid, 0, MAX_TID - 1) ) {
-			LookupResult_t t2;
-			if(lookup(Gobjs[parid].tid, &t2) == -1) {
-				return -1;
-			}
-			if(t2.objecttype == UNITTYPE_UNIT || t2.objecttype == UNITTYPE_FACILITY) {
-				Gobjs[newid].srcid = parid;
-			} else {
-				Gobjs[newid].srcid = Gobjs[parid].srcid;
-			}
-		} else {
-			Gobjs[newid].srcid = Gobjs[parid].srcid;
-		}
-	} else {
-		Gobjs[newid].srcid = -1;
-	}
-	Gobjs[newid].parentid = parid;
-	//MISSLIE, bullet and laser will try to aim closest enemy unit
-	if(tid == TID_MISSILE || tid == TID_ALLYBULLET || tid == TID_ENEMYBULLET || tid == TID_KUMO9_X24_MISSILE) {
-		//Set initial target
-		int32_t r;
-		if(tid == TID_KUMO9_X24_MISSILE) {
-			r = find_random_unit(newid, KUMO9_X24_MISSILE_RANGE, UNITTYPE_FACILITY | UNITTYPE_UNIT);
-		} else {
-			r = find_nearest_unit(newid, DISTANCE_INFINITY, UNITTYPE_FACILITY | UNITTYPE_BULLET_INTERCEPTABLE | UNITTYPE_UNIT);
-		}
-		if(r != OBJID_INVALID) {
-			Gobjs[newid].aiming_target = r;
-			set_speed_for_following(newid);
-		} else {
-			Gobjs[newid].tid = TID_NULL;
-			warn("add_character(): object destroyed, no target found.\n");
-		}
-	}
-	if(tid == TID_EARTH) {
-		Gobjs[newid].hp = 1; //For initial scene
-		
-	} else if(tid == TID_ENEMYBASE) {
-		//tid = 1, zundamon star
-		//find earth and attempt to approach it
-		aim_earth(newid);
-		Gobjs[newid].hp = 1; //For initial scene
-		
-	} else if(tid == TID_KUMO9_X24_PCANNON) {
-		//Kumo9's pcanon aims nearest facility
-		Gobjs[newid].aiming_target = find_nearest_unit(newid, KUMO9_X24_PCANNON_RANGE, UNITTYPE_FACILITY);
-		
-	}
-	return newid;
 }
 
 //Add chat message
@@ -262,165 +171,6 @@ void chatf(const char* p, ...) {
 	chat(b);
 }
 
-//calculate distance between Gobjs[id1] and Gobjs[id2]
-double get_distance(int32_t id1, int32_t id2){
-	if(!is_range(id1, 0, MAX_OBJECT_COUNT - 1) || !is_range(id2, 0, MAX_OBJECT_COUNT - 1)) {
-		die("gamesys.c: set_speed_for_following(): bad id passed!\n");
-		return INFINITY;
-	}
-	if(Gobjs[id1].tid == TID_NULL || Gobjs[id2].tid == TID_NULL) {
-		return INFINITY;
-	}
-	return get_distance_raw(Gobjs[id1].x, Gobjs[id1].y, Gobjs[id2].x, Gobjs[id2].y);
-}
-
-double get_distance_raw(double x1, double y1, double x2, double y2) {
-	double dx = fabs(x1 - x2);
-	double dy = fabs(y1 - y2);
-	return sqrt((dx * dx) + (dy * dy)); // a*a = b*b + c*c
-}
-
-//calculate appropriate speed for following object to Gobjs[srcid]
-void set_speed_for_following(int32_t srcid) {
-	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
-		die("gamesys.c: set_speed_for_following(): bad srcid passed!\n");
-		return;
-	}
-	int32_t targetid = Gobjs[srcid].aiming_target;
-	if(!is_range(targetid, 0, MAX_OBJECT_COUNT - 1)) {
-		Gobjs[srcid].sx = 0;
-		Gobjs[srcid].sy = 0;
-		//g_print("gamesys.c: set_speed_for_following(): id %d has bad target id %d.\n", srcid, targetid);
-		return;
-	}
-	if(Gobjs[targetid].tid == TID_NULL) {
-		Gobjs[srcid].sx = 0;
-		Gobjs[srcid].sy = 0;
-		//g_print("gamesys.c: set_speed_for_following(): id %d has target id %d, this object is dead.\n", srcid, targetid);
-		return;
-	}
-	double dstx = Gobjs[targetid].x;
-	double dsty = Gobjs[targetid].y;
-	LookupResult_t t;
-	if(lookup((uint8_t)Gobjs[srcid].tid, &t) == -1) {
-		return;
-	}
-	double spdlimit = t.maxspeed;
-	set_speed_for_going_location(srcid, dstx, dsty, spdlimit);
-	//print(f"line 499: ID={srcid} set_speed_for_following maxspeed={spdlimit} sx={sx} sy={sy}")
-}
-
-//set appropriate speed for Gobjs[srcid] to go to coordinate dstx, dsty from current coordinate of Gobjs[srcid]
-void set_speed_for_going_location(int32_t srcid, double dstx, double dsty, double speedlimit) {
-	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
-		die("set_speed_for_going_location(): bad srcid passed!\n");
-		return;
-	}
-	double srcx = Gobjs[srcid].x;
-	double srcy = Gobjs[srcid].y;
-	double dx = fabs(dstx - srcx);
-	double dy = fabs(dsty - srcy);
-	//If objects are too close, set speed to 0
-	if(sqrt( (dx * dx) + (dy * dy) ) < 3) {
-		Gobjs[srcid].sx = 0;
-		Gobjs[srcid].sy = 0;
-		return;
-	}
-	double sx, sy;
-	if(dx > dy) {
-		double r = 0;
-		if(dy != 0) { r = dy / dx; }
-		sx = speedlimit;
-		sy = r * speedlimit;
-	} else {
-		double r = 0;
-		if(dx != 0) {r = dx / dy; }
-		sy = speedlimit;
-		sx = r * speedlimit;
-	}
-	if(dstx < srcx) { sx = -sx; }
-	if(dsty < srcy) { sy = -sy; }
-	Gobjs[srcid].sx = sx;
-	Gobjs[srcid].sy = sy;
-}
-
-
-//find nearest object (different team) from Gobjs[srcid] within diameter finddist
-//if object has same objecttype specified in va_list, they will be excluded
-//returns OBJID_INVALID if not found
-int32_t find_nearest_unit(int32_t srcid, int32_t finddist, facility_type_t cfilter) {
-	double mindist = finddist / 2;
-	int32_t t = OBJID_INVALID;
-	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
-		die("find_nearest_unit(): bad srcid passed!\n");
-		return -1;
-	}
-	//esrc = self.gobjs[srcid]
-	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
-		//e = self.gobjs[i]
-		if(Gobjs[i].tid != TID_NULL && srcid != i) {
-			//C = self.lookup(e.tid)
-			LookupResult_t dstinfo;
-			LookupResult_t srcinfo;
-			if(lookup(Gobjs[i].tid, &dstinfo) == -1 || lookup(Gobjs[srcid].tid, &srcinfo) == -1) {
-				return -1;
-			}
-			//if objects are in same team, exclude from searching
-			if(dstinfo.teamid != srcinfo.teamid && (cfilter & dstinfo.objecttype) ) {
-				double dist = get_distance(i, srcid);
-				//find nearest object
-				if(dist < mindist) {
-					mindist = dist;
-					t = i;
-				}
-			}
-		}
-	}
-	//if(t != -1){
-	//	g_print("gamesys.c: find_nearest_unit(): src=%d id=%d dist=%d\n", srcid, t, mindist);
-	//}
-	return t;
-}
-
-//find random object (different team) from Gobjs[srcid] within diameter finddist
-//if object has same objecttype specified in va_list, they will be excluded
-//returns OBJID_INVALID if not found
-int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilter) {
-	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
-		die("find_nearest_unit(): bad srcid passed!\n");
-		return -1;
-	}
-	uint16_t findobjs[MAX_OBJECT_COUNT];
-	uint16_t oc = 0;
-	//esrc = self.gobjs[srcid]
-	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
-		//e = self.gobjs[i]
-		if(Gobjs[i].tid != TID_NULL && srcid != i) {
-			//C = self.lookup(e.tid)
-			LookupResult_t dstinfo;
-			LookupResult_t srcinfo;
-			if(lookup(Gobjs[i].tid, &dstinfo) == -1 || lookup(Gobjs[srcid].tid, &srcinfo) == -1) {
-				return -1;
-			}
-			//if objects are in same team, exclude from searching
-			//if object type is not in cfilter, exclude
-			//if object im more far than finddist / 2, exclude
-			if(dstinfo.teamid != srcinfo.teamid && (dstinfo.objecttype & cfilter) && get_distance(srcid, i) < finddist / 2) {
-				findobjs[oc] = i;
-				oc++;
-			}
-		}
-	}
-	if(oc == 0) {
-		return OBJID_INVALID;
-	} else {
-		uint16_t selnum = (uint16_t)randint(0, oc - 1);
-		//if(t != -1){
-		//	g_print("gamesys.c: find_nearest_unit(): src=%d id=%d dist=%d\n", srcid, t, mindist);
-		//}
-		return findobjs[selnum];
-	}
-}
 
 void gametick() {
 	//gametick, called for every 10mS
@@ -861,7 +611,7 @@ void execcmd() {
 		togglechat_cmd();
 	} else if(strcmp(CommandBuffer, "/title") == 0) {
 		//title command
-		title_cmd();
+		go_title();
 
 	} else {
 		if(CommandBuffer[0] == '/') {
@@ -876,8 +626,11 @@ void execcmd() {
 	}
 }
 
-void title_cmd() {
-	close_connection_cmd();
+void go_title() {
+	if(SMPStatus != NETWORK_DISCONNECTED) {
+		close_connection_cmd();
+	}
+	TitleSkillTimer = 0;
 	GameState = GAMESTATE_TITLE;
 	reset_game();
 }
@@ -996,8 +749,15 @@ void reset_game() {
 	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		Gobjs[i].tid = TID_NULL;
 	}
-	//In TITLE state, skip state changing and adding character
+
+	//In TITLE state, skip state changing and preparing enemy, playable
 	if(GameState == GAMESTATE_TITLE) {
+		//Place demo facilities instead
+		EarthID = add_character(TID_EARTH, 100, 100, OBJID_INVALID);
+		for(int32_t i = 0; i < 4; i++) {
+			add_character(TID_ENEMYBASE, WINDOW_WIDTH + (300 * (i + 1) ), WINDOW_HEIGHT + 300, OBJID_INVALID);
+		}
+		add_character(TID_FORT, WINDOW_WIDTH * 0.7, 100, OBJID_INVALID);
 		return;
 	}
 	GameState = GAMESTATE_INITROUND;
@@ -1005,7 +765,7 @@ void reset_game() {
 	//Add Earth (Ally base, if you lose it game is over.)
 	const double START_POS = 200;
 	EarthID = add_character(TID_EARTH, START_POS, START_POS, OBJID_INVALID);
-	
+		
 	//Place enemy zundamon base according to DifEnemyBaseCount (defines how many enemybase spawns by each edges) and DifEnemyBaseDist(defines how far between enemy bases)
 	//Top right, bottom right, top left, bottomleft
 	const double BASEPOS_X[] = {MAP_WIDTH - START_POS, MAP_WIDTH - START_POS, START_POS, START_POS}; //Exact spawn coordinate for each enemy spawn points
@@ -1060,18 +820,6 @@ int32_t spawn_playable(int32_t pid) {
 	return add_character(t.associatedtid, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, OBJID_INVALID);
 }
 
-//Set object to aim the earth
-void aim_earth(int32_t i) {
-	//Gobjs[i].aiming_target = (int16_t)find_earth();
-		for(uint16_t j = 0; j < MAX_OBJECT_COUNT; j++) {
-			if(Gobjs[j].tid == TID_EARTH) {
-				Gobjs[i].aiming_target = j;
-				break;
-			}
-		}
-	set_speed_for_following(i);
-}
-
 void showstatus(const char* ctx, ...) {
 	va_list varg;
 	va_start(varg, ctx);
@@ -1114,8 +862,7 @@ int32_t gameinit(char* fn) {
 	}
 	
 	check_data(); //Data Check
-	GameState = GAMESTATE_TITLE;
-	reset_game();	
+	go_title();
 
 	return 0;
 }
@@ -1266,15 +1013,6 @@ void cmd_putch(char c) {
 void switch_locator() {
 	LocatorType++;
 	if(LocatorType > 3) { LocatorType = 0; }
-}
-
-//Set or reset bit of KeyFlags, s 1: set, 0: reset; f: bitmask
-void modifyKeyFlags(keyflags_t f, int32_t s) {
-	if(s == 0) {
-		KeyFlags &= ~f;
-	} else {
-		KeyFlags |= f;
-	}
 }
 
 void mousemotion_handler(int32_t x, int32_t y) {

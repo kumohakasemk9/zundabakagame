@@ -56,6 +56,7 @@ zunda-defs.h: definitions
 #define KUMO9_X24_MISSILE_RANGE 500
 #define KUMO9_X24_LASER_RANGE 600
 #define KUMO9_X24_PCANNON_RANGE 1000
+#define UNIT_STALK_LIMIT 200 //Limit distance for following (not enforced except unit)
 #define FONT_DEFAULT_SIZE 14 //Default fontsize
 
 //Some localized string IDs

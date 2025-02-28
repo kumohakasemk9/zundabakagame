@@ -16,9 +16,16 @@ aiproc.c: Character AI
 #include "inc/zundagame.h"
 
 #include <string.h>
+#include <math.h>
 
 int32_t procobjhit(int32_t, int32_t, LookupResult_t, LookupResult_t);
 void damage_object(int32_t, int32_t);
+void set_speed_for_going_location(int32_t, double, double, double, double);
+double get_distance(int32_t, int32_t);
+void set_speed_for_following(int32_t, double);
+int32_t find_nearest_unit(int32_t, int32_t, facility_type_t);
+int32_t find_random_unit(int32_t, int32_t, facility_type_t);
+void aim_earth(int32_t);
 
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
 extern gamestate_t GameState;
@@ -35,15 +42,38 @@ extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS];
 extern double DifATKGain;
 extern int32_t SpawnRemain;
 extern int32_t InitSpawnRemain;
+int32_t TitleSkillTimer = 0;
 
 void procai() {
 	//AI proc
-	uint16_t earthcount = 0;
-	uint16_t enemybasecount = 0;
-	uint16_t tecstar_count = 0;
-	uint16_t powerplant_cnt = 0;
+	//If game in title, random playable will use skill every 5 sec
+	if(GameState == GAMESTATE_TITLE) {
+		TitleSkillTimer++;
+		if(TitleSkillTimer > 500) {
+			TitleSkillTimer = 0;
+			//Get playable character ids
+			int32_t playablegids[MAX_OBJECT_COUNT];
+			int32_t c = 0;
+			for(int32_t i = 0; i < MAX_OBJECT_COUNT; i++) {
+				if(is_playable_character(Gobjs[i].tid) ) {
+					playablegids[c] = i;
+					c++;
+				}
+			}
+			if(c != 0) {
+				int32_t selectedgid = playablegids[randint(0, c - 1)];
+				int32_t skillid = randint(0, SKILL_COUNT - 1);
+				int32_t initskillt = get_skillinittimer(Gobjs[selectedgid].tid, skillid);
+				Gobjs[selectedgid].timers[1 + skillid] = constrain_i32(initskillt, 0, 500);
+			}
+		}
+	}
+	int32_t earthcount = 0;
+	int32_t enemybasecount = 0;
+	int32_t tecstar_count = 0;
+	int32_t powerplant_cnt = 0;
 	int32_t tmpreqpowerlevel = 0;
-	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
+	for(int32_t i = 0; i < MAX_OBJECT_COUNT; i++) {
 		obj_type_t tid = Gobjs[i].tid;
 		if(Gobjs[i].tid == TID_NULL) {continue;}
 		LookupResult_t srcinfo;
@@ -128,25 +158,45 @@ void procai() {
 		}
 		//Calculate required Power
 		tmpreqpowerlevel += srcinfo.requirepower;
-		
+
 		//AI Processes for each object types
-		
 		if(tid == TID_EARTH) {
 			earthcount++;
 			//Apply recovery according to MapTechnologyLevel
 			Gobjs[i].hp = constrain_number(Gobjs[i].hp + MapTechnologyLevel, 0, srcinfo.inithp);
-			
+			//If in title, spawn ally every 10 sec
+			if(GameState == GAMESTATE_TITLE && Gobjs[i].timers[1] == 0) {
+				Gobjs[i].timers[1] = 1000;
+				int32_t newallycid = randint(0, PLAYABLE_CHARACTERS_COUNT - 1);
+				PlayableInfo_t newally;
+				lookup_playable(newallycid, &newally);
+				int32_t naobjid = add_character(newally.associatedtid, Gobjs[i].x, Gobjs[i].y, i);
+				Gobjs[naobjid].timeout = 6000;
+			}
+
 		} else if(tid == TID_ENEMYBASE) {
 			enemybasecount++;
-			//Generate random zundamon every 20 sec
+			//Generate random zundamon every 20 sec, but every 10 sec if in title
 			if(Gobjs[i].timers[0] == 0) {
-				Gobjs[i].timers[0] = 2000;
-				if(is_range_number(Gobjs[i].hp, 10000, 20000) ) {
-					add_character(TID_ZUNDAMON1, Gobjs[i].x, Gobjs[i].y, i);
-				} else if(is_range_number(Gobjs[i].hp, 5000, 9999) ) {
-					add_character(TID_ZUNDAMON2, Gobjs[i].x, Gobjs[i].y, i);
+				obj_type_t newetid;
+				if(GameState != GAMESTATE_TITLE) {
+					Gobjs[i].timers[0] = 2000;
+					if(is_range_number(Gobjs[i].hp, 10000, 20000) ) {
+						newetid = TID_ZUNDAMON1;
+					} else if(is_range_number(Gobjs[i].hp, 5000, 9999) ) {
+						newetid = TID_ZUNDAMON2;
+					} else {
+						newetid = TID_ZUNDAMON3;
+					}
 				} else {
-					add_character(TID_ZUNDAMON3, Gobjs[i].x, Gobjs[i].y, i);
+					//Spawn random unit when title
+					Gobjs[i].timers[0] = 1000;
+					obj_type_t ETIDS[] = {TID_ZUNDAMON1, TID_ZUNDAMON2, TID_ZUNDAMON3};
+					newetid = ETIDS[randint(0, 2)];
+				}
+				int32_t newgid = add_character(newetid, Gobjs[i].x, Gobjs[i].y, i);
+				if(GameState == GAMESTATE_TITLE) {
+					Gobjs[newgid].timeout = 6000;
 				}
 				//There is 20% chance of kamikaze zundamon swawn
 				if(randint(0, 100) < 20) {
@@ -169,7 +219,7 @@ void procai() {
 			}
 			//Follow nearest object
 			Gobjs[i].aiming_target = find_nearest_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT | UNITTYPE_FACILITY);
-			set_speed_for_following(i);
+			set_speed_for_following(i, UNIT_STALK_LIMIT);
 			
 		} else if (tid == TID_ZUNDAMON2 || tid == TID_ZUNDAMON3) {
 			//Generate zundamon mine every 3 sec
@@ -177,7 +227,7 @@ void procai() {
 				Gobjs[i].timers[0] = 300;
 				add_character(TID_ZUNDAMONMINE, Gobjs[i].x, Gobjs[i].y, i);
 			}
-			//Targets random unit
+			//Targets random unit (if game is in title state, zundamons already targets playable)
 			if(!is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
 				if(Gobjs[i].tid == TID_ZUNDAMON2) {
 					Gobjs[i].aiming_target = find_random_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT);
@@ -188,8 +238,8 @@ void procai() {
 				//g_print("gamesys.c: gametick(): zundamon2(%d): stalking object dead: %d\n", i, Gobjs[i].aiming_target);
 				Gobjs[i].aiming_target = OBJID_INVALID;
 			}
-			set_speed_for_following(i);
-			
+			set_speed_for_following(i, UNIT_STALK_LIMIT);
+		
 		} else if(tid == TID_ZUNDAMONMINE || tid == TID_ZUNDAMON_KAMIKAZE) {
 			//Follow enemy persistently
 			if(!is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
@@ -202,7 +252,7 @@ void procai() {
 			} else if(Gobjs[Gobjs[i].aiming_target].tid == TID_NULL) {
 				Gobjs[i].aiming_target = OBJID_INVALID;
 			}
-			set_speed_for_following(i);
+			set_speed_for_following(i, 3);
 			
 		} else if(tid == TID_ENEMYZUNDALASER || tid == TID_KUMO9_X24_LASER) {
 			//Damage aimed target if they are in range
@@ -293,6 +343,16 @@ void procai() {
 				Gobjs[i].tid = TID_NULL;
 			}
 			continue; //This object don't need normal hitdetection
+		}
+
+		//If in title screen, enable playable object AI (follow enemy)
+		if(GameState == GAMESTATE_TITLE && is_playable_character(tid) ) {
+			if(!is_range(Gobjs[i].aiming_target, 0, MAX_OBJECT_COUNT - 1) ) {
+				Gobjs[i].aiming_target = find_random_unit(i, DISTANCE_INFINITY, UNITTYPE_UNIT | UNITTYPE_FACILITY);
+			} else if(Gobjs[Gobjs[i].aiming_target].tid == TID_NULL) {
+				Gobjs[i].aiming_target = OBJID_INVALID;
+			}
+			set_speed_for_following(i, UNIT_STALK_LIMIT);
 		}
 		
 		//Hitdetection proc
@@ -497,6 +557,10 @@ void damage_object(int32_t dstid, int32_t srcid) {
 		return;
 	}
 
+	if(dstinfo.objecttype == UNITTYPE_FACILITY && GameState == GAMESTATE_TITLE) {
+		return; //All facilities can not be damaged in title mode
+	}
+
 	//Decrease target HP
 	double m = 1.00;
 	//Apply DifATKGain if attacker is playable character
@@ -582,6 +646,10 @@ void damage_object(int32_t dstid, int32_t srcid) {
 					}
 				}
 			}
+
+			if(GameState == GAMESTATE_TITLE) { 
+				return; //No deathlog in title
+			}
 			//show death log
 			if(is_range(killerid, 0, MAX_OBJECT_COUNT - 1) && is_range(Gobjs[killerid].tid, 0, MAX_TID - 1) ){
 				int32_t killertid = Gobjs[killerid].tid;
@@ -601,3 +669,273 @@ void damage_object(int32_t dstid, int32_t srcid) {
 		}
 	}
 }
+
+//Add character into game object buffer, returns -1 if fail.
+//tid (character id), x, y(initial pos), parid (parent object id)
+int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
+	int32_t newid = -1;
+	//Get empty slot id
+	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
+		if(Gobjs[i].tid != TID_NULL) { continue; } //Skip occupied slot
+		newid = i;
+		break;
+	}
+	if(newid == -1) {
+		die("gamesys.c: add_character(): Gameobj is full!\n");
+		return 0;
+	}
+	//Add new character
+	LookupResult_t t;
+	if(lookup(tid, &t) == -1) {
+		return 0;
+	}
+	Gobjs[newid].imgid = t.initimgid;
+	Gobjs[newid].tid = tid;
+	Gobjs[newid].x = x;
+	Gobjs[newid].y = y;
+	Gobjs[newid].hp = (double)t.inithp;
+	Gobjs[newid].sx = 0;
+	Gobjs[newid].sy = 0;
+	Gobjs[newid].aiming_target = OBJID_INVALID;
+	for(uint8_t i = 0; i < CHARACTER_TIMER_COUNT; i++) {
+		Gobjs[newid].timers[i] = 0;
+	}
+	Gobjs[newid].hitdiameter = t.inithitdiameter;
+	Gobjs[newid].timeout = t.timeout;
+	Gobjs[newid].damage = t.damage;
+	//set srcid
+	if(is_range(parid, 0, MAX_OBJECT_COUNT - 1) ) {
+		//Set src id to parid if Gobjs[parid] is UNITTYPE_UNIT or UNITTYPE_FACILITY
+		//Otherwise inherit from parent.
+		if(is_range(Gobjs[parid].tid, 0, MAX_TID - 1) ) {
+			LookupResult_t t2;
+			if(lookup(Gobjs[parid].tid, &t2) == -1) {
+				return -1;
+			}
+			if(t2.objecttype == UNITTYPE_UNIT || t2.objecttype == UNITTYPE_FACILITY) {
+				Gobjs[newid].srcid = parid;
+			} else {
+				Gobjs[newid].srcid = Gobjs[parid].srcid;
+			}
+		} else {
+			Gobjs[newid].srcid = Gobjs[parid].srcid;
+		}
+	} else {
+		Gobjs[newid].srcid = -1;
+	}
+	Gobjs[newid].parentid = parid;
+	//MISSLIE, bullet and laser will try to aim closest enemy unit
+	if(tid == TID_MISSILE || tid == TID_ALLYBULLET || tid == TID_ENEMYBULLET || tid == TID_KUMO9_X24_MISSILE) {
+		//Set initial target
+		int32_t r;
+		if(tid == TID_KUMO9_X24_MISSILE) {
+			r = find_random_unit(newid, KUMO9_X24_MISSILE_RANGE, UNITTYPE_FACILITY | UNITTYPE_UNIT);
+		} else {
+			r = find_nearest_unit(newid, DISTANCE_INFINITY, UNITTYPE_FACILITY | UNITTYPE_BULLET_INTERCEPTABLE | UNITTYPE_UNIT);
+		}
+		if(r != OBJID_INVALID) {
+			Gobjs[newid].aiming_target = r;
+			set_speed_for_following(newid, 3);
+		} else {
+			Gobjs[newid].tid = TID_NULL;
+			//warn("add_character(): object destroyed, no target found.\n");
+		}
+	}
+	if(tid == TID_EARTH) {
+		if(GameState != GAMESTATE_TITLE) {
+			Gobjs[newid].hp = 1; //For initial scene
+		}
+		
+	} else if(tid == TID_ENEMYBASE) {
+		//tid = 1, zundamon star
+		if(GameState != GAMESTATE_TITLE) {
+			//find earth and attempt to approach it
+			aim_earth(newid);
+			Gobjs[newid].hp = 1; //For initial scene
+		}
+
+	} else if(tid == TID_KUMO9_X24_PCANNON) {
+		if(GameState != GAMESTATE_TITLE) {
+			//Kumo9's pcanon aims nearest facility
+			Gobjs[newid].aiming_target = find_nearest_unit(newid, KUMO9_X24_PCANNON_RANGE, UNITTYPE_FACILITY);
+		} else {
+			Gobjs[newid].aiming_target = find_nearest_unit(newid, KUMO9_X24_PCANNON_RANGE, UNITTYPE_FACILITY | UNITTYPE_UNIT);
+		}
+
+	}
+	return newid;
+}
+
+//calculate distance between Gobjs[id1] and Gobjs[id2]
+double get_distance(int32_t id1, int32_t id2){
+	if(!is_range(id1, 0, MAX_OBJECT_COUNT - 1) || !is_range(id2, 0, MAX_OBJECT_COUNT - 1)) {
+		die("gamesys.c: set_speed_for_following(): bad id passed!\n");
+		return INFINITY;
+	}
+	if(Gobjs[id1].tid == TID_NULL || Gobjs[id2].tid == TID_NULL) {
+		return INFINITY;
+	}
+	return get_distance_raw(Gobjs[id1].x, Gobjs[id1].y, Gobjs[id2].x, Gobjs[id2].y);
+}
+
+double get_distance_raw(double x1, double y1, double x2, double y2) {
+	double dx = fabs(x1 - x2);
+	double dy = fabs(y1 - y2);
+	return sqrt((dx * dx) + (dy * dy)); // a*a = b*b + c*c
+}
+
+//calculate appropriate speed for following object to Gobjs[srcid], stop if object is closer to the target more than distlimit
+void set_speed_for_following(int32_t srcid, double distlimit) {
+	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
+		die("gamesys.c: set_speed_for_following(): bad srcid passed!\n");
+		return;
+	}
+	int32_t targetid = Gobjs[srcid].aiming_target;
+	if(!is_range(targetid, 0, MAX_OBJECT_COUNT - 1)) {
+		Gobjs[srcid].sx = 0;
+		Gobjs[srcid].sy = 0;
+		//g_print("gamesys.c: set_speed_for_following(): id %d has bad target id %d.\n", srcid, targetid);
+		return;
+	}
+	if(Gobjs[targetid].tid == TID_NULL) {
+		Gobjs[srcid].sx = 0;
+		Gobjs[srcid].sy = 0;
+		//g_print("gamesys.c: set_speed_for_following(): id %d has target id %d, this object is dead.\n", srcid, targetid);
+		return;
+	}
+	double dstx = Gobjs[targetid].x;
+	double dsty = Gobjs[targetid].y;
+	LookupResult_t t;
+	if(lookup((uint8_t)Gobjs[srcid].tid, &t) == -1) {
+		return;
+	}
+	double spdlimit = t.maxspeed;
+	set_speed_for_going_location(srcid, dstx, dsty, spdlimit, distlimit);
+	//print(f"line 499: ID={srcid} set_speed_for_following maxspeed={spdlimit} sx={sx} sy={sy}")
+}
+
+//set appropriate speed for Gobjs[srcid] to go to coordinate dstx, dsty from current coordinate of Gobjs[srcid]
+//stop object if objects are closer less than dstlimit
+void set_speed_for_going_location(int32_t srcid, double dstx, double dsty, double speedlimit, double distlimit) {
+	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
+		die("set_speed_for_going_location(): bad srcid passed!\n");
+		return;
+	}
+	double srcx = Gobjs[srcid].x;
+	double srcy = Gobjs[srcid].y;
+	double dx = fabs(dstx - srcx);
+	double dy = fabs(dsty - srcy);
+	//If objects are closer than dstlimit, stop
+	if(sqrt( (dx * dx) + (dy * dy) ) < distlimit) {
+		Gobjs[srcid].sx = 0;
+		Gobjs[srcid].sy = 0;
+		return;
+	}
+	double sx, sy;
+	if(dx > dy) {
+		double r = 0;
+		if(dy != 0) { r = dy / dx; }
+		sx = speedlimit;
+		sy = r * speedlimit;
+	} else {
+		double r = 0;
+		if(dx != 0) {r = dx / dy; }
+		sy = speedlimit;
+		sx = r * speedlimit;
+	}
+	if(dstx < srcx) { sx = -sx; }
+	if(dsty < srcy) { sy = -sy; }
+	Gobjs[srcid].sx = sx;
+	Gobjs[srcid].sy = sy;
+}
+
+
+//find nearest object (different team) from Gobjs[srcid] within diameter finddist
+//if object has same objecttype specified in va_list, they will be excluded
+//returns OBJID_INVALID if not found
+int32_t find_nearest_unit(int32_t srcid, int32_t finddist, facility_type_t cfilter) {
+	double mindist = finddist / 2;
+	int32_t t = OBJID_INVALID;
+	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
+		die("find_nearest_unit(): bad srcid passed!\n");
+		return -1;
+	}
+	//esrc = self.gobjs[srcid]
+	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
+		//e = self.gobjs[i]
+		if(Gobjs[i].tid != TID_NULL && srcid != i) {
+			//C = self.lookup(e.tid)
+			LookupResult_t dstinfo;
+			LookupResult_t srcinfo;
+			if(lookup(Gobjs[i].tid, &dstinfo) == -1 || lookup(Gobjs[srcid].tid, &srcinfo) == -1) {
+				return -1;
+			}
+			//if objects are in same team, exclude from searching
+			if(dstinfo.teamid != srcinfo.teamid && (cfilter & dstinfo.objecttype) ) {
+				double dist = get_distance(i, srcid);
+				//find nearest object
+				if(dist < mindist) {
+					mindist = dist;
+					t = i;
+				}
+			}
+		}
+	}
+	//if(t != -1){
+	//	g_print("gamesys.c: find_nearest_unit(): src=%d id=%d dist=%d\n", srcid, t, mindist);
+	//}
+	return t;
+}
+
+//find random object (different team) from Gobjs[srcid] within diameter finddist
+//if object has same objecttype specified in va_list, they will be excluded
+//returns OBJID_INVALID if not found
+int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilter) {
+	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
+		die("find_nearest_unit(): bad srcid passed!\n");
+		return -1;
+	}
+	uint16_t findobjs[MAX_OBJECT_COUNT];
+	uint16_t oc = 0;
+	//esrc = self.gobjs[srcid]
+	for(uint16_t i = 0; i < MAX_OBJECT_COUNT; i++) {
+		//e = self.gobjs[i]
+		if(Gobjs[i].tid != TID_NULL && srcid != i) {
+			//C = self.lookup(e.tid)
+			LookupResult_t dstinfo;
+			LookupResult_t srcinfo;
+			if(lookup(Gobjs[i].tid, &dstinfo) == -1 || lookup(Gobjs[srcid].tid, &srcinfo) == -1) {
+				return -1;
+			}
+			//if objects are in same team, exclude from searching
+			//if object type is not in cfilter, exclude
+			//if object im more far than finddist / 2, exclude
+			if(dstinfo.teamid != srcinfo.teamid && (dstinfo.objecttype & cfilter) && get_distance(srcid, i) < finddist / 2) {
+				findobjs[oc] = i;
+				oc++;
+			}
+		}
+	}
+	if(oc == 0) {
+		return OBJID_INVALID;
+	} else {
+		uint16_t selnum = (uint16_t)randint(0, oc - 1);
+		//if(t != -1){
+		//	g_print("gamesys.c: find_nearest_unit(): src=%d id=%d dist=%d\n", srcid, t, mindist);
+		//}
+		return findobjs[selnum];
+	}
+}
+
+//Set object to aim the earth
+void aim_earth(int32_t i) {
+	//Gobjs[i].aiming_target = (int16_t)find_earth();
+		for(uint16_t j = 0; j < MAX_OBJECT_COUNT; j++) {
+			if(Gobjs[j].tid == TID_EARTH) {
+				Gobjs[i].aiming_target = j;
+				break;
+			}
+		}
+	set_speed_for_following(i, 3);
+}
+
