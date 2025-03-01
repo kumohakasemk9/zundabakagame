@@ -469,6 +469,7 @@ void start_command_mode(int32_t c) {
 		CommandBuffer[0] = 0;
 		CommandCursor = 0;
 	}
+	textinput_on_cb();
 }
 
 int32_t insert_cmdbuf(char* data) {
@@ -973,12 +974,14 @@ void read_blocked_users() {
 //Execute typed command and exit command mode
 void cmd_enter() {
 	CommandCursor = -1;
+	textinput_off_cb();
 	execcmd();
 }
 
 //Cancel command mode without execute
 void cmd_cancel() {
 	CommandCursor = -1;
+	textinput_off_cb();
 }
 
 //Move cursor back in command mode
@@ -1124,6 +1127,11 @@ void keypress_handler(char kc, specialkey_t ks) {
 		case 'u':
 		case 'U':
 			switch_locator();
+			break;
+		case 0x16: //CtrlV
+			if(CommandCursor != -1) {
+				clipboard_readstart_cb();
+			}
 			break;
 		default:
 			if(ks == SPK_F3) {

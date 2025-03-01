@@ -34,6 +34,12 @@ uint8_t WASMRXBuffer[NET_BUFFER_SIZE]; //WASM can not reference Javascript Memor
 extern int32_t WebsockMode;
 extern smpstatus_t SMPStatus;
 
+void clipboard_readstart_cb() {};
+
+void textinput_on_cb() {};
+
+void textinput_off_cb() {};
+
 char* getPtr_CommandBuffer() {
 	return CommandBuffer;
 }

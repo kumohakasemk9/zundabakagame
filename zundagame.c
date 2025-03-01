@@ -15,7 +15,6 @@ zundagame.c: linux (and mac) entry point, X11 funcs.
 TODO List
 add sync packet (stop sending server buffer -> sync -> upload map data -> sync -> all client download map data -> start sending buffer again)
 Make me ahri
-Enable CtrlV
 Enable IM
 Make sound
 */
@@ -44,6 +43,8 @@ Make sound
 #include <errno.h>
 #include <string.h>
 
+XIM Xinputmet;
+XIC Xinputctx = NULL;
 Display *Disp = NULL; //XDisplay
 Window Win; //XWindow
 cairo_surface_t *GSsfc; //GameScreen drawer surface
@@ -90,6 +91,27 @@ int main(int argc, char *argv[]) {
 	UTF8_STRING = XInternAtom(Disp, "UTF8_STRING", True);
 	CLIPBOARD = XInternAtom(Disp, "CLIPBOARD", False);
 	
+	//Init IM
+	/*Xinputmet = XOpenIM(Disp, 0, 0, 0);
+	XIMStyles *styles = NULL;
+	XIMStyle bestMatchStyle = 0;
+	if(XGetIMValues(Xinputmet, XNQueryInputStyle, &styles, NULL) == NULL && styles != NULL) {
+		for(int32_t i = 0; i < styles->count_styles; i++) {
+			XIMStyle e = styles->supported_styles[i];
+			if(e == (XIMPreeditNothing | XIMStatusNothing) ) {
+				bestMatchStyle = e;
+				break;
+			}
+		}
+		XFree(styles);
+	}
+	if(bestMatchStyle != 0) {
+		Xinputctx = XCreateIC(Xinputmet, XNInputStyle, bestMatchStyle, XNClientWindow, Win, XNFocusWindow, Win, NULL);
+	}
+	if(Xinputctx == NULL) {
+		warn("main(): Preparing IM failed.\n");
+	}*/
+
 	//Create and show window
 	Window r = DefaultRootWindow(Disp);
 	Win = XCreateSimpleWindow(Disp, r, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, 0);
@@ -145,6 +167,7 @@ int main(int argc, char *argv[]) {
 	
 	//Finalize
 	do_finalize();
+	//XCloseIM(Xinputmet);
 	XDestroyWindow(Disp, Win);
 	XCloseDisplay(Disp);
 	cairo_destroy(GS);
@@ -153,11 +176,18 @@ int main(int argc, char *argv[]) {
 }
 
 
-void start_clipboardpaste() {
+void clipboard_readstart_cb() {
 	info("Clipboard paste start\n");
 	const Atom XSEL_DATA = XInternAtom(Disp, "XSEL_DATA", False);
 	XConvertSelection(Disp, CLIPBOARD, UTF8_STRING, XSEL_DATA, Win, CurrentTime);
 	XSync(Disp, 0);
+}
+
+void textinput_on_cb() {
+}
+
+void textinput_off_cb() {
+	
 }
 
 void redraw_win() {
@@ -173,6 +203,19 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 		ProgramExiting = 1;
 	} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
 		//Get key char andd sym
+
+		/*if(ev.type == KeyPress && Xinputctx != NULL) {
+			Status status;
+			char sym[4];
+			KeySym ksr;
+			Xutf8LookupString(Xinputctx, (XKeyPressedEvent*)&ev, sym, sizeof(sym), &ksr, &status);
+			if(status == XLookupChars) {
+				printf("%s\n", sym);
+				return;
+			} else {
+				info("Xutf8LookupString(): not XLookupChars!\n");
+			}
+		}*/
 		char r;
 		KeySym ks;
 		XLookupString(&ev.xkey, &r, sizeof(r), &ks, NULL);
@@ -189,9 +232,6 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 			k = SPK_DOWN;
 		} else if(ks == XK_F3) {
 			k = SPK_F3;
-		}
-		if(r == 0x16 && ev.type == KeyPress) {
-			start_clipboardpaste();
 		}
 		
 		//Pass it to wrapper
@@ -222,6 +262,7 @@ void xwindowevent_handler(XEvent ev, Atom wmdel) {
 	}
 }
 
+//Clipboard read handler
 void clipboard_cb(XEvent ev) {
 	Atom rettype;
 	const Atom XA_STRING = XInternAtom(Disp, "XA_STRING", False);
