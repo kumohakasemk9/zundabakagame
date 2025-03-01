@@ -79,7 +79,8 @@ void drawstring(double x, double y, char* ctx) {
 //draw image in pos x, y
 void drawimage(double x, double y, int32_t imgid) {
 	if(!is_range(imgid, 0, IMAGE_COUNT - 1)) {
-		die("drawimage() failed: Bad imgid passed: %d\n", imgid);
+		drawstring(x, y, "No such image");
+		warn("drawimage() failed: Bad imgid passed: %d\n", imgid);
 		return;
 	}
 	cairo_set_source_surface(G, Plimgs[imgid], x, y);
@@ -90,11 +91,12 @@ void drawimage(double x, double y, int32_t imgid) {
 void drawimage_scale(double x, double y, double w, double h, int32_t imgid) {
 	//Test
 	if(w < 0 || h < 0) {
-		die("drawimage_scale() failed, bad scale passed.\n");
+		warn("drawimage_scale() failed, bad scale passed.\n");
 		return;
 	}
 	if(!is_range(imgid, 0, IMAGE_COUNT - 1) ) {
-		die("drawimage_scale() failed, bad imgid passed.\n");
+		warn("drawimage_scale() failed, bad imgid passed.\n");
+		drawstring(x, y, "No such image");
 		return;
 	}
 	//get original image size
@@ -230,7 +232,9 @@ int32_t get_font_height() {
 //get image size of imgid
 void get_image_size(int32_t imgid, double *w, double *h) {
 	if(!is_range(imgid, 0, IMAGE_COUNT - 1)) {
-		die("get_image_size() failed: Bad imgid passed: %d\n", imgid);
+		warn("get_image_size() failed: Bad imgid passed: %d\n", imgid);
+		*w = 0;
+		*h = 0;
 		return;
 	}
 	*w = (double)cairo_image_surface_get_width(Plimgs[imgid]);

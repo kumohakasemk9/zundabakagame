@@ -43,6 +43,7 @@ extern double DifATKGain;
 extern int32_t SpawnRemain;
 extern int32_t InitSpawnRemain;
 int32_t TitleSkillTimer = 0;
+extern int32_t EndlessMode;
 
 void procai() {
 	//AI proc
@@ -92,8 +93,12 @@ void procai() {
 					if(SpawnRemain > 0) {
 						SpawnRemain--;
 					}
-					GameState = GAMESTATE_DEAD;
-					StateChangeTimer = 1000;
+					if(EndlessMode) {
+						spawn_playable_me();
+					} else {
+						GameState = GAMESTATE_DEAD;
+						StateChangeTimer = 1000;
+					}
 				} else {
 					//Orelse game over (if local, in multiplay all playables need to be dead)
 					if(SMPStatus != NETWORK_LOGGEDIN) {
@@ -107,11 +112,15 @@ void procai() {
 						if(SMPPlayerInfo[j].playable_objid == i) {
 							//Set specific player's SMP character respawn timer if their respawn_remain is not 0 or -1.
 							if(SMPPlayerInfo[j].respawn_remain > 0 || SMPPlayerInfo[j].respawn_remain == -1) {
-								if(SMPPlayerInfo[j].respawn_remain > 0) {
-									SMPPlayerInfo[j].respawn_remain--;
+								if(EndlessMode) {
+									respawn_smp_player(i);
+								} else {
+									if(SMPPlayerInfo[j].respawn_remain > 0) {
+										SMPPlayerInfo[j].respawn_remain--;
+									}
+									SMPPlayerInfo[j].respawn_timer = 1000;
+									SMPPlayerInfo[j].playable_objid = -1;
 								}
-								SMPPlayerInfo[j].respawn_timer = 1000;
-								SMPPlayerInfo[j].playable_objid = -1;
 							}
 							break;
 						}
@@ -173,7 +182,7 @@ void procai() {
 			//Generate random zundamon every 20 sec
 			if(Gobjs[i].timers[0] == 0) {
 				obj_type_t newetid;
-				if(GameState != GAMESTATE_TITLE) {
+				if(GameState != GAMESTATE_TITLE && !EndlessMode) {
 					Gobjs[i].timers[0] = 2000;
 					if(is_range_number(Gobjs[i].hp, 10000, 20000) ) {
 						newetid = TID_ZUNDAMON1;
@@ -553,6 +562,10 @@ void damage_object(int32_t dstid, int32_t srcid) {
 	if(dstinfo.objecttype == UNITTYPE_FACILITY && GameState == GAMESTATE_TITLE) {
 		return; //If in title mode, facilities can not be danaged.
 	}
+
+	if(EndlessMode && (Gobjs[dstid].tid == TID_ENEMYBASE || Gobjs[dstid].tid == TID_EARTH) ) {
+		return; //No damaging earth or enemybase in endless mode
+	}
 	
 	//Decrease target HP
 	double m = 1.00;
@@ -650,16 +663,16 @@ void damage_object(int32_t dstid, int32_t srcid) {
 			if(is_range(killerid, 0, MAX_OBJECT_COUNT - 1) && is_range(Gobjs[killerid].tid, 0, MAX_TID - 1) ){
 				int32_t killertid = Gobjs[killerid].tid;
 				if(LangID == LANGID_JP) {
-					chatf("%s%sは%s%sによって%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizedcharactername(killertid), smpkiller, getlocalizeddeathreason(deathreasonid));
+					chatf("%s%sは%s%sによって%s", get_localized_charactername(Gobjs[dstid].tid), smpvictim, get_localized_charactername(killertid), smpkiller, get_localized_deathreason(deathreasonid));
 				} else {
-					chatf("%s%s is %s by %s%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizeddeathreason(deathreasonid), getlocalizedcharactername(killertid), smpkiller);
+					chatf("%s%s is %s by %s%s", get_localized_charactername(Gobjs[dstid].tid), smpvictim, get_localized_deathreason(deathreasonid), get_localized_charactername(killertid), smpkiller);
 				}
 				//printlog("Object %d is %s\n", killerid, EN_TID_NAMES[killertid]);
 			} else {
 				if(LangID == LANGID_JP) {
-					chatf("%s%sは%s%s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizeddeathreason(deathreasonid) );
+					chatf("%s%sは%s%s", get_localized_charactername(Gobjs[dstid].tid), smpvictim, get_localized_deathreason(deathreasonid) );
 				} else {
-					chatf("%s%s %s", getlocalizedcharactername(Gobjs[dstid].tid), smpvictim, getlocalizeddeathreason(deathreasonid) );
+					chatf("%s%s %s", get_localized_charactername(Gobjs[dstid].tid), smpvictim, get_localized_deathreason(deathreasonid) );
 				}
 			}
 		}
@@ -677,7 +690,9 @@ int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
 		break;
 	}
 	if(newid == -1) {
-		die("gamesys.c: add_character(): Gameobj is full!\n");
+		warn("gamesys.c: add_character(): Gameobj is full!\n");
+		chat("Reset enforced due to error.");
+		reset_game();
 		return 0;
 	}
 	//Add new character
@@ -764,7 +779,7 @@ int32_t add_character(obj_type_t tid, double x, double y, int32_t parid) {
 //calculate distance between Gobjs[id1] and Gobjs[id2]
 double get_distance(int32_t id1, int32_t id2){
 	if(!is_range(id1, 0, MAX_OBJECT_COUNT - 1) || !is_range(id2, 0, MAX_OBJECT_COUNT - 1)) {
-		die("gamesys.c: set_speed_for_following(): bad id passed!\n");
+		warn("gamesys.c: set_speed_for_following(): bad id passed!\n");
 		return INFINITY;
 	}
 	if(Gobjs[id1].tid == TID_NULL || Gobjs[id2].tid == TID_NULL) {
@@ -782,7 +797,7 @@ double get_distance_raw(double x1, double y1, double x2, double y2) {
 //calculate appropriate speed for following object to Gobjs[srcid], stop if object is closer to the target more than distlimit
 void set_speed_for_following(int32_t srcid, double distlimit) {
 	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
-		die("gamesys.c: set_speed_for_following(): bad srcid passed!\n");
+		warn("gamesys.c: set_speed_for_following(): bad srcid passed!\n");
 		return;
 	}
 	int32_t targetid = Gobjs[srcid].aiming_target;
@@ -852,7 +867,7 @@ int32_t find_nearest_unit(int32_t srcid, int32_t finddist, facility_type_t cfilt
 	double mindist = finddist / 2;
 	int32_t t = OBJID_INVALID;
 	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
-		die("find_nearest_unit(): bad srcid passed!\n");
+		warn("find_nearest_unit(): bad srcid passed!\n");
 		return -1;
 	}
 	//esrc = self.gobjs[srcid]
@@ -887,7 +902,7 @@ int32_t find_nearest_unit(int32_t srcid, int32_t finddist, facility_type_t cfilt
 //returns OBJID_INVALID if not found
 int32_t find_random_unit(int32_t srcid, int32_t finddist, facility_type_t cfilter) {
 	if(!is_range(srcid, 0, MAX_OBJECT_COUNT - 1)) {
-		die("find_nearest_unit(): bad srcid passed!\n");
+		warn("find_nearest_unit(): bad srcid passed!\n");
 		return -1;
 	}
 	uint16_t findobjs[MAX_OBJECT_COUNT];

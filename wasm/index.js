@@ -167,7 +167,7 @@ function smpadd_cb() {
 	let port = document.getElementById("smpport");
 	let usr = document.getElementById("smpusername");
 	let pwd = document.getElementById("smppassword");
-	send_cmd_to_game(`/addsmp ${serv.value} ${port.value} ${usr.value} ${pwd.value}`);
+	send_cmd_to_game(`:addsmp ${serv.value} ${port.value} ${usr.value} ${pwd.value}`);
 	usr.value = "";
 	pwd.value = "";
 }
@@ -237,7 +237,7 @@ function keydown_cb(evt) {
 	if(IsGameFocused == 0) { return; }
 	if(evt.key == "t" || evt.key == "T") {
 		start_command_mode(0);
-	} else if(evt.key == "/") {
+	} else if(evt.key == ":") {
 		start_command_mode(1);
 	} else if(evt.key == "ArrowUp") {
 		ZundaGame.keypress_handler(0, 4);
@@ -256,7 +256,7 @@ function keydown_cb(evt) {
 
 function start_command_mode(m) {
 	if(m == 1) {
-		CmdInput.value = "/";
+		CmdInput.value = ":";
 	}
 	CmdInput.focus();
 	unfocus_game();

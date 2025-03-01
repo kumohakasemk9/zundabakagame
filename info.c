@@ -23,21 +23,9 @@ int32_t get_playableid_from_tid(obj_type_t);
 const char* JP_STRINGS[MAX_STRINGS] = {
 	"施設同士の距離が近すぎます。",
 	"不正なパラメータです",
-	"戦闘配置!",
-	"ずんだもんを退治せよ!",
-	"破壊された...",
-	"新しい自機を生産しています",
-	"地球は乗っ取られた",
-	"プレイありがとうございます。(作戦失敗)",
-	"地球は守られた!",
-	"プレイありがとうございます。おめでとう!",
 	"現在使用出来ません",
 	"無限",
 	"上下矢印キーで選択、左右矢印キーで項目変更、スペースで決定",
-	"大量の枝豆を浴びた",
-	"カリカリに焼けた",
-	"消滅した",
-	"わけの分からない理由で死んだ",
 	"サーバーに接続しています",
 	"接続できませんでした",
 	"サーバーから切断しました",
@@ -48,27 +36,17 @@ const char* JP_STRINGS[MAX_STRINGS] = {
 	"応答なし",
 	"接続していません",
 	"チャットは表示されます",
-	"チャットを非表示にしました"
+	"チャットを非表示にしました",
+	"はい",
+	"いいえ"
 };
 
 const char *EN_STRINGS[MAX_STRINGS] = {
 	"Planets are too close eachother!",
 	"Insufficient parameter!",
-	"Start operation!",
-	"Protect the earth from offensive Zundamons!",
-	"Your ship broke...",
-	"Recovering, please wait.",
-	"PWNED!",
-	"Thank you for playing.",
-	"Earth is safe now!",
-	"Thanks for playing, Congratulations!",
 	"Unavailable",
 	"infinite",
 	"Up Down Arrow Key to select, Left Right Arrow key to modify item, space to enter.",
-	"took too much Edamames",
-	"burnt into crisp",
-	"annihilated",
-	"got killed by uncomprehensible reason",
 	"Connecting to server",
 	"Server connection failed.",
 	"Disconnected from server.",
@@ -79,7 +57,9 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 	"Timed out",
 	"Offline",
 	"Enabled chat",
-	"Disabled chat"
+	"Disabled chat",
+	"Yes",
+	"No"
 };
 
 //Menu strings
@@ -92,6 +72,7 @@ const char *EN_MENU_STRINGS[MAX_MENU_STRINGS] = {
 	"Enemy base count bottomright: ",
 	"Enemy base count topleft: ",
 	"Spawn limit: ",
+	"Endless Mode: ",
 	"Battleship: "
 };
 
@@ -104,6 +85,7 @@ const char *JP_MENU_STRINGS[MAX_MENU_STRINGS] = {
 	"敵星数 右下: ",
 	"敵星数 左上: ",
 	"リスポーン上限: ",
+	"無限ずんだもん編: ",
 	"戦闘艦: "
 };
 
@@ -124,6 +106,29 @@ const char *JP_DEATH_STRINGS[MAX_DEATH_STRINGS] = {
 	"カリカリに焼けた",
 	"消滅した",
 	"わけの分からない理由で死んだ"
+};
+
+//Title messages
+const char *EN_TITLE_STRINGS[MAX_TITLE_STRINGS] = {
+	"Start operation!",
+	"Protect the earth from offensive Zundamons!",
+	"Your ship broke...",
+	"Recovering, please wait.",
+	"PWNED!",
+	"Thank you for playing.",
+	"Earth is safe now!",
+	"Thanks for playing, Congratulations!",
+};
+
+const char *JP_TITLE_STRINGS[MAX_TITLE_STRINGS] = {
+	"戦闘配置!",
+	"ずんだもんを退治せよ!",
+	"破壊された...",
+	"新しい自機を生産しています",
+	"地球は乗っ取られた",
+	"プレイありがとうございます。(作戦失敗)",
+	"地球は守られた!",
+	"プレイありがとうございます。おめでとう!",
 };
 
 //TID names LUT
@@ -336,7 +341,7 @@ const int32_t NUMINFO[MAX_TID][9] = {
 	{-1,     0,  TEAMID_ALLY, 2,   50,               UNITTYPE_BULLET,   0,   20,  0}  //23 Kumo9-x24-robot-pcanon
 };
 
-//MaxSpeeds, damage
+//MaxSpeeds
 const double DBLINFO[MAX_TID] = {
 	0,   //0
 	0.05, //1
@@ -367,9 +372,9 @@ const double DBLINFO[MAX_TID] = {
 const int32_t HELPIMG_EN_LUT[HELP_PAGE_MAX] = {38, 39, 40, 36}; //English help manual image id LUT
 const int32_t HELPIMG_JP_LUT[HELP_PAGE_MAX] = {41, 42, 43, 37}; //Japanese help manual image LUT
 
-int32_t getlocalizedhelpimgid(int32_t imgid) {
+int32_t get_localized_helpimgid(int32_t imgid) {
 	if(!is_range(imgid, 0, HELP_PAGE_MAX - 1) ) {
-		warn("getlocalizedhelpimgid(): bad imgid passed.\n");
+		warn("get_localized_helpimgid(): bad imgid passed.\n");
 		return 0;
 	}
 	if(LangID == LANGID_JP) {
@@ -379,9 +384,9 @@ int32_t getlocalizedhelpimgid(int32_t imgid) {
 	}
 }
 
-const char* getlocalizedstring(int32_t stringid) {
+const char* get_localized_string(int32_t stringid) {
 	if(!is_range(stringid, 0, MAX_STRINGS - 1) ) {
-		warn("getlocalizedstring(): bad stringid passed.\n");
+		warn("get_localized_string(): bad stringid passed.\n");
 		return NULL;
 	}
 	if(LangID == LANGID_JP) {
@@ -391,9 +396,22 @@ const char* getlocalizedstring(int32_t stringid) {
 	}
 }
 
-const char* getlocalizeddeathreason(int32_t stringid) {
+const char *get_localized_bool(int32_t b) {
+	int sn = 17;
+	if(b) {
+		sn = 16;
+	}
+	if(LangID == LANGID_JP) {
+		return JP_STRINGS[sn];
+	} else {
+		return EN_STRINGS[sn];
+	}
+
+}
+
+const char* get_localized_deathreason(int32_t stringid) {
 	if(!is_range(stringid, 0, MAX_DEATH_STRINGS - 1) ) {
-		warn("getlocalizeddeathreason(): bad stringid passed.\n");
+		warn("get_localized_deathreason(): bad stringid passed.\n");
 		return NULL;
 	}
 	if(LangID == LANGID_JP) {
@@ -404,15 +422,27 @@ const char* getlocalizeddeathreason(int32_t stringid) {
 
 }
 
-const char* getlocalizedmenustring(int32_t stringid) {
+const char* get_localized_menustring(int32_t stringid) {
 	if(!is_range(stringid, 0, MAX_MENU_STRINGS - 1) ) {
-		warn("getlocalizedstring(): bad stringid passed.\n");
+		warn("get_localized_menustring(): bad stringid passed.\n");
 		return NULL;
 	}
 	if(LangID == LANGID_JP) {
 		return JP_MENU_STRINGS[stringid];
 	} else {
 		return EN_MENU_STRINGS[stringid];
+	}
+}
+
+const char* get_localized_titlestring(int32_t stringid) {
+	if(!is_range(stringid, 0, MAX_TITLE_STRINGS - 1) ) {
+		warn("get_localized_titlestring(): bad stringid passed.\n");
+		return NULL;
+	}
+	if(LangID == LANGID_JP) {
+		return JP_TITLE_STRINGS[stringid];
+	} else {
+		return EN_TITLE_STRINGS[stringid];
 	}
 }
 
@@ -515,9 +545,9 @@ int32_t lookup_playable(int32_t i, PlayableInfo_t *t) {
 	return 0;
 }
 
-const char* getlocalizeditemdesc(int32_t did) {
+const char* get_localized_itemdesc(int32_t did) {
 	if(!is_range(did,0 ,ITEM_COUNT - 1) ) {
-		warn("getlocalizeditemdesc(): bad did passed: %d\n", did);
+		warn("get_localized_itemdesc(): bad did passed: %d\n", did);
 		return NULL;
 	}
 	if(LangID == LANGID_JP) {
@@ -527,9 +557,9 @@ const char* getlocalizeditemdesc(int32_t did) {
 }
 
 
-const char* getlocalizedcharactername(int32_t did) {
+const char* get_localized_charactername(int32_t did) {
 	if(!is_range(did,0 , MAX_TID - 1) ) {
-		warn("getlocalizedcharactername(): bad did passed: %d\n", did);
+		warn("get_localized_charactername(): bad did passed: %d\n", did);
 		return NULL;
 	}
 	if(LangID == LANGID_JP) {

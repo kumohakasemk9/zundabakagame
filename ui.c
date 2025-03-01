@@ -86,7 +86,7 @@ extern int32_t SelectingItemID;
 extern int32_t SelectedMenuItem;
 extern const int32_t ITEMPRICES[ITEM_COUNT];
 extern const int32_t ITEMIMGIDS[ITEM_COUNT];
-extern char StatusTextBuffer[BUFFER_SIZE];
+extern int32_t StatusTextID;
 extern int32_t StatusShowTimer;
 extern int32_t StateChangeTimer;
 extern int32_t ItemCooldownTimers[ITEM_COUNT];
@@ -113,6 +113,7 @@ extern int32_t InitSpawnRemain;
 extern double DifATKGain;
 extern int32_t PlayableID;
 extern int32_t SelectingHelpPage;
+extern int32_t EndlessMode;
 
 //Paint event of window client, called for every 30mS
 void game_paint() {
@@ -138,13 +139,13 @@ void game_paint() {
 			draw_title_screen();
 		} else {
 			if(is_range(SelectingHelpPage, 0, HELP_PAGE_MAX - 1) ) {
-				draw_image_center(getlocalizedhelpimgid(SelectingHelpPage) );
+				draw_image_center(get_localized_helpimgid(SelectingHelpPage) );
 			}
 		}
 	}
 
 	if(GameState != GAMESTATE_TITLE && (KeyFlags & KEY_HELP) ) {
-		draw_image_center(getlocalizedhelpimgid(3) );
+		draw_image_center(get_localized_helpimgid(3) );
 	}
 
 	#ifndef __WASM
@@ -222,11 +223,7 @@ void draw_game_main() {
 
 void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 	if(!is_range(idx, 0, MAX_OBJECT_COUNT - 1)) {
-		die("draw_game_object(): bad idx, how can you do that!?\n");
-		return;
-	}
-	if(!is_range(Gobjs[idx].imgid, 0, IMAGE_COUNT - 1)) {
-		die("draw_game_object(): bad Gobjs[idx].imgid, how can you do that!?\n");
+		warn("draw_game_object(): bad idx, how can you do that!?\n");
 		return;
 	}
 	double w, h, tx, ty;
@@ -268,7 +265,7 @@ void draw_game_object(int32_t idx, LookupResult_t t, double x, double y) {
 
 void draw_shapes(int32_t idx, double x, double y) {
 	if(!is_range(idx, 0, MAX_OBJECT_COUNT - 1)) {
-		die("draw_game_object(): bad idx, how can you do that!?\n");
+		warn("draw_game_object(): bad idx, how can you do that!?\n");
 		return;
 	}
 	obj_type_t tid = Gobjs[idx].tid;
@@ -350,13 +347,13 @@ void draw_title_screen() {
 	x = (WINDOW_WIDTH / 2.0) - (w / 2.0);
 	drawimage(x, y - (h / 2.0), IMG_TITLE);
 	y += (h / 2.0) + 50;
-	drawstring_title(y, getlocalizedstring(12), FONT_DEFAULT_SIZE);
+	drawstring_title(y, get_localized_string(4), FONT_DEFAULT_SIZE); //Menu op help
 	y += 50;
 
 	//Draw menu
 	for(int i = 0; i < MAX_MENU_STRINGS; i++) {
 		//Draw menu item
-		const char *t = getlocalizedmenustring(i);
+		const char *t = get_localized_menustring(i);
 		double fh = get_font_height();
 		if(SelectingMenuItem == i) {
 			chcolor(0x60ffffff, 1);
@@ -379,11 +376,13 @@ void draw_title_screen() {
 			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[2]);
 		} else if(i == 7) {
 			if(InitSpawnRemain == -1) {
-				strcpy(st, getlocalizedstring(11) );
+				strcpy(st, get_localized_string(3) ); //Infinity
 			} else {
 				snprintf(st, BUFFER_SIZE - 1, "%d", InitSpawnRemain);
 			}
 		} else if(i == 8) {
+			snprintf(st, BUFFER_SIZE - 1, "%s", (char*)get_localized_bool(EndlessMode) );
+		} else if(i == 9) {
 			snprintf(st, BUFFER_SIZE - 1, "%d", PlayableID);
 		}
 		st[BUFFER_SIZE - 1] = 0;
@@ -482,9 +481,15 @@ void draw_locator() {
 void draw_cui() {
 	//draw minecraft like cui
 	int32_t fh = get_font_height();
-	double yoff = IHOTBAR_YOFF - fh - 12; //text area pos
+	double yoff = WINDOW_HEIGHT - fh; //text area pos
 
-	//Show command input window if command mode
+	//Show text background if command mode or there are message
+	if(CommandCursor != -1 || StatusShowTimer != 0) {
+		chcolor(COLOR_TEXTBG, 1); //White (70% transparent)
+		fillrect(0, yoff, WINDOW_WIDTH, fh + 2);
+		chcolor(COLOR_TEXTCMD, 1); //Green
+	}
+	//Show command input if command mode
 	if(CommandCursor != -1) {
 		//Shrink string to fit in screen
 		uint16_t sp = 0;
@@ -495,13 +500,12 @@ void draw_cui() {
 			if(w <= WINDOW_WIDTH - 5 || sp >= l - 1) { break; }
 			sp++;
 		}
-
 		//Show command buffer
-		chcolor(COLOR_TEXTBG, 1); //White (70% transparent)
-		fillrect(0, yoff, WINDOW_WIDTH, fh + 2);
-		chcolor(COLOR_TEXTCMD, 1); //Green
 		drawsubstring(0, yoff, CommandBuffer, sp, 65535);
 		drawline(w, yoff, w , yoff + fh + 2, 1);
+	} else if(StatusShowTimer != 0 && is_range(StatusTextID, 0, MAX_STRINGS - 1) ) {
+		//If not command mode and there are status message, show
+		drawstring(0, yoff, (char*)get_localized_string(StatusTextID) );
 	}
 
 	//Show message window if there are message
@@ -516,35 +520,25 @@ void draw_cui() {
 		}
 	}
 
-	//Draw Error Message if there are error
-	if(StatusShowTimer != 0) {
-		/*if(!is_range(RecentErrorId, 0, MAX_STRINGS - 1) ) {
-			die("draw_info(): bad RecentErrorId!\n");
-			return;
-		}*/
-		chcolor(COLOR_TEXTERROR, 1);
-		drawstring_title(WINDOW_WIDTH / 2, StatusTextBuffer, FONT_DEFAULT_SIZE);
-	}
-
 	//Draw title Message when GAMESTATE != PLAYING
 	if(GameState != GAMESTATE_PLAYING) {
 		chcolor(COLOR_TEXTCMD, 1);
 		int32_t r;
 		if(GameState == GAMESTATE_INITROUND) {
-			r = drawstring_title(100, (char*)getlocalizedstring(2), 48);
-			drawstring_title(120 + r, (char*)getlocalizedstring(3), FONT_DEFAULT_SIZE);
+			r = drawstring_title(100, (char*)get_localized_titlestring(0), 48);
+			drawstring_title(120 + r, (char*)get_localized_titlestring(1), FONT_DEFAULT_SIZE);
 			
 		} else if(GameState == GAMESTATE_GAMEOVER) {
-			r = drawstring_title(100, (char*)getlocalizedstring(6), 48);
-			drawstring_title(120 + r, (char*)getlocalizedstring(7), FONT_DEFAULT_SIZE);
+			r = drawstring_title(100, (char*)get_localized_titlestring(2), 48);
+			drawstring_title(120 + r, (char*)get_localized_titlestring(3), FONT_DEFAULT_SIZE);
 			
 		} else if(GameState == GAMESTATE_GAMECLEAR) {
-			r = drawstring_title(100, (char*)getlocalizedstring(8), 48);
-			drawstring_title(120 + r, (char*)getlocalizedstring(9), FONT_DEFAULT_SIZE);
+			r = drawstring_title(100, (char*)get_localized_titlestring(6), 48);
+			drawstring_title(120 + r, (char*)get_localized_titlestring(7), FONT_DEFAULT_SIZE);
 			
 		} else if(GameState == GAMESTATE_DEAD) {
-			r = drawstring_title(100, (char*)getlocalizedstring(4), 48);
-			drawstring_title(120 + r, (char*)getlocalizedstring(5), FONT_DEFAULT_SIZE);
+			r = drawstring_title(100, (char*)get_localized_titlestring(4), 48);
+			drawstring_title(120 + r, (char*)get_localized_titlestring(5), FONT_DEFAULT_SIZE);
 			
 		}
 	}
@@ -630,7 +624,7 @@ void draw_hotbar(double offsx, double offsy) {
 		if(SelectingItemID == i) {
 			//When item is selected, change backcolor and show item description
 			chcolor(COLOR_TEXTCMD, 1);
-			drawstring_inwidth(offsx, offsy + 52, (char*)getlocalizeditemdesc(SelectingItemID), WINDOW_WIDTH / 2, COLOR_TEXTBG);
+			drawstring_inwidth(offsx, offsy + 52, (char*)get_localized_itemdesc(SelectingItemID), WINDOW_WIDTH * 0.95, COLOR_TEXTBG);
 			chcolor(COLOR_TEXTCHAT, 1);
 		} else {
 			chcolor(COLOR_TEXTBG, 1);
@@ -726,7 +720,8 @@ void drawstringf(double x, double y, const char *p, ...) {
 	va_end(v);
 	//Safety check
 	if(r >= sizeof(b) || r == -1) {
-		die("ui.c: drawstringf() failed: formatted string not null terminated, input format string too long?\n");
+		warn("ui.c: drawstringf() failed: formatted string not null terminated, input format string too long?\n");
+		drawstring(x, y, "Error");
 		return;
 	}
 	//Print

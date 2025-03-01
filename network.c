@@ -14,11 +14,11 @@ network.c: process network packets
 */
 
 //Text consts
-#define TEXT_DISCONNECTED 19 //Disconnected from server
-#define TEXT_SMP_ERROR 21 //Disconnected because error in SMP routine
-#define TEXT_SMP_TIMEOUT 24 //Timed out
-#define TEXT_OFFLINE 25 //Offline
-#define TEXT_UNAVAILABLE 10 //Command or item unavailable
+#define TEXT_DISCONNECTED 7 //Disconnected from server
+#define TEXT_SMP_ERROR 9 //Disconnected because error in SMP routine
+#define TEXT_SMP_TIMEOUT 12 //Timed out
+#define TEXT_OFFLINE 13 //Offline
+#define TEXT_UNAVAILABLE 2 //Command or item unavailable
 
 #include "inc/zundagame.h"
 
@@ -95,7 +95,7 @@ void network_recv_task() {
 		TimeoutTimer--;
 		if(TimeoutTimer < 0) {
 			warn("network_recv_task(): Timeout\n");
-			close_connection((char*)getlocalizedstring(TEXT_SMP_TIMEOUT) );
+			close_connection( (char*)get_localized_string(TEXT_SMP_TIMEOUT) );
 			return;
 		}
 	}
@@ -106,7 +106,7 @@ void network_recv_task() {
 		//Process connection timeout (5Sec)
 		if(ConnectionTimeoutTimer > 500) {
 			warn("network_recv_task(): Connection timed out.\n");
-			close_connection((char*)getlocalizedstring(TEXT_SMP_TIMEOUT) );
+			close_connection( (char*)get_localized_string(TEXT_SMP_TIMEOUT) );
 			return;
 		} else {
 			ConnectionTimeoutTimer++;
@@ -131,7 +131,7 @@ void network_recv_task() {
 		return;
 	} else if(r == -2) { //recv error
 		warn("network_recv_task(): recv failed\n");
-		close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR) );
+		close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 		return;
 	}
 	process_tcp_packet(b, (size_t)r);
@@ -173,7 +173,7 @@ void process_tcp_packet(uint8_t *b, size_t l) {
 		//Check buffer overflow
 		if(reqsize > NET_BUFFER_SIZE) {
 			warn("network_recv_task(): data length exceeds buffer size. closing connection.\n");
-			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+			close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 			return;
 		}
 		if(remain < reqsize) {
@@ -198,7 +198,7 @@ void connection_close_handler() {
 }
 
 void connection_establish_handler() {
-	showstatus( (char*)getlocalizedstring(20) ); //connected
+	chat( (char*)get_localized_string(8) ); //connected
 	info("Connected to remote SMP server.\n");
 	SMPStatus = NETWORK_CONNECTED;
 	if(WebsockMode == 0) {
@@ -226,14 +226,16 @@ void net_message_handler(uint8_t *pkt, size_t plen) {
 		//Security update: avoid sending credentials for multiple times
 		if(SMPcid != -1) {
 			warn("net_message_handler(): Duplicate greetings packet.\n");
-			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+			if(DisconnectWhenBadPacket) {
+				close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
+			}
 			return;
 		}
 		//Data length check
 		if(plen != sizeof(np_greeter_t) ) {
 			warn("net_message_handler(): Too short greetings packet.\n");
 			if(DisconnectWhenBadPacket) {
-				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+				close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 			}
 			return;
 		}
@@ -254,7 +256,7 @@ void net_message_handler(uint8_t *pkt, size_t plen) {
 			//Length check
 			if(csiz >= UNAME_SIZE) {
 				warn("net_message_handler(): username too large (in initial user list)\n");
-				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+				close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 				return;
 			}
 			//Fill client information
@@ -273,7 +275,7 @@ void net_message_handler(uint8_t *pkt, size_t plen) {
 		//Exchange event response
 		if(plen - 1 >= NET_BUFFER_SIZE) {
 			warn("net_message_handler(): GetEvent: Buffer overflow.\n");
-			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+			close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 		}
 		//Get client coordinate list
 		int32_t offs = 2;
@@ -284,7 +286,7 @@ void net_message_handler(uint8_t *pkt, size_t plen) {
 			double ty = (double)network2host_fconv_16(t->py);
 			int32_t cid = t->cid;
 			if(change_playable_location_of_cid(cid, tx, ty) == -1 && DisconnectWhenBadPacket) {
-				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+				close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 				return;
 			}
 			if(DebugSpam) {
@@ -297,7 +299,7 @@ void net_message_handler(uint8_t *pkt, size_t plen) {
 		//printf("pkt_recv_handler(): GetEvent: RXSMPEventlen: %d\n", RXSMPEventLen);
 	} else {
 		if(DisconnectWhenBadPacket) {
-			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+			close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 		}
 		warn("net_message_handler(): Unknown Packet (%ld): ", plen);
 		for(size_t i = 0; i < plen; i++) {
@@ -308,9 +310,9 @@ void net_message_handler(uint8_t *pkt, size_t plen) {
 }
 
 //Connect to specified address
-void connect_server_cmd(char* cmdparam) {
+int32_t connect_server_cmd(char* cmdparam) {
 	if(GameState == GAMESTATE_TITLE) {
-		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable in title screen
+		return TEXT_UNAVAILABLE; //Unavailable in title screen
 	}
 
 	//Convert parameter to int
@@ -319,20 +321,18 @@ void connect_server_cmd(char* cmdparam) {
 	//Check for parameter
 	if(!is_range(sp, 0, SMPProfCount - 1) ) {
 		warn("connect_server(): Bad profile number: %d\n", sp);
-		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
-		return;
+		return TEXT_UNAVAILABLE; //Unavailable if there's no profile
 	}
 	SelectedSMPProf = sp;
 
 	//If already connected, return
 	if(SMPStatus != NETWORK_DISCONNECTED) {
-		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
 		warn("connect_server(): Already connected.\n");
-		return;
+		return TEXT_UNAVAILABLE; //Unavailable
 	}
 
 	//Announce and reset variables
-	showstatus("%s %s", getlocalizedstring(17), SMPProfs[sp].host);
+	chatf("%s %s", get_localized_string(5), SMPProfs[sp].host); //Connecting
 	info("connect_server(): Attempting to connect to %s:%s\n", SMPProfs[sp].host, SMPProfs[sp].port);
 	RXSMPEventLen = 0;
 	TXSMPEventLen = 0;
@@ -353,10 +353,10 @@ void connect_server_cmd(char* cmdparam) {
 
 	//Connect
 	if(make_tcp_socket(SMPProfs[sp].host, SMPProfs[sp].port) != 0) {
-		showstatus( (char*)getlocalizedstring(18) ); //can not connect
 		SMPStatus = NETWORK_DISCONNECTED;
-		return;
+		return 6;//Can not connect
 	}
+	return -1; //OK
 }
 
 //Close connection but do not announce.
@@ -364,9 +364,9 @@ void close_connection(char* reason) {
 	if(SMPStatus != NETWORK_DISCONNECTED) {
 		if(DisconnectReasonProvided == 0) {
 			if(reason != NULL) {
-				showstatus("%s %s", (char*)getlocalizedstring(TEXT_DISCONNECTED), reason);
+				chatf("%s %s", (char*)get_localized_string(TEXT_DISCONNECTED), reason);
 			} else {
-				showstatus((char*)getlocalizedstring(TEXT_DISCONNECTED));
+				chat( (char*)get_localized_string(TEXT_DISCONNECTED) );
 			}
 			DisconnectReasonProvided = 1;
 		}
@@ -385,7 +385,6 @@ void net_server_send_cmd(server_command_t cmd) {
 		//NP_EXCHANGE_EVENT: put buffered event to server and get remote events
 		if(TXSMPEventLen + 1 >= NET_BUFFER_SIZE) {
 			warn("net_server_send_cmd(): ADD_EVENT: Packet buffer overflow.\n");
-			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 			return;
 		}
 		memcpy(&cmdbuf[1], TXSMPEventBuffer, TXSMPEventLen);
@@ -441,9 +440,15 @@ void net_server_send_cmd(server_command_t cmd) {
 		}
 		memcpy(&buf[hdrlen], cmdbuf, ctxlen);
 		if(send_tcp_socket(buf, totallen) != totallen) {
-			close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+			close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 		}
 	}
+}
+
+//respawn foreign player
+void respawn_smp_player(int cid) {
+	int32_t r = spawn_playable(SMPPlayerInfo[cid].pid);
+	SMPPlayerInfo[cid].playable_objid = r;
 }
 
 //Process SMP packet
@@ -455,8 +460,7 @@ void process_smp() {
 			//If timer went to 0, respawn playable character of SMP client
 			if(SMPPlayerInfo[i].respawn_timer == 0) {
 				SMPPlayerInfo[i].respawn_timer = -1;
-				int32_t r = spawn_playable(SMPPlayerInfo[i].pid);
-				SMPPlayerInfo[i].playable_objid = r;
+				respawn_smp_player(i);
 			}
 		}
 	}
@@ -471,7 +475,7 @@ void process_smp() {
 			if(rem < sizeof(event_hdr_t) ) {
 				warn("process_smp(): header read failed, rem:%ld, ptr: %ld\n", rem, ptr);
 				if(DisconnectWhenBadPacket) {
-					close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+					close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 				}
 				return;
 			}
@@ -484,7 +488,7 @@ void process_smp() {
 			if(!is_range(cid, -1, MAX_CLIENTS) ) {
 				warn("process_smp(): Bad event header\n");
 				if(DisconnectWhenBadPacket) {
-					close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+					close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 					return;
 				}
 				break;
@@ -492,7 +496,7 @@ void process_smp() {
 			if(evlen >= NET_BUFFER_SIZE) {
 				warn("process_smp(): Event chunk too large\n");
 				if(DisconnectWhenBadPacket) {
-					close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR) );
+					close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 					return;
 				}
 				break;
@@ -500,7 +504,7 @@ void process_smp() {
 			if(rem < reclen) {
 				warn("process_smp(): Too short event chunk.\n");
 				if(DisconnectWhenBadPacket) {
-					close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+					close_connection( (char*)get_localized_string(TEXT_SMP_ERROR) );
 					return;
 				}
 				break;
@@ -509,7 +513,7 @@ void process_smp() {
 			//Process event
 			uint8_t* evhead = &RXSMPEventBuffer[ptr + (int32_t)sizeof(event_hdr_t)];
 			if(process_smp_events(evhead, evlen, cid) == -1 && DisconnectWhenBadPacket) {
-				close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
+				close_connection( (char*)get_localized_string(TEXT_SMP_ERROR));
 				return;
 			}
 			ptr += (uint32_t)reclen;
@@ -636,7 +640,6 @@ void stack_packet(event_type_t etype, ...) {
 	//}
 	if(TXSMPEventLen + pktlen >= NET_BUFFER_SIZE) {
 		warn("net_stack_packet(): TX SMP buffer overflow.\n");
-		close_connection((char*)getlocalizedstring(TEXT_SMP_ERROR));
 	} else {
 		TXSMPEventLen += pktlen;
 	}
@@ -646,7 +649,7 @@ int32_t change_playable_location_of_cid(int cid, double tx, double ty) {
 	//Parameter check
 	if(!is_range_number(tx, 0, MAP_WIDTH) || !is_range_number(ty, 0, MAP_HEIGHT) || !is_range_number(cid, 0, MAX_CLIENTS) ) {
 		if(DebugSpam) {
-			warn("change_palyable_location_of_cid(): Bad parameter\n");
+			warn("change_playable_location_of_cid(): Bad parameter\n");
 		}
 		return -1;
 	}
@@ -985,7 +988,7 @@ int32_t evh_bye(int32_t cid) {
 	}
 
 	//Notify disconnection of another client
-	chatf("%s %s", SMPPlayerInfo[i].usr, getlocalizedstring(23) );
+	chatf("%s %s", SMPPlayerInfo[i].usr, get_localized_string(11) );
 	//Clean up left user's playable character
 	int32_t j = SMPPlayerInfo[i].playable_objid;
 	info("Trying to clear playable object id=%d\n", j);
@@ -1035,7 +1038,7 @@ ssize_t evh_hello(uint8_t *eventbuffer, size_t eventoffset, int cid) {
 	char funame[UNAME_SIZE];
 	memcpy(funame, &evh[1], namelen);
 	funame[namelen] = 0;
-	chatf("%s %s", funame, getlocalizedstring(22) );
+	chatf("%s %s", funame, get_localized_string(10) );
 	//Register client info
 	for(int32_t i = 0; i < MAX_CLIENTS; i++) {
 		if(SMPPlayerInfo[i].cid == -1 || SMPPlayerInfo[i].cid == cid) {
@@ -1074,42 +1077,45 @@ int32_t evh_change_playable_id(uint8_t* eventbuffer, size_t eventoffset, int32_t
 }
 
 
-void changetimeout_cmd(char *param) {
+int32_t changetimeout_cmd(char *param) {
 	//change network timeout
 	int32_t i = (int32_t)strtol(param, NULL, 10);
 	if(!is_range(i, 0, 1000) ) {
-		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		warn("changetimeout_cmd(): paraneter must be 0 to 1000.\n");
-		return;
+		return TEXT_BAD_COMMAND_PARAM; //Bad param
 	}
 	NetworkTimeout = i;
+	return -1;
 }
 
-void getcurrentsmp_cmd() {
+int32_t getcurrentsmp_cmd() {
 	//Command to get connection state
 	if(SMPStatus == NETWORK_DISCONNECTED) {
-		showstatus( (char*)getlocalizedstring(TEXT_OFFLINE) );
+		return TEXT_OFFLINE; //Offline
 	} else {
 		chatf("getcurrentsmp: %d (%s@%s:%s)", SelectedSMPProf, SMPProfs[SelectedSMPProf].usr, SMPProfs[SelectedSMPProf].host, SMPProfs[SelectedSMPProf].port);
 	}
+	return -1;
 }
 
-void add_smp_cmd(char* p) {
+int32_t add_smp_cmd(char* p) {
 	//Add SMP profile
 	if(add_smp_profile(p, ' ') != 0) {
-			showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		return TEXT_BAD_COMMAND_PARAM; //Bad parameter
 	}
+	return -1;
 }
 
-void get_smp_cmd(char *param) {
+int32_t get_smp_cmd(char *param) {
 	//Get current selected SMP profile
 	int i = atoi(param);
 	if(is_range(i, 0, SMPProfCount - 1) ) {
 		chatf("getsmp: %d (%s@%s:%s)", i, SMPProfs[i].usr, SMPProfs[i].host, SMPProfs[i].port);
 	} else {
 		warn("get_smp_cmd(): bad SMP id.\n");
-		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		return TEXT_BAD_COMMAND_PARAM; //Bad parameter
 	}
+	return -1;
 }
 
 int32_t add_smp_profile(char* line, char spliter) {
@@ -1170,7 +1176,7 @@ int32_t add_smp_profile(char* line, char spliter) {
 	return 0;
 }
 
-void getclients_cmd() {
+int32_t getclients_cmd() {
 	//Get current connected users
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		//Make client username list divided by ,
@@ -1183,11 +1189,11 @@ void getclients_cmd() {
 				s = snprintf(t, UNAME_SIZE + 5, "%s (%d), ", SMPPlayerInfo[i].usr, SMPPlayerInfo[i].cid);
 				if(s < 0) {
 					warn("getclients_cmd(): error.\n");
-					return;
+					return TEXT_UNAVAILABLE;
 				}
 				if(p + s >= UNAME_SIZE + 5) {
 					warn("getclients(): overflow condition while making list.\n");
-					return;
+					return TEXT_UNAVAILABLE;
 				}
 				memcpy(&clientlist[p], t, s);
 				p += s;
@@ -1197,8 +1203,9 @@ void getclients_cmd() {
 		chatf("getclients: %s", clientlist);
 	} else {
 		warn("getclients_cmd(): disconnected.\n");
-		showstatus( (char*)getlocalizedstring(TEXT_OFFLINE) ); //Offline
+		return TEXT_OFFLINE; //Offline
 	}
+	return -1;
 }
 
 //Find specified name from BlockedUsers array, return id if match (otherwise return -1)
@@ -1216,15 +1223,17 @@ int32_t findblockeduser(char *n) {
 	return -1;
 }
 
-void addusermute_cmd(char *p) {
+int32_t addusermute_cmd(char *p) {
 	size_t l = strnlen(p, UNAME_SIZE);
 	//Check param
 	if(l >= UNAME_SIZE) {
-		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		warn("addusermute_cmd(): too long username.\n");
-		return;
+		return TEXT_BAD_COMMAND_PARAM; // Bad parameter
 	}
-	addusermute(p);
+	if(addusermute(p) == -1) {
+		return TEXT_UNAVAILABLE;
+	}
+	return -1;
 }
 
 int32_t addusermute(char *p) {
@@ -1288,15 +1297,14 @@ int32_t addusermute(char *p) {
 	}
 }
 
-void delusermute_cmd(char *p) {
+int32_t delusermute_cmd(char *p) {
 	//Unmute user command
 	size_t l = strnlen(p, UNAME_SIZE);
 
 	//Check param
 	if(l >= UNAME_SIZE) {
-		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		warn("addusermute_cmd(): too long username.\n");
-		return;
+		return TEXT_BAD_COMMAND_PARAM; //Bad parameter
 	}
 	
 	//Search for specified string
@@ -1307,16 +1315,16 @@ void delusermute_cmd(char *p) {
 		free(BlockedUsers[i]);
 		BlockedUsers[i] = NULL;
 	} else {
-		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
 		warn("addusermute_cmd(): not found on list!\n");
+		return TEXT_BAD_COMMAND_PARAM;
 	}
+	return -1;
 }
 
-void listusermute_cmd() {
+int32_t listusermute_cmd() {
 	//list muted users
 	if(BlockedUsers == NULL || BlockedUsersCount == 0) {
-		showstatus( (char*)getlocalizedstring(TEXT_UNAVAILABLE) ); //Unavailable
-		return;
+		return TEXT_UNAVAILABLE;
 	}
 
 	//Make list
@@ -1335,7 +1343,7 @@ void listusermute_cmd() {
 		//Check array boundary
 		if(p + l + 2 >= BUFFER_SIZE) {
 			warn("listusermute_cmd(): overflow condition\n");
-			return;
+			return TEXT_UNAVAILABLE;
 		}
 		memcpy(&t[p], BlockedUsers[i], l);
 		//Terminate last element with 0, else append ", "
@@ -1349,15 +1357,16 @@ void listusermute_cmd() {
 	}
 
 	chatf("listmuted (%d): %s", c, t);
+	return -1;
 }
 
-void togglechat_cmd() {
+int32_t togglechat_cmd() {
 	//Chat toggle command
 	if(IsChatEnable) {
 		IsChatEnable = 0;
-		showstatus( (char*)getlocalizedstring(27));
+		return 15; //Chat disable
 	} else {
 		IsChatEnable = 1;
-		showstatus( (char*)getlocalizedstring(26));
+		return 14; //Chat enable
 	}
 }

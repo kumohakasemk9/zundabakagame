@@ -54,17 +54,18 @@ void utf8_substring(char* src, int32_t st, int32_t ed, char *dst, int32_t dstlen
 	char* e;
 	int32_t subl;
 	ed = constrain_i32(ed, 0, (int32_t)utf8_strlen(src) ); //Restrict ed not to be greater than src letter count
+	if(dst == NULL) {
+		warn("Destination must not be NULL!\n");
+		return;
+	}
 	if(st > ed || dstlen < 2) {
-		die("utf8_substring() failed. Parameters error: st=%d, ed=%d, dstlen=%d\n", st, ed, dstlen);
+		warn("utf8_substring() failed. Parameters error: st=%d, ed=%d, dstlen=%d\n", st, ed, dstlen);
+		dst[0] = 0;
 		return;
 	}
 	s = utf8_strlen_to_pointer(src, st);
 	e = utf8_strlen_to_pointer(src, ed);
-	subl = (int32_t)(e - s);
-	if(subl + 1 > dstlen) {
-		die("util.c: utf8_substring() failed. No enough buffer for substring.\n");
-		return;
-	}
+	subl = constrain_i32( (int32_t)(e - s), 0, dstlen - 1);
 	memcpy(dst, s, (size_t)subl);
 	dst[subl] = '\0';
 }
@@ -85,7 +86,8 @@ int32_t utf8_insertstring(char *dst, char *src, int32_t pos, size_t dstlen) {
 	//backup string
 	char *b = malloc(dstlen);
 	if(b == NULL) {
-		die("utf8_insertstring(): String backup failed.\n");
+		warn("utf8_insertstring(): String backup failed.\n");
+		return 1;
 	}
 	char *s = utf8_strlen_to_pointer(dst, pos);
 	strcpy(b, s); //b = string after pos

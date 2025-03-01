@@ -47,19 +47,18 @@ int32_t buy_facility(int32_t fid);
 void debug_add_character();
 void select_next_item();
 void select_prev_item();
-void spawn_playable_me();
 void reset_game_cmd();
-void ebcount_cmd();
-void ebdist_cmd();
-void atkgain_cmd();
-void chspawn_cmd(char*);
+int32_t ebcount_cmd(char*);
+int32_t ebdist_cmd(char*);
+int32_t atkgain_cmd(char*);
+int32_t chspawn_cmd(char*);
 void cmd_enter();
 void cmd_cancel();
 void cmd_cursor_back();
 void cmd_cursor_forward();
 void cmd_putch(char);
 void switch_debug_info();
-void changeplayable_cmd(char*);
+int32_t changeplayable_cmd(char*);
 void read_blocked_users();
 void commit_menu();
 void go_title();
@@ -104,8 +103,8 @@ extern int32_t SelectedSMPProf;
 extern SMPProfile_t *SMPProfs;
 extern SMPPlayers_t SMPPlayerInfo[MAX_CLIENTS]; //Server's player informations
 extern int32_t SMPcid; //ID of our client (told from SMP server)
-int32_t StatusShowTimer; //For showstatus(), it countdowns and if it gots 0 status message disappears
-char StatusTextBuffer[BUFFER_SIZE]; //For showstatus(), status text storage
+int32_t StatusShowTimer; //it countdowns and if it gots 0 status message disappears
+int32_t StatusTextID; //status text id, shown in command bar
 int32_t CommandBufferMutex = 0; //If 1, we should not modify CommandBuffer
 int32_t DifEnemyBaseCount[4] = {1, 0, 0, 0}; //Default topright, bottomright, topleft and bottomleft enemy boss count
 int32_t DifEnemyBaseDist = 500; //Default enemy boss distance from each other
@@ -120,6 +119,7 @@ extern char** BlockedUsers;
 int32_t LocatorType = 0; //Game background type
 extern int32_t TitleSkillTimer;
 int32_t SelectingHelpPage;
+int32_t EndlessMode = 0; //Endless mode; no damaging earth and enemy base, unlimited skills, no respawn delay
 
 //Translate window coordinate into map coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -166,7 +166,7 @@ void chatf(const char* p, ...) {
 	r = vsnprintf(b, sizeof(b), p, v);
 	va_end(v);
 	if(r >= sizeof(b) || r == -1) {
-		die("gamesys.c: chatf() failed. Buffer overflow or vsnprintf() failed.\n");
+		warn("gamesys.c: chatf() failed. Buffer overflow or vsnprintf() failed.\n");
 		return;
 	}
 	chat(b);
@@ -318,8 +318,8 @@ void proc_playable_op() {
 						stack_packet(EV_USE_SKILL, i); //if logged in to SMP server, notify event instead
 					}
 					//Reset Skill CD
-					if(DebugMode) {
-						SkillCooldownTimers[i] = 100;
+					if(DebugMode || EndlessMode) {
+						SkillCooldownTimers[i] = plinf.skillinittimers[i];
 					} else {
 						SkillCooldownTimers[i] = plinf.skillcooldowns[i];
 					}
@@ -393,7 +393,7 @@ int32_t buy_facility(int32_t fid) {
 		if(t.objecttype == UNITTYPE_FACILITY) {
 			if(get_distance_raw(Gobjs[i].x, Gobjs[i].y, mx, my) < 500) {
 				//showerrorstr(0);
-				showstatus( (char*)getlocalizedstring(0));
+				set_cmdstatus(0); //Too close!
 				return 1;
 			}
 		}
@@ -463,7 +463,7 @@ void start_command_mode(int32_t c) {
 	KeyFlags = 0;
 	SkillKeyState = -1;
 	if(c) {
-		strcpy(CommandBuffer, "/");
+		strcpy(CommandBuffer, ":");
 		CommandCursor = 1;
 	} else {
 		CommandBuffer[0] = 0;
@@ -507,116 +507,124 @@ void execcmd() {
 	if(strlen(CommandBuffer) == 0) {
 		return;
 	}
-
-	if(strcmp(CommandBuffer, "/credit") == 0) {
+	
+	int32_t errid = -1;
+	if(strcmp(CommandBuffer, ":credit") == 0) {
 		//Show Credit
 		chat(CREDIT_STRING);
-	} else if(strcmp(CommandBuffer, "/builddate") == 0) {
+	} else if(strcmp(CommandBuffer, ":builddate") == 0) {
 		//Show build date
 		chat(__TIMESTAMP__);
 
-	} else if(strcmp(CommandBuffer, "/getsmps") == 0) {
+	} else if(strcmp(CommandBuffer, ":getsmps") == 0) {
 		//Get current loaded SMP profile count
 		chatf("getsmps: %d", SMPProfCount);
 
-	} else if(memcmp(CommandBuffer, "/getsmp ", 8) == 0) {
+	} else if(memcmp(CommandBuffer, ":getsmp ", 8) == 0) {
 		//get selected smp profile info
-		get_smp_cmd(&CommandBuffer[8]);
+		errid = get_smp_cmd(&CommandBuffer[8]);
 
-	} else if(strcmp(CommandBuffer, "/getcurrentsmp") == 0) {
+	} else if(strcmp(CommandBuffer, ":getcurrentsmp") == 0) {
 		//get current SMP profile.
-		getcurrentsmp_cmd();
+		errid = getcurrentsmp_cmd();
 
-	} else if(memcmp(CommandBuffer, "/addsmp ", 8) == 0) {
+	} else if(memcmp(CommandBuffer, ":addsmp ", 8) == 0) {
 		//Add SMP profile
-		add_smp_cmd(&CommandBuffer[8]);
+		errid = add_smp_cmd(&CommandBuffer[8]);
 
-	} else if(strcmp(CommandBuffer, "/reset") == 0) {
+	} else if(strcmp(CommandBuffer, ":reset") == 0) {
 		//reset game
 		reset_game_cmd();
 
-	} else if(strcmp(CommandBuffer, "/jp") == 0) {
+	} else if(strcmp(CommandBuffer, ":jp") == 0) {
 		//Change language to Japanese
 		LangID = LANGID_JP;
 
-	} else if(strcmp(CommandBuffer, "/en") == 0) {
+	} else if(strcmp(CommandBuffer, ":en") == 0) {
 		//Change language to English
 		LangID = LANGID_EN;
 
-	} else if(memcmp(CommandBuffer, "/chfont ", 8) == 0) {
+	} else if(memcmp(CommandBuffer, ":chfont ", 8) == 0) {
 		//Load font list
 		loadfont(&CommandBuffer[8]);
 
-	} else if(memcmp(CommandBuffer, "/connect ", 9) == 0) {
+	} else if(memcmp(CommandBuffer, ":connect ", 9) == 0) {
 		//Connect to SMP server
-		connect_server_cmd(&CommandBuffer[9]);
+		errid = connect_server_cmd(&CommandBuffer[9]);
 
-	} else if(strcmp(CommandBuffer, "/disconnect") == 0) {
+	} else if(strcmp(CommandBuffer, ":disconnect") == 0) {
 		//Disconnect from SMP server
 		close_connection_cmd();
 	
-	} else if(memcmp(CommandBuffer, "/ebcount ", 9) == 0) {
+	} else if(memcmp(CommandBuffer, ":ebcount ", 9) == 0) {
 		//Set difficulty parameter: enemy base count
-		ebcount_cmd();
+		errid = ebcount_cmd(&CommandBuffer[9]);
 
-	} else if(memcmp(CommandBuffer, "/ebdist ", 8) == 0) {
+	} else if(memcmp(CommandBuffer, ":ebdist ", 8) == 0) {
 		//Set difficulty parameter: enemy base distance
-		ebdist_cmd();
+		errid = ebdist_cmd(&CommandBuffer[8]);
 
-	} else if(memcmp(CommandBuffer, "/atkgain ", 9) == 0) {
+	} else if(memcmp(CommandBuffer, ":atkgain ", 9) == 0) {
 		//Set difficulty parameter: attack gain
-		atkgain_cmd();
+		errid = atkgain_cmd(&CommandBuffer[9]);
 	
-	} else if(strcmp(CommandBuffer, "/difficulty") == 0) {
+	} else if(strcmp(CommandBuffer, ":difficulty") == 0) {
 		//Difficulty query command
-		chatf("difficulty: ATKGain: %.2f EBDist: %d EBCount: %d %d %d\n", DifATKGain, DifEnemyBaseDist, DifEnemyBaseCount[0], DifEnemyBaseCount[1], DifEnemyBaseCount[2]);
+		chatf("difficulty: ATKGain: %.2f EBDist: %d EBCount: %d %d %d Endless: %d\n", DifATKGain, DifEnemyBaseDist, DifEnemyBaseCount[0], DifEnemyBaseCount[1], DifEnemyBaseCount[2], (char*)get_localized_bool(EndlessMode) );
 
-	} else if(memcmp(CommandBuffer, "/chspawn ", 9) == 0) {
+	} else if(memcmp(CommandBuffer, ":chspawn ", 9) == 0) {
 		//Allowable spawn count change cmd
-		chspawn_cmd(&CommandBuffer[9]);
+		errid = chspawn_cmd(&CommandBuffer[9]);
 
-	} else if(memcmp(CommandBuffer, "/chtimeout ", 11) == 0) {
+	} else if(memcmp(CommandBuffer, ":chtimeout ", 11) == 0) {
 		//Setting timeout command
-		changetimeout_cmd(&CommandBuffer[11]);
+		errid = changetimeout_cmd(&CommandBuffer[11]);
 
-	} else if(strcmp(CommandBuffer, "/timeout") == 0) {
+	} else if(strcmp(CommandBuffer, ":timeout") == 0) {
 		//Get timeout
 		chatf("timeout: %d", NetworkTimeout);
 
-	} else if(strcmp(CommandBuffer, "/getclients") == 0) {
+	} else if(strcmp(CommandBuffer, ":getclients") == 0) {
 		//Get connected users
-		getclients_cmd();
+		errid = getclients_cmd();
 
-	} else if(memcmp(CommandBuffer, "/chplayable ", 12) == 0 ) {
+	} else if(memcmp(CommandBuffer, ":chplayable ", 12) == 0 ) {
 		//Change playable
-		changeplayable_cmd(&CommandBuffer[12]);
+		errid = changeplayable_cmd(&CommandBuffer[12]);
 
-	} else if(strcmp(CommandBuffer, "/getplayable") == 0) {
+	} else if(strcmp(CommandBuffer, ":getplayable") == 0) {
 		//Get playable
 		chatf("getplayable: %d", PlayableID);
 
-	} else if(memcmp(CommandBuffer, "/ignore ", 8) == 0) {
+	} else if(memcmp(CommandBuffer, ":ignore ", 8) == 0) {
 		//Add blocked user
-		addusermute_cmd(&CommandBuffer[8]);
+		errid = addusermute_cmd(&CommandBuffer[8]);
 
-	} else if(memcmp(CommandBuffer, "/listen ", 8) == 0) {
+	} else if(memcmp(CommandBuffer, ":listen ", 8) == 0) {
 		//Delete blocked user
-		delusermute_cmd(&CommandBuffer[8]);
+		errid = delusermute_cmd(&CommandBuffer[8]);
 		
-	} else if(strcmp(CommandBuffer, "/listmuted") == 0) {
+	} else if(strcmp(CommandBuffer, ":listmuted") == 0) {
 		//list blocked user
-		listusermute_cmd();
+		errid = listusermute_cmd();
 
-	} else if(strcmp(CommandBuffer, "/togglechat") == 0) {
+	} else if(strcmp(CommandBuffer, ":togglechat") == 0) {
 		//Togglechat cmd
-		togglechat_cmd();
-	} else if(strcmp(CommandBuffer, "/title") == 0) {
+		errid = togglechat_cmd();
+
+	} else if(strcmp(CommandBuffer, ":title") == 0) {
 		//title command
 		go_title();
+	
+	} else if(strcmp(CommandBuffer, ":endless") == 0) {
+		EndlessMode = 1;
+
+	} else if(strcmp(CommandBuffer, ":noendless") == 0) {
+		EndlessMode = 0;
 
 	} else {
-		if(CommandBuffer[0] == '/') {
-			showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) );
+		if(CommandBuffer[0] == ':') {
+			set_cmdstatus(TEXT_BAD_COMMAND_PARAM);
 		} else {
 			if(SMPStatus == NETWORK_LOGGEDIN) {
 				stack_packet(EV_CHAT, CommandBuffer);
@@ -625,6 +633,13 @@ void execcmd() {
 			}
 		}
 	}
+
+	set_cmdstatus(errid);
+}
+
+void set_cmdstatus(int32_t sid) {
+	StatusShowTimer = ERROR_SHOW_TIMEOUT;
+	StatusTextID = sid;
 }
 
 void go_title() {
@@ -638,12 +653,12 @@ void go_title() {
 	reset_game();
 }
 
-void changeplayable_cmd(char *param) {
+int32_t changeplayable_cmd(char *param) {
 	//Change playable character for next round
 	int32_t i = atoi(param);
 	if(!is_range(i, 0, PLAYABLE_CHARACTERS_COUNT - 1) ) {
-		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-		return;
+		warn("changeplayable_cmd(): no such playable character\n");
+		return TEXT_BAD_COMMAND_PARAM; // Bad param
 	}
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		stack_packet(EV_CHANGE_PLAYABLE_ID);
@@ -651,21 +666,23 @@ void changeplayable_cmd(char *param) {
 		info("Change Playableid to %d\n", PlayableID);
 		PlayableID = i;
 	}
+	return -1;
 }
 
-void chspawn_cmd(char* param) {
+int32_t chspawn_cmd(char* param) {
 	//Change allowed spawn count
 	int32_t i = atoi(param);
 	if(is_range(i, -1, MAX_SPAWN_COUNT) ) {
 		InitSpawnRemain = i;
 	} else {
-		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
+		warn("chspawn_cmd(): parameter range check fail\n");
+		return TEXT_BAD_COMMAND_PARAM; //Bad parameter
 	}
+	return -1;
 }
 
-void ebcount_cmd() {
+int32_t ebcount_cmd(char *p) {
 	//DifEnemyBaseCount set command ( topright [bottomright] [topleft] )
-	char *p = &CommandBuffer[9];
 	int32_t t[4] = {0, 0, 0, 0};
 	for(int32_t i = 0; i < 4; i++) {
 		//convert and check
@@ -676,8 +693,8 @@ void ebcount_cmd() {
 			minim = 1;
 		}
 		if(!is_range(t[i], minim, MAX_EBCOUNT) ) {
-			showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-			return;
+			warn("ebcount_cmd(): parameter range check failed.\n");
+			return TEXT_BAD_COMMAND_PARAM; //Bad parameter
 		}
 
 		//find next space and advance pointer, if not found finish converting task.
@@ -690,24 +707,26 @@ void ebcount_cmd() {
 	for(int32_t i = 0; i < 4; i++) {
 		DifEnemyBaseCount[i] = t[i];
 	}
+	return -1;
 }
 
-void ebdist_cmd() {
+int32_t ebdist_cmd(char *p) {
 	//DifEnemyBaseDist set command (distance)
-	int32_t i = (int32_t)strtol(&CommandBuffer[8], NULL, 10);
+	int32_t i = (int32_t)strtol(p, NULL, 10);
 	if(!is_range(i, MIN_EBDIST, MAX_EBDIST) ) {
-		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-		return;
+		warn("ebdist_cmd(): parameter range check fail\n");
+		return TEXT_BAD_COMMAND_PARAM; //bad param
 	}
 	DifEnemyBaseDist = i;
+	return -1;
 }
 
-void atkgain_cmd() {
+int32_t atkgain_cmd(char *p) {
 	//DifATKGain set command (atkgain)
-	double i = (double)atof(&CommandBuffer[9]);
+	double i = (double)atof(p);
 	if(!is_range_number(i, MIN_ATKGAIN, MAX_ATKGAIN) ) {
-		showstatus( (char*)getlocalizedstring(TEXT_BAD_COMMAND_PARAM) ); //Bad parameter
-		return;
+		warn("atkgain_cmd(): parameter range check fail.\n");
+		return TEXT_BAD_COMMAND_PARAM; //Bad parameter
 	}
 	if(SMPStatus == NETWORK_LOGGEDIN) {
 		stack_packet(EV_CHANGE_ATKGAIN);
@@ -715,6 +734,7 @@ void atkgain_cmd() {
 		DifATKGain = i;
 		info("atkgain_cmd(): atkgain changed to %f\n", DifATKGain);
 	}
+	return -1;
 }
 
 void reset_game_cmd() {
@@ -792,8 +812,7 @@ void reset_game() {
 			int32_t cid = SMPPlayerInfo[i].cid;
 			if(cid != -1 && cid != SMPcid) {
 				//If not empty record nor myself
-				int32_t t = spawn_playable(SMPPlayerInfo[i].pid);
-				SMPPlayerInfo[i].playable_objid = t;
+				respawn_smp_player(i);
 			}
 		}
 	}
@@ -821,15 +840,6 @@ int32_t spawn_playable(int32_t pid) {
 		return 0;
 	}
 	return add_character(t.associatedtid, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, OBJID_INVALID);
-}
-
-void showstatus(const char* ctx, ...) {
-	va_list varg;
-	va_start(varg, ctx);
-	vsnprintf(StatusTextBuffer, BUFFER_SIZE, ctx, varg);
-	va_end(varg);
-	StatusTextBuffer[BUFFER_SIZE - 1] = 0; //For Additional Security
-	StatusShowTimer = ERROR_SHOW_TIMEOUT;
 }
 
 int32_t gameinit(char* fn) {
@@ -1034,13 +1044,13 @@ void keypress_handler(char kc, specialkey_t ks) {
 	if(CommandCursor == -1) {
 		//normal mode
 		switch(kc) {
-		case 't':
 		case 'T':
+		case 't':
 			//T
 			start_command_mode(0);
 			break;
-		case '/':
-			// slash
+		case ':':
+			//:
 			start_command_mode(1);
 			break;
 		case ' ':
@@ -1250,6 +1260,8 @@ void commit_menu() {
 	} else if(SelectingMenuItem == 1) {
 		//Instruction Manual
 		SelectingHelpPage = 0;
+	} else if(SelectingMenuItem == 8) {
+		EndlessMode = ~EndlessMode;
 	}
 }
 
