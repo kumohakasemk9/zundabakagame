@@ -100,7 +100,8 @@ typedef struct {
 	unsigned int basecount1 : 2;
 	unsigned int basecount2 : 2;
 	unsigned int basecount3 : 2;
-	uint16_t basedistance; //how close each enemy bases in one cluster
+	unsigned int endlessmode : 1; //endless mode
+	unsigned int basedistance : 15; //how close each enemy bases in one cluster
 	float atkgain; //attack damage gain of playable
 	uint8_t spawnlimit; //Spawn limit, playables can not respawn more than it.
 } PACKED ev_reset_t;

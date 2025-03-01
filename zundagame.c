@@ -10,13 +10,14 @@ Zundamon bakage powered by cairo, X11.
 Zundamon is from https://zunko.jp/
 (C) 2024 ＳＳＳ合同会社, (C) 2024 坂本アヒル https://twitter.com/sakamoto_ahr
 
-zundagame-x11.c: linux (and mac) entry point, X11 funcs.
+zundagame.c: linux (and mac) entry point, X11 funcs.
 
 TODO List
-restrict from changing difficulty parameter by non oped user when SMP
 add sync packet (stop sending server buffer -> sync -> upload map data -> sync -> all client download map data -> start sending buffer again)
 Make me ahri
 Enable CtrlV
+Enable IM
+Make sound
 */
 
 #include "inc/zundagame.h"
@@ -51,69 +52,14 @@ extern cairo_surface_t *Gsfc; //game screen
 int ConnectionSocket = -1;
 extern int32_t ProgramExiting;
 extern langid_t LangID;
+Atom UTF8_STRING, CLIPBOARD;
+extern int32_t CommandCursor;
 
+void clipboard_cb(XEvent);
 void redraw_win();
 void xwindowevent_handler(XEvent, Atom);
 void *thread_cb(void*);
-
-void redraw_win() {
-	game_paint();
-	//Apply game screen
-	cairo_set_source_surface(GS, Gsfc, 0, 0);
-	cairo_paint(GS);
-}
-
-//X11 window event catcher
-void xwindowevent_handler(XEvent ev, Atom wmdel) {
-	if(ev.type == ClientMessage && (Atom)ev.xclient.data.l[0] == wmdel) { //Alt+F4
-		ProgramExiting = 1;
-	} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
-		//Get key char andd sym
-		char r;
-		KeySym ks;
-		XLookupString(&ev.xkey, &r, sizeof(r), &ks, NULL);
-		
-		//translate XKeySym to original data
-		specialkey_t k = SPK_NONE;
-		if(ks == XK_Return || ks == XK_KP_Enter) {
-			k = SPK_ENTER;
-		} else if(ks == XK_BackSpace) {
-			k = SPK_BS;
-		} else if(ks == XK_Left) {
-			k = SPK_LEFT;
-		} else if(ks == XK_Right) {
-			k = SPK_RIGHT;
-		} else if(ks == XK_Escape) {
-			k = SPK_ESC;
-		} else if(ks == XK_F3) {
-			k = SPK_F3;
-		}
-		
-		//Pass it to wrapper
-		if(ev.type == KeyPress) {
-			keypress_handler(r, k);
-		} else {
-			keyrelease_handler(r);
-		}
-	} else if(ev.type == MotionNotify) { //Mouse move
-		mousemotion_handler( (int32_t)ev.xmotion.x, (int32_t)ev.xmotion.y);
-	} else if(ev.type == ButtonPress) { //Mouse button press or wheel
-		//translate
-		unsigned int b = ev.xbutton.button;
-		mousebutton_t t = MB_NONE;
-		if(b == Button1) {
-			t = MB_LEFT;
-		} else if(b == Button3) {
-			t = MB_RIGHT;
-		} else if(b == Button4) {
-			t = MB_UP;
-		} else if(b == Button5) {
-			t = MB_DOWN;
-		}
-		
-		mousepressed_handler(t);
-	}
-} 
+void start_clipboardpaste();
 
 int main(int argc, char *argv[]) {
 	char *fn = "credentials.txt";
@@ -141,6 +87,8 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	info("X11 opened.\n");
+	UTF8_STRING = XInternAtom(Disp, "UTF8_STRING", True);
+	CLIPBOARD = XInternAtom(Disp, "CLIPBOARD", False);
 	
 	//Create and show window
 	Window r = DefaultRootWindow(Disp);
@@ -204,6 +152,104 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
+
+void start_clipboardpaste() {
+	info("Clipboard paste start\n");
+	const Atom XSEL_DATA = XInternAtom(Disp, "XSEL_DATA", False);
+	XConvertSelection(Disp, CLIPBOARD, UTF8_STRING, XSEL_DATA, Win, CurrentTime);
+	XSync(Disp, 0);
+}
+
+void redraw_win() {
+	game_paint();
+	//Apply game screen
+	cairo_set_source_surface(GS, Gsfc, 0, 0);
+	cairo_paint(GS);
+}
+
+//X11 window event catcher
+void xwindowevent_handler(XEvent ev, Atom wmdel) {
+	if(ev.type == ClientMessage && (Atom)ev.xclient.data.l[0] == wmdel) { //Alt+F4
+		ProgramExiting = 1;
+	} else if(ev.type == KeyPress || ev.type == KeyRelease) { //Keyboard press or Key Release
+		//Get key char andd sym
+		char r;
+		KeySym ks;
+		XLookupString(&ev.xkey, &r, sizeof(r), &ks, NULL);
+		//printf("%02x\n", r);
+		//translate XKeySym to original data
+		specialkey_t k = SPK_NONE;
+		if(ks == XK_Left) {
+			k = SPK_LEFT;
+		} else if(ks == XK_Right) {
+			k = SPK_RIGHT;
+		} else if(ks == XK_Up) {
+			k = SPK_UP;
+		} else if(ks == XK_Down) {
+			k = SPK_DOWN;
+		} else if(ks == XK_F3) {
+			k = SPK_F3;
+		}
+		if(r == 0x16 && ev.type == KeyPress) {
+			start_clipboardpaste();
+		}
+		
+		//Pass it to wrapper
+		if(ev.type == KeyPress) {
+			keypress_handler(r, k);
+		} else {
+			keyrelease_handler(r);
+		}
+	} else if(ev.type == MotionNotify) { //Mouse move
+		mousemotion_handler( (int32_t)ev.xmotion.x, (int32_t)ev.xmotion.y);
+	} else if(ev.type == ButtonPress) { //Mouse button press or wheel
+		//translate
+		unsigned int b = ev.xbutton.button;
+		mousebutton_t t = MB_NONE;
+		if(b == Button1) {
+			t = MB_LEFT;
+		} else if(b == Button3) {
+			t = MB_RIGHT;
+		} else if(b == Button4) {
+			t = MB_UP;
+		} else if(b == Button5) {
+			t = MB_DOWN;
+		}
+		
+		mousepressed_handler(t);
+	} else if(ev.type == SelectionNotify && ev.xselection.selection == CLIPBOARD && ev.xselection.property != 0) {
+		clipboard_cb(ev);
+	}
+}
+
+void clipboard_cb(XEvent ev) {
+	Atom rettype;
+	const Atom XA_STRING = XInternAtom(Disp, "XA_STRING", False);
+	int retformat;
+	unsigned long retitemc, retremain;
+	char *retdata;
+	if(CommandCursor == -1) {
+		warn("Clipboard paste request denied.\n");
+		return;
+	}
+	//info("clipboard read handler\n");
+	if(XGetWindowProperty(Disp, Win, ev.xselection.property, 0, BUFFER_SIZE - 1, False, AnyPropertyType, &rettype, &retformat, &retitemc, &retremain, (unsigned char**)&retdata) == Success) {
+		//info("return format:%d, return item count:%d, return remain count: %d\n", retformat, retitemc, retremain);
+		if(rettype == UTF8_STRING || rettype == XA_STRING) {
+			char t[BUFFER_SIZE];
+			memcpy(t, retdata, retitemc);
+			t[retitemc] = 0;
+			insert_cmdbuf(t);
+			//info("clipboard: ");
+			//for(int32_t i = 0; i < retitemc; i++) {
+			//	info("%02x ", retdata[i] & 0xff);
+			//}
+			//info("\n");
+		}
+		XFree(retdata);
+	}
+}
+
 uint16_t host2network_fconv_16(int16_t d) {
 	return htons( (uint16_t)d);
 }
@@ -255,38 +301,9 @@ void *thread_cb(void* p) {
 			gametick();
 			tbefore = get_current_time_ms();
 		}
-		usleep(100);
+		usleep(10);
 	}
 }
-
-/*
-void clipboard_read_handler(GObject* obj, GAsyncResult* res, gpointer data) {
-	//Data type check
-	const GdkContentFormats* f = gdk_clipboard_get_formats(GClipBoard);
-	gsize i;
-	const GType* t = gdk_content_formats_get_gtypes(f, &i);
-	if(t == NULL) {
-		g_print("main.c: clipboard_read_handler(): gdk_content_formats_get_gtypes() failed.\n");
-		return;
-	}
-	if(i != 1 || t[0] != G_TYPE_STRING) {
-		g_print("main.c: clipboard_read_handler(): Data type missmatch.\n");
-		return;
-	}
-	//Get text and insert into CommandBuffer
-	char *cb = gdk_clipboard_read_text_finish(GClipBoard, res, NULL);
-	//g_print("Clipboard string size: %d\nCommandBuffer length: %d\n", l, (uint32_t)strlen(CommandBuffer));
-	CommandBufferMutex = TRUE;
-	if(utf8_insertstring(CommandBuffer, cb, CommandCursor, sizeof(CommandBuffer) ) == 0) {
-		CommandCursor += (int32_t)g_utf8_strlen(cb, 65535);
-	} else {
-		g_print("main.c: clipboard_read_handler(): insert failed.\n");
-	}
-	CommandBufferMutex = FALSE;
-	free(cb);
-}
-
-*/
 
 //Open and connect tcp socket to hostname and port
 int32_t make_tcp_socket(char* hostname, char* port) {

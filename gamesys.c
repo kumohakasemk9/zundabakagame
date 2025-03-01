@@ -624,7 +624,7 @@ void execcmd() {
 
 	} else {
 		if(CommandBuffer[0] == ':') {
-			set_cmdstatus(TEXT_BAD_COMMAND_PARAM);
+			errid = TEXT_BAD_COMMAND_PARAM;
 		} else {
 			if(SMPStatus == NETWORK_LOGGEDIN) {
 				stack_packet(EV_CHAT, CommandBuffer);

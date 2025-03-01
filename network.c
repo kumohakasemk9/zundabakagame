@@ -28,6 +28,7 @@ network.c: process network packets
 #include <stdarg.h>
 #include <errno.h>
 
+extern int32_t EndlessMode;
 extern int32_t PlayingCharacterID;
 extern int32_t CurrentPlayableID;
 extern GameObjs_t Gobjs[MAX_OBJECT_COUNT];
@@ -594,6 +595,7 @@ void stack_packet(event_type_t etype, ...) {
 			.evtype = etype,
 			.level_seed = host2network_fconv_32(rand() ),
 			.basedistance = host2network_fconv_16( (int16_t)DifEnemyBaseDist),
+			.endlessmode = EndlessMode,
 			.basecount0 = DifEnemyBaseCount[0],
 			.basecount1 = DifEnemyBaseCount[1],
 			.basecount2 = DifEnemyBaseCount[2],
@@ -906,8 +908,9 @@ int32_t evh_reset(uint8_t* eventbuffer, size_t eventoffset, int32_t cid) {
 	uint32_t _seed = (uint32_t)network2host_fconv_32(ev->level_seed);
 	int32_t basedistance = (int32_t)network2host_fconv_16(ev->basedistance);
 	double atkgain = (double)ev->atkgain;
-	int8_t spawnlimit = (int8_t)ev->spawnlimit;
-	info("evh_reset(): seed=%u spawnlimit=%d basedistance=%d atkgain=%lf BaseCount: %d, %d, %d, %d cid=%d\n", _seed, spawnlimit, basedistance, atkgain, ev->basecount0, ev->basecount1, ev->basecount2, ev->basecount3, cid);
+	int32_t spawnlimit = (int32_t)ev->spawnlimit;
+	int32_t em = (int32_t)ev->endlessmode;
+	info("evh_reset(): seed=%u spawnlimit=%d basedistance=%d atkgain=%lf BaseCount: %d, %d, %d, %d endless=%d cid=%d\n", _seed, spawnlimit, basedistance, atkgain, ev->basecount0, ev->basecount1, ev->basecount2, ev->basecount3, em, cid);
 
 	//Check paraneter
 	if(!is_range(basedistance, MIN_EBDIST, MAX_EBDIST) || !is_range_number(atkgain, MIN_ATKGAIN, MAX_ATKGAIN) || !is_range(spawnlimit, -1, MAX_SPAWN_COUNT) ) {
@@ -916,6 +919,7 @@ int32_t evh_reset(uint8_t* eventbuffer, size_t eventoffset, int32_t cid) {
 	} 
 
 	//Change map difficulty parameter and reset round
+	EndlessMode = em;
 	DifEnemyBaseDist = basedistance;
 	DifATKGain = atkgain;
 	DifEnemyBaseCount[0] = ev->basecount0;

@@ -484,7 +484,7 @@ void draw_cui() {
 	double yoff = WINDOW_HEIGHT - fh; //text area pos
 
 	//Show text background if command mode or there are message
-	if(CommandCursor != -1 || StatusShowTimer != 0) {
+	if(CommandCursor != -1 || (StatusShowTimer != 0 && is_range(StatusTextID, 0, MAX_STRINGS - 1) ) ) {
 		chcolor(COLOR_TEXTBG, 1); //White (70% transparent)
 		fillrect(0, yoff, WINDOW_WIDTH, fh + 2);
 		chcolor(COLOR_TEXTCMD, 1); //Green
