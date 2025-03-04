@@ -670,7 +670,7 @@ void damage_object(int32_t dstid, int32_t srcid) {
 				//printlog("Object %d is %s\n", killerid, EN_TID_NAMES[killertid]);
 			} else {
 				if(LangID == LANGID_JP) {
-					chatf("%s%sは%s%s", get_localized_charactername(Gobjs[dstid].tid), smpvictim, get_localized_deathreason(deathreasonid) );
+					chatf("%s%sは%s", get_localized_charactername(Gobjs[dstid].tid), smpvictim, get_localized_deathreason(deathreasonid) );
 				} else {
 					chatf("%s%s %s", get_localized_charactername(Gobjs[dstid].tid), smpvictim, get_localized_deathreason(deathreasonid) );
 				}
