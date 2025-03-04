@@ -529,16 +529,16 @@ void draw_cui() {
 			drawstring_title(120 + r, (char*)get_localized_titlestring(1), FONT_DEFAULT_SIZE);
 			
 		} else if(GameState == GAMESTATE_GAMEOVER) {
-			r = drawstring_title(100, (char*)get_localized_titlestring(2), 48);
-			drawstring_title(120 + r, (char*)get_localized_titlestring(3), FONT_DEFAULT_SIZE);
+			r = drawstring_title(100, (char*)get_localized_titlestring(4), 48);
+			drawstring_title(120 + r, (char*)get_localized_titlestring(5), FONT_DEFAULT_SIZE);
 			
 		} else if(GameState == GAMESTATE_GAMECLEAR) {
 			r = drawstring_title(100, (char*)get_localized_titlestring(6), 48);
 			drawstring_title(120 + r, (char*)get_localized_titlestring(7), FONT_DEFAULT_SIZE);
 			
 		} else if(GameState == GAMESTATE_DEAD) {
-			r = drawstring_title(100, (char*)get_localized_titlestring(4), 48);
-			drawstring_title(120 + r, (char*)get_localized_titlestring(5), FONT_DEFAULT_SIZE);
+			r = drawstring_title(100, (char*)get_localized_titlestring(2), 48);
+			drawstring_title(120 + r, (char*)get_localized_titlestring(3), FONT_DEFAULT_SIZE);
 			
 		}
 	}
