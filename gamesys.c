@@ -1266,15 +1266,22 @@ void commit_menu() {
 		GameState = GAMESTATE_INITROUND;
 		reset_game();
 	} else if(SelectingMenuItem == 1) {
+		//Switch language
+		if(LangID < MAX_LANG_ID) {
+			LangID++;
+		} else {
+			LangID = 0;
+		}
+	} else if(SelectingMenuItem == 2) {
 		//Instruction Manual
 		SelectingHelpPage = 0;
-	} else if(SelectingMenuItem == 8) {
+	} else if(SelectingMenuItem == 9) {
 		EndlessMode = ~EndlessMode;
 	}
 }
 
 void title_item_change(int amount) {
-	if(SelectingMenuItem == 2) {
+	if(SelectingMenuItem == 3) {
 		//Atkgain
 		double t = DifATKGain;
 		if(amount > 0) {
@@ -1283,7 +1290,7 @@ void title_item_change(int amount) {
 			t -= 0.1;
 		}
 		DifATKGain = constrain_number(t, MIN_ATKGAIN, MAX_ATKGAIN);
-	} else if(SelectingMenuItem == 3) {
+	} else if(SelectingMenuItem == 4) {
 		//EnemyBasesDistance
 		int32_t t = DifEnemyBaseDist;
 		if(amount > 0) {
@@ -1292,19 +1299,19 @@ void title_item_change(int amount) {
 			t -= 50;
 		}
 		DifEnemyBaseDist = constrain_i32(t, MIN_EBDIST, MAX_EBDIST);
-	} else if(4 <= SelectingMenuItem && SelectingMenuItem <= 6) {
+	} else if(5 <= SelectingMenuItem && SelectingMenuItem <= 7) {
 		//EnemyBaseCount 0 - 3
-		int32_t t = DifEnemyBaseCount[SelectingMenuItem - 4] + amount;
+		int32_t t = DifEnemyBaseCount[SelectingMenuItem - 5] + amount;
 		int32_t m = 0;
-		if(SelectingMenuItem == 4) {
+		if(SelectingMenuItem == 5) {
 			m = 1;
 		}
-		DifEnemyBaseCount[SelectingMenuItem - 4] = constrain_i32(t, m, MAX_EBCOUNT);
-	} else if(SelectingMenuItem == 7) {
+		DifEnemyBaseCount[SelectingMenuItem - 5] = constrain_i32(t, m, MAX_EBCOUNT);
+	} else if(SelectingMenuItem == 8) {
 		//Spawn limit
 		int32_t t = InitSpawnRemain + amount;
 		InitSpawnRemain = constrain_i32(t, -1, MAX_SPAWN_COUNT);
-	} else if(SelectingMenuItem == 8) {
+	} else if(SelectingMenuItem == 9) {
 		int32_t t = PlayableID + amount;
 		PlayableID = constrain_i32(t, 0, PLAYABLE_CHARACTERS_COUNT - 1);
 	}

@@ -20,7 +20,7 @@ zunda-defs.h: definitions
 #define MAX_STRINGS 26 // Max string count
 #define MAX_MENU_STRINGS 10 //Main menu string count
 #define MAX_DEATH_STRINGS 6 //Death reason strings count
-#define MAX_TITLE_STRINGS 8 //Title strings count (game status)
+#define MAX_TITLE_STRINGS 9 //Title strings count (game status)
 #define CHARACTER_TIMER_COUNT 4
 #define MAX_TID 24 //max type id
 #define PLAYABLE_CHARACTERS_COUNT 1 //Playable characters count
@@ -37,6 +37,7 @@ zunda-defs.h: definitions
 #define MAX_EBCOUNT 4 //Maxmium ebcount
 #define MAX_SPAWN_COUNT 20 //Maximum revival count
 #define MAX_ZINDEX 3 //Max z-index
+#define MAX_LANG_ID 1 //Max lang id
 
 //Sizes
 #define MAP_WIDTH 5000 //map max width

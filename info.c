@@ -65,6 +65,7 @@ const char *EN_STRINGS[MAX_STRINGS] = {
 //Menu strings
 const char *EN_MENU_STRINGS[MAX_MENU_STRINGS] = {
 	"Start operation",
+	"Switch language",
 	"View manual",
 	"Attack gain: ",
 	"Enemy bases distance: ",
@@ -78,6 +79,7 @@ const char *EN_MENU_STRINGS[MAX_MENU_STRINGS] = {
 
 const char *JP_MENU_STRINGS[MAX_MENU_STRINGS] = {
 	"作戦開始",
+	"Switch language",
 	"操作説明",
 	"攻撃力倍率: ",
 	"敵星間距離: ",

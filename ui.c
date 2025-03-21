@@ -364,25 +364,25 @@ void draw_title_screen() {
 
 		//Draw settings for setting item
 		char st[BUFFER_SIZE] = "";
-		if(i == 2) {
+		if(i == 3) {
 			snprintf(st, BUFFER_SIZE - 1, "%.3lf", DifATKGain);
-		} else if(i == 3) {
-			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseDist);
 		} else if(i == 4) {
-			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[0]);
+			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseDist);
 		} else if(i == 5) {
-			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[1]);
+			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[0]);
 		} else if(i == 6) {
-			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[2]);
+			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[1]);
 		} else if(i == 7) {
+			snprintf(st, BUFFER_SIZE - 1, "%d", DifEnemyBaseCount[2]);
+		} else if(i == 8) {
 			if(InitSpawnRemain == -1) {
 				strcpy(st, get_localized_string(3) ); //Infinity
 			} else {
 				snprintf(st, BUFFER_SIZE - 1, "%d", InitSpawnRemain);
 			}
-		} else if(i == 8) {
-			snprintf(st, BUFFER_SIZE - 1, "%s", (char*)get_localized_bool(EndlessMode) );
 		} else if(i == 9) {
+			snprintf(st, BUFFER_SIZE - 1, "%s", (char*)get_localized_bool(EndlessMode) );
+		} else if(i == 10) {
 			snprintf(st, BUFFER_SIZE - 1, "%d", PlayableID);
 		}
 		st[BUFFER_SIZE - 1] = 0;
