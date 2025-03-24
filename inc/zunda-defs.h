@@ -18,7 +18,7 @@ zunda-defs.h: definitions
 #define MAX_OBJECT_COUNT 1000 //Max object count
 #define BUFFER_SIZE 1024 //Command, message buffer size
 #define MAX_STRINGS 26 // Max string count
-#define MAX_MENU_STRINGS 10 //Main menu string count
+#define MAX_MENU_STRINGS 11 //Main menu string count
 #define MAX_DEATH_STRINGS 6 //Death reason strings count
 #define MAX_TITLE_STRINGS 9 //Title strings count (game status)
 #define CHARACTER_TIMER_COUNT 4
