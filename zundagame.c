@@ -61,6 +61,7 @@ void redraw_win();
 void xwindowevent_handler(XEvent, Atom);
 void *thread_cb(void*);
 void start_clipboardpaste();
+int32_t init_wiimote();
 
 int main(int argc, char *argv[]) {
 	char *fn = "credentials.txt";
@@ -90,6 +91,13 @@ int main(int argc, char *argv[]) {
 	info("X11 opened.\n");
 	UTF8_STRING = XInternAtom(Disp, "UTF8_STRING", True);
 	CLIPBOARD = XInternAtom(Disp, "CLIPBOARD", False);
+	
+	//Load External Module
+	
+	//Initialize wiimote if available
+	if(init_wiimote() != 0) {
+		fail("main(): Failed to initialize wiimote device. Wiimote feature will be disabled.\n");
+	}
 	
 	//Init IM
 	/*Xinputmet = XOpenIM(Disp, 0, 0, 0);
@@ -496,4 +504,83 @@ void detect_syslang() {
 			return;
 		}
 	}
+}
+
+//Initialize wiimote controller if available
+int32_t init_wiimote() {
+	FILE *f;
+	info("Initializing wiimote device\n");
+
+	// open /proc/bus/input/devices and search for wiimote input device
+	f = fopen("/proc/bus/input/devices", "r");
+	if(f == NULL) {
+		warn("init_wiimote(): Can not open /proc/bus/input/devices: %s\n", strerror(errno) );
+		return -1;
+	}
+
+	//Search for records that gives device file path for wiimote
+	char name[512];
+	char indev[128];
+	char accelin[512] = "";
+	char buttonin[512] = "";
+	while(1) {
+		char line[4096];
+		if(fgets(line, 4095, f) == NULL) { break; }
+		line[4095] = 0;
+
+		//Store Name
+		if(memcmp(line, "N: Name=", 8) == 0) {
+			strncpy(name, &line[8], 511);
+			name[511] = 0;
+
+		//Store Handlers
+		} else if(memcmp(line, "H: Handlers=", 12) == 0) {
+			strncpy(indev, &line[12], 127);
+			indev[127] = 0;
+
+		//Empty line will appear on end of record, inspect saved name and handler
+		} else if(strcmp(line, "\n") == 0) {
+			char evtf[512] = "";
+			if(name[0] != 0 && indev[0] != 0) {
+				//Search for string event (detect failed if string event* is not found)
+				//Try to cut string between "event" and 0x20
+				char *t = strstr(indev, "event");
+				if(t != NULL) {
+					char *u = strchr(t, ' ');
+					if(u != NULL) {
+						size_t l = u - t;
+						if(l > 511) {
+							l = 511;
+						}
+						memcpy(evtf, t, l);
+						evtf[l] = 0;
+						
+						//delete \n
+						char *v = strchr(name, '\n');
+						if(v != NULL) { *v = 0; }
+						printf("%s: %s\n", name, evtf);
+						if(strcmp(name, "\"Nintendo Wii Remote Accelerometer\"") == 0) {
+							strncpy(accelin, evtf, 512);
+						} else if(strcmp(name, "\"Nintendo Wii Remote\"") == 0) {
+							strncpy(buttonin, evtf, 512);
+						}
+					} else {
+						warn("init_wiimote(): No terminator\n");
+					}
+				} else {
+					warn("init_wiimote(): No event*\n");
+				}
+				name[0] = 0;
+				indev[0] = 0;
+			} else {
+				warn("init_wiimote(): Bad record in /proc/bus/input/devices\n");
+			}
+		}
+	}
+	fclose(f);
+	if(accelin[0] == 0 || button[0] == 0) {
+		warn("init_wiimote(): Could not find wiimote device.\n");
+		return -1;
+	}
+	return 0;
 }
