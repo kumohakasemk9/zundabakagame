@@ -48,7 +48,7 @@ typedef struct {
 	uint16_t type;
 	uint16_t code;
 	uint32_t val;
-} __attribute__((packed)) wiimote_button_indev;
+} __attribute__((packed)) evdev_evt;
 
 /* Wii Button Codes */
 #define WII_BTN_A 304
@@ -62,6 +62,10 @@ typedef struct {
 #define WII_BTN_DOWN 108
 #define WII_BTN_LEFT 105
 #define WII_BTN_RIGHT 106
+
+/* Wii Tilt Codes */
+#define WII_TILT_ROTATE 3
+#define WII_TILT_PITCH 4
 
 XIM Xinputmet;
 XIC Xinputctx = NULL;
@@ -77,6 +81,9 @@ Atom UTF8_STRING, CLIPBOARD;
 extern int32_t CommandCursor;
 int FHWiiMoteAcc = -1; //Wiimote accelerometer raw input
 int FHWiiMoteBtn = -1; //Wiimote button raw input
+int32_t WiiMoteRotate = 0; //WiiMoteAccelarationValue
+int32_t WiiMotePitch = 0; //WiiMoteAccelatationValue
+extern int32_t WiiMoteMoveMode; //1 if wiimote took control of character movement
 
 void clipboard_cb(XEvent);
 void redraw_win();
@@ -631,7 +638,10 @@ int32_t init_wiimote() {
 
 //Wiimote input, called every 10 ms
 void wiimote_input_process() {
-	if(FHWiiMoteAcc == -1 || FHWiiMoteBtn == -1) { return; }
+	if(FHWiiMoteAcc == -1 || FHWiiMoteBtn == -1) { return; } //If WiiMote is not opened, do nothing
+	
+	//Process button input
+	//Read event
 	static uint8_t buffer[24];
 	static size_t bufcnt = 0;
 	ssize_t r = read(FHWiiMoteBtn, &buffer[bufcnt], 24 - bufcnt);
@@ -646,17 +656,59 @@ void wiimote_input_process() {
 		}
 	} else {
 		bufcnt += (size_t)r;
+		
+		//Decode event
 		if(bufcnt >= 24) {
-			wiimote_button_indev *t = (wiimote_button_indev*)buffer;
+			evdev_evt *t = (evdev_evt*)buffer;
 			bufcnt = 0;
+			
 			if(t->type == 1 && t->val == 1) {
+				
 				//Button Push
-				if(t->code == WII_BTN_PLUS) {
+				if(t->code == WII_BTN_MINUS) {
+					//Switch item
 					keypress_handler('a', 0);
-				} else if(t->code == WII_BTN_MINUS) {
+					
+				} else if(t->code == WII_BTN_PLUS) {
+					
+					//Switch item
 					keypress_handler('s', 0);
 				} else if(t->code == WII_BTN_HOME) {
+					
+					//Use item
 					keypress_handler('d', 0);
+				} else if(t->code == WII_BTN_1) {
+					
+					//Q Skill
+					keypress_handler('q', 0);
+				} else if(t->code == WII_BTN_2) {
+					
+					//W Skill
+					keypress_handler('w', 0);
+				} else if(t->code == WII_BTN_B) {
+					
+					//E Skill
+					keypress_handler('e', 0);
+				} else if(t->code == WII_BTN_A) {
+					
+					//Toggle wiimote movement
+					if(WiiMoteMoveMode) {
+						info("Wiimote movement disabled\n");
+						WiiMoteMoveMode = 0;
+					} else {
+						info("Wiimote movement enabled\n");
+						WiiMoteMoveMode = 1;
+					}
+				}
+			} else if(t->type == 1 && t->val == 0) {
+				
+				//Button Release
+				if(t->code == WII_BTN_1) {
+					keyrelease_handler('q');
+				} else if(t->code == WII_BTN_2) {
+					keyrelease_handler('w');
+				} else if(t->code == WII_BTN_B) {
+					keyrelease_handler('e');
 				}
 			}
 			//info("Wiimote event occured. Type=%d, Code=%d Val=%d\n\n", t->type, t->code, t->val);
@@ -664,6 +716,38 @@ void wiimote_input_process() {
 			//	printf("%02x ", buffer[i]);
 			//}
 			//info("\n");
+		}
+	}
+	
+	//Process Accelerometer input
+	
+	//Read evdev
+	static uint8_t buffer2[24];
+	static size_t bufcnt2 = 0;
+	r = read(FHWiiMoteAcc, &buffer2[bufcnt2], 24 - bufcnt2);
+	if(r < 0) {
+		if(errno != EWOULDBLOCK && errno != EAGAIN) {
+			warn("wiimote_input_process(): %s\n", strerror(errno) );
+			close(FHWiiMoteAcc);
+			close(FHWiiMoteBtn);
+			FHWiiMoteAcc = -1;
+			FHWiiMoteBtn = -1;
+			return;
+		}
+	} else {
+		bufcnt2 += (size_t)r;
+		
+		//Decode Event
+		if(bufcnt2 >= 24) {
+			bufcnt2 = 0;
+			evdev_evt *t = (evdev_evt*)buffer2;
+			//info("Wiimote event occured. Type=%d, Code=%d Val=%d\n\n", t->type, t->code, t->val);
+			if(t->type == 3 && t->code == WII_TILT_ROTATE) {
+				WiiMoteRotate = (int32_t)t->val;
+			} else if(t->type == 3 && t->code == WII_TILT_PITCH) {
+				WiiMotePitch = (int32_t)t->val;
+			}
+			//info("WiiMote: %d %d\n", WiiMoteXTilt, WiiMoteYTilt);
 		}
 	}
 }

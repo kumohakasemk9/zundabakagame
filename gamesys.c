@@ -120,6 +120,13 @@ int32_t LocatorType = 0; //Game background type
 extern int32_t TitleSkillTimer;
 int32_t SelectingHelpPage;
 int32_t EndlessMode = 0; //Endless mode; no damaging earth and enemy base, unlimited skills, no respawn delay
+int32_t WiiMoteMoveMode = 0; //1 If character movement is controlled by wiimote
+
+#ifndef __WASM
+	//WiiRemoteAccelarometer Values
+	extern int32_t WiiMoteRotate;
+	extern int32_t WiiMotePitch;
+#endif
 
 //Translate window coordinate into map coordinate
 void local2map(double localx, double localy, double* mapx, double* mapy) {
@@ -271,27 +278,43 @@ void proc_playable_op() {
 		return;
 	}
 	
-	//Move Playable character
-	double tx = 0, ty = 0;
-	if(CharacterMove && GameState == GAMESTATE_PLAYING) {
-		//If CharacterMove == 1, and PLAYING state, playable character will follow mouse
-		//Set player move speed
-		double cx, cy;
+	//Move Playable character if game is in GAMESTATE_PLAYING
+	if(GameState == GAMESTATE_PLAYING) {
+		double tx = 0, ty = 0;
 		double playerspd = 1.0 + (MapTechnologyLevel * 0.5);
-		getlocalcoord(PlayingCharacterID, &cx, &cy);
-		double dx, dy;
-		dx = constrain_number(CursorX, cx - 100, cx + 100) - (cx - 100);
-		dy = constrain_number(CursorY, cy - 100, cy + 100) - (cy - 100);
-		//g_print("%f, %f, %f, %f\n", dx, dy, cx, cy);
-		tx = scale_number(dx, 200, playerspd * 2) - playerspd;
-		ty = playerspd - scale_number(dy, 200, playerspd * 2);
+		//If CharacterMove == 1, playable character will follow mouse
+		if(CharacterMove) {
+			//If game is not in wiimote operation mode, calc speed from mouse loc
+			//Set player move speed
+			double cx, cy;
+			
+			getlocalcoord(PlayingCharacterID, &cx, &cy);
+			double dx, dy;
+			dx = constrain_number(CursorX, cx - 100, cx + 100) - (cx - 100);
+			dy = constrain_number(CursorY, cy - 100, cy + 100) - (cy - 100);
+			//g_print("%f, %f, %f, %f\n", dx, dy, cx, cy);
+			tx = scale_number(dx, 200, playerspd * 2) - playerspd;
+			ty = playerspd - scale_number(dy, 200, playerspd * 2);
+			
+		//If WiiMoteMoveMouse == 1, move character according to wiimote tilting
+		} else if(WiiMoteMoveMode) {
+			
+			//This code isn't for WASM
+			#ifndef __WASM
+			
+				tx = scale_number(WiiMoteRotate, 40, playerspd);
+				ty = scale_number(WiiMotePitch, 40, playerspd);
+			
+			#endif
+		}
+		
+		Gobjs[PlayingCharacterID].sx = tx;
+		Gobjs[PlayingCharacterID].sy = ty;
+			if(SMPStatus == NETWORK_LOGGEDIN ) {
+				stack_packet(EV_PLAYABLE_LOCATION, Gobjs[PlayingCharacterID].x, Gobjs[PlayingCharacterID].y);
+		}
 	}
-	Gobjs[PlayingCharacterID].sx = tx;
-	Gobjs[PlayingCharacterID].sy = ty;
-	if(SMPStatus == NETWORK_LOGGEDIN ) {
-		stack_packet(EV_PLAYABLE_LOCATION, Gobjs[PlayingCharacterID].x, Gobjs[PlayingCharacterID].y);
-	}
-
+	
 	//Set camera location to display playable character in the center of display.
 	CameraX = (int32_t)constrain_number(Gobjs[PlayingCharacterID].x - (WINDOW_WIDTH / 2.0), 0, MAP_WIDTH - WINDOW_WIDTH);
 	CameraY = (int32_t)constrain_number(Gobjs[PlayingCharacterID].y - (WINDOW_HEIGHT / 2.0), 0, MAP_HEIGHT - WINDOW_HEIGHT);
