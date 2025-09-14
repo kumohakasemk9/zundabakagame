@@ -47,6 +47,9 @@ void vfail(const char*, va_list);
 void textinput_on_cb();
 void textinput_off_cb();
 void clipboard_readstart_cb();
+#ifndef __WASM
+	void wiimote_input_process();
+#endif
 
 //gamesys.c
 void gametick();

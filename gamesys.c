@@ -36,7 +36,7 @@ gamesys.c: game process and related functions
 #include <time.h>
 
 //gamesys.c
-void read_creds();
+void read_creds(char *fn);
 void local2map(double, double, double*, double*);
 void start_command_mode(int32_t);
 void switch_character_move();

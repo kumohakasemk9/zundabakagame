@@ -43,6 +43,26 @@ Make sound
 #include <errno.h>
 #include <string.h>
 
+typedef struct {
+	struct timeval tm;
+	uint16_t type;
+	uint16_t code;
+	uint32_t val;
+} __attribute__((packed)) wiimote_button_indev;
+
+/* Wii Button Codes */
+#define WII_BTN_A 304
+#define WII_BTN_B 305
+#define WII_BTN_PLUS 407
+#define WII_BTN_MINUS 412
+#define WII_BTN_HOME 316
+#define WII_BTN_1 257
+#define WII_BTN_2 258
+#define WII_BTN_UP 103
+#define WII_BTN_DOWN 108
+#define WII_BTN_LEFT 105
+#define WII_BTN_RIGHT 106
+
 XIM Xinputmet;
 XIC Xinputctx = NULL;
 Display *Disp = NULL; //XDisplay
@@ -55,6 +75,8 @@ extern int32_t ProgramExiting;
 extern langid_t LangID;
 Atom UTF8_STRING, CLIPBOARD;
 extern int32_t CommandCursor;
+int FHWiiMoteAcc = -1; //Wiimote accelerometer raw input
+int FHWiiMoteBtn = -1; //Wiimote button raw input
 
 void clipboard_cb(XEvent);
 void redraw_win();
@@ -96,7 +118,9 @@ int main(int argc, char *argv[]) {
 	
 	//Initialize wiimote if available
 	if(init_wiimote() != 0) {
-		fail("main(): Failed to initialize wiimote device. Wiimote feature will be disabled.\n");
+		warn("Failed to initialize wiimote device. Wiimote feature will be disabled.\n");
+	} else {
+		info("Wiimote device opened.\n");
 	}
 	
 	//Init IM
@@ -169,12 +193,15 @@ int main(int argc, char *argv[]) {
 				redraw_win();
 				tbefore = get_current_time_ms();
 			}
+			wiimote_input_process(); //Process wiimote
 			usleep(100);
 		}
 	}
 	
-	//Finalize
-	do_finalize();
+	do_finalize();//Finalize
+	
+	if(FHWiiMoteAcc != -1) { close(FHWiiMoteAcc); }
+	if(FHWiiMoteBtn != -1) { close(FHWiiMoteBtn); }
 	//XCloseIM(Xinputmet);
 	XDestroyWindow(Disp, Win);
 	XCloseDisplay(Disp);
@@ -548,11 +575,11 @@ int32_t init_wiimote() {
 				if(t != NULL) {
 					char *u = strchr(t, ' ');
 					if(u != NULL) {
-						size_t l = u - t;
+						ssize_t l = u - t;
 						if(l > 511) {
 							l = 511;
 						}
-						memcpy(evtf, t, l);
+						memcpy(evtf, t, (size_t)l);
 						evtf[l] = 0;
 						
 						//delete \n
@@ -578,9 +605,65 @@ int32_t init_wiimote() {
 		}
 	}
 	fclose(f);
-	if(accelin[0] == 0 || button[0] == 0) {
+	if(accelin[0] == 0 || buttonin[0] == 0) {
 		warn("init_wiimote(): Could not find wiimote device.\n");
 		return -1;
 	}
+	info("Opening wiimote device.\n");
+	char tf[512] = "/dev/input/";
+	strncat(tf, accelin, 511);
+	tf[511] = 0;
+	FHWiiMoteAcc = open(tf, O_NONBLOCK | O_RDONLY);
+	if(FHWiiMoteAcc == -1) {
+		warn("Can not open wiimote accelerometer input: %s\n", strerror(errno) );
+		return -1;
+	}
+	strncpy(tf, "/dev/input/", 511);
+	strncat(tf, buttonin, 511);
+	tf[511] = 0;
+	FHWiiMoteBtn = open(tf, O_NONBLOCK | O_RDONLY);
+	if(FHWiiMoteBtn == -1) {
+		warn("Can not open wiimote button input: %s\n", strerror(errno) );
+		return -1;
+	}
 	return 0;
+}
+
+//Wiimote input, called every 10 ms
+void wiimote_input_process() {
+	if(FHWiiMoteAcc == -1 || FHWiiMoteBtn == -1) { return; }
+	static uint8_t buffer[24];
+	static size_t bufcnt = 0;
+	ssize_t r = read(FHWiiMoteBtn, &buffer[bufcnt], 24 - bufcnt);
+	if(r < 0) {
+		if(errno != EWOULDBLOCK && errno != EAGAIN) {
+			warn("wiimote_input_process(): %s\n", strerror(errno) );
+			close(FHWiiMoteAcc);
+			close(FHWiiMoteBtn);
+			FHWiiMoteAcc = -1;
+			FHWiiMoteBtn = -1;
+			return;
+		}
+	} else {
+		bufcnt += (size_t)r;
+		if(bufcnt >= 24) {
+			wiimote_button_indev *t = (wiimote_button_indev*)buffer;
+			bufcnt = 0;
+			if(t->type == 1 && t->val == 1) {
+				//Button Push
+				if(t->code == WII_BTN_PLUS) {
+					keypress_handler('a', 0);
+				} else if(t->code == WII_BTN_MINUS) {
+					keypress_handler('s', 0);
+				} else if(t->code == WII_BTN_HOME) {
+					keypress_handler('d', 0);
+				}
+			}
+			//info("Wiimote event occured. Type=%d, Code=%d Val=%d\n\n", t->type, t->code, t->val);
+			//for(int i = 0; i < 24; i++) {
+			//	printf("%02x ", buffer[i]);
+			//}
+			//info("\n");
+		}
+	}
 }
