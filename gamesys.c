@@ -120,12 +120,14 @@ int32_t LocatorType = 0; //Game background type
 extern int32_t TitleSkillTimer;
 int32_t SelectingHelpPage;
 int32_t EndlessMode = 0; //Endless mode; no damaging earth and enemy base, unlimited skills, no respawn delay
-int32_t WiiMoteMoveMode = 0; //1 If character movement is controlled by wiimote
+
 
 #ifndef __WASM
 	//WiiRemoteAccelarometer Values
 	extern int32_t WiiMoteRotate;
 	extern int32_t WiiMotePitch;
+	int32_t WiiMoteAccelOn = 0; //1 If character movement is controlled by wiimote
+	extern keyflags_t WiiMoteArrowFlags;
 #endif
 
 //Translate window coordinate into map coordinate
@@ -297,16 +299,26 @@ void proc_playable_op() {
 			ty = playerspd - scale_number(dy, 200, playerspd * 2);
 			
 		//If WiiMoteMoveMouse == 1, move character according to wiimote tilting
-		} else if(WiiMoteMoveMode) {
-			
-			//This code isn't for WASM
-			#ifndef __WASM
-			
-				tx = scale_number(WiiMoteRotate, 40, playerspd);
-				ty = scale_number(WiiMotePitch, 40, playerspd);
-			
-			#endif
 		}
+		
+		//If wii mote accelarator is on (This code isn't for WASM)
+		#ifndef __WASM
+		if(WiiMoteAccelOn) {
+			tx = scale_number(WiiMoteRotate, 40, playerspd);
+			ty = scale_number(WiiMotePitch, 40, playerspd);
+		} else {
+			if(WiiMoteArrowFlags & KEY_UP) {
+				ty = playerspd;
+			} else if(WiiMoteArrowFlags & KEY_DOWN) {
+				ty = -playerspd;
+			}
+			if(WiiMoteArrowFlags & KEY_LEFT) {
+				tx = playerspd;
+			} else if(WiiMoteArrowFlags & KEY_RIGHT) {
+				tx = -playerspd;
+			}
+		}
+		#endif
 		
 		Gobjs[PlayingCharacterID].sx = tx;
 		Gobjs[PlayingCharacterID].sy = ty;

@@ -83,7 +83,8 @@ int FHWiiMoteAcc = -1; //Wiimote accelerometer raw input
 int FHWiiMoteBtn = -1; //Wiimote button raw input
 int32_t WiiMoteRotate = 0; //WiiMoteAccelarationValue
 int32_t WiiMotePitch = 0; //WiiMoteAccelatationValue
-extern int32_t WiiMoteMoveMode; //1 if wiimote took control of character movement
+extern int32_t WiiMoteAccelOn; //1 if wiimote took control of character movement
+keyflags_t WiiMoteArrowFlags = 0; //Wiimote arrow key flags
 
 void clipboard_cb(XEvent);
 void redraw_win();
@@ -673,7 +674,7 @@ void wiimote_input_process() {
 					
 					//Switch item
 					keypress_handler('s', 0);
-				} else if(t->code == WII_BTN_HOME) {
+				} else if(t->code == WII_BTN_A) {
 					
 					//Use item
 					keypress_handler('d', 0);
@@ -689,16 +690,24 @@ void wiimote_input_process() {
 					
 					//E Skill
 					keypress_handler('e', 0);
-				} else if(t->code == WII_BTN_A) {
+				} else if(t->code == WII_BTN_HOME) {
 					
 					//Toggle wiimote movement
-					if(WiiMoteMoveMode) {
-						info("Wiimote movement disabled\n");
-						WiiMoteMoveMode = 0;
+					if(WiiMoteAccelOn) {
+						info("Wiimote accelarometer disabled\n");
+						WiiMoteAccelOn = 0;
 					} else {
-						info("Wiimote movement enabled\n");
-						WiiMoteMoveMode = 1;
+						info("Wiimote accelerometer enabled\n");
+						WiiMoteAccelOn = 1;
 					}
+				} else if(t->code == WII_BTN_DOWN) {
+					WiiMoteArrowFlags |= KEY_LEFT;
+				} else if(t->code == WII_BTN_UP) {
+					WiiMoteArrowFlags |= KEY_RIGHT;
+				} else if(t->code == WII_BTN_LEFT) {
+					WiiMoteArrowFlags |= KEY_DOWN;
+				} else if(t->code == WII_BTN_RIGHT) {
+					WiiMoteArrowFlags |= KEY_UP;
 				}
 			} else if(t->type == 1 && t->val == 0) {
 				
@@ -709,6 +718,14 @@ void wiimote_input_process() {
 					keyrelease_handler('w');
 				} else if(t->code == WII_BTN_B) {
 					keyrelease_handler('e');
+				} else if(t->code == WII_BTN_DOWN) {
+					if(WiiMoteArrowFlags & KEY_LEFT) {WiiMoteArrowFlags -= KEY_LEFT; }
+				} else if(t->code == WII_BTN_UP) {
+					if(WiiMoteArrowFlags & KEY_RIGHT) {WiiMoteArrowFlags -= KEY_RIGHT; }
+				} else if(t->code == WII_BTN_LEFT) {
+					if(WiiMoteArrowFlags & KEY_DOWN) {WiiMoteArrowFlags -= KEY_DOWN; }
+				} else if(t->code == WII_BTN_RIGHT) {
+					if(WiiMoteArrowFlags & KEY_UP) {WiiMoteArrowFlags -= KEY_UP; }
 				}
 			}
 			//info("Wiimote event occured. Type=%d, Code=%d Val=%d\n\n", t->type, t->code, t->val);

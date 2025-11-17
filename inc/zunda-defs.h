@@ -32,7 +32,7 @@ zunda-defs.h: definitions
 //Parameter limits
 #define MAX_ATKGAIN 8.0 //Maxmium AtkGain
 #define MIN_ATKGAIN 0.1 //Minimum AtkGain
-#define MIN_EBDIST 100 //Minimum ebdist
+#define MIN_EBDIST 10 //Minimum ebdist
 #define MAX_EBDIST 600 //Maximum ebdist
 #define MAX_EBCOUNT 4 //Maxmium ebcount
 #define MAX_SPAWN_COUNT 20 //Maximum revival count
